@@ -31,4 +31,4 @@ function Reinstall-App {
 
 # Execution starts here
 Uninstall-App
-Reinstall-App
+#Reinstall-App
