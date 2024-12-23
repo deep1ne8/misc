@@ -31,14 +31,19 @@ function Start-AdvancedSystemCleanup {
     Write-Host "Initial free space: $initialFreeSpace GB" -ForegroundColor Cyan
 
     # Define cleanup locations with descriptions
+    $LoggedInUser = quser | ForEach-Object { ($_ -split '\s{2,}')[0].TrimStart('>', ' ') } | Where-Object { $_ -notmatch 'USERNAME' }
+    $LocalAppDataTempFolder = "$env:SystemDrive\Users\$LoggedInUser\appdata\local\Temp"
+    $LocalSoftwareDistributionFolder = "$env:SystemRoot\SoftwareDistribution"
+    $WindowsExplorerCacheFolder = "$env:SystemDrive\Users\$LoggedInUser\appdata\local\Microsoft\Windows\Explorer"
+    $LocalAppCrashDumpsFolder = "$env:SystemDrive\Users\$LoggedInUser\appdata\local\CrashDumps"
     $cleanupPaths = @(
         @{ Path = "$env:TEMP"; Description = "Temporary Files" },
         @{ Path = "$env:SystemRoot\Temp"; Description = "Windows Temp" },
-        @{ Path = "$env:LOCALAPPDATA\Temp"; Description = "Local App Temp" },
-        @{ Path = "$env:SystemRoot\SoftwareDistribution"; Description = "Windows Update Cache" },
-        @{ Path = "$env:LOCALAPPDATA\Microsoft\Windows\Explorer"; Description = "Explorer Cache" },
+        @{ Path = "$LocalAppDataTempFolder"; Description = "Local App Temp" },
+        @{ Path = "$LocalSoftwareDistributionFolder"; Description = "Windows Update Cache" },
+        @{ Path = "$WindowsExplorerCacheFolder"; Description = "Explorer Cache" },
         @{ Path = "$env:SystemRoot\Logs"; Description = "Windows Logs" },
-        @{ Path = "$env:LOCALAPPDATA\CrashDumps"; Description = "Crash Dumps" }
+        @{ Path = "$LocalAppCrashDumpsFolder"; Description = "Crash Dumps" }
     )
 
     # Track space cleaned
