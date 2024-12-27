@@ -1,9 +1,10 @@
 <#
 	This PowerShell script automates disk cleanup and system optimization with a menu-driven interface. 
-	It offers two modes:
+	It offers three modes:
 
 		Dry-Run Mode: Simulates cleanup actions without making changes.
 		Normal Mode: Executes the cleanup process.
+  		Large File Scanner: Scans for files larger then 1GB on the C: drive
 	
 	Features:
 		Menu Interface: User-friendly options to select the mode or exit.
@@ -11,6 +12,8 @@
 		Additional Tasks: Clears Recycle Bin, DNS cache, and performs a DISM cleanup.
 		Disk Space Reporting: Displays before-and-after disk space and space recovered.
 		Error Handling: Provides detailed error messages.
+  		Large Files Scanner: Scans for files larger then 1GB on the C: drive and outputs to terminal
+    		** Scanning can take a long time to complete **
 
 	Author: EDaniels
 	Date: 12/2024
