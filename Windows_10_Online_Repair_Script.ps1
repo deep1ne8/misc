@@ -23,8 +23,26 @@ function Download-Win10ISO {
         $DestinationDirectory
     )
 
-    $FidoCommand = Join-Path -Path $DestinationDirectory -ChildPath "Fido.ps1" -Resolve
-    $IsoPath = Join-Path -Path $DestinationDirectory -ChildPath "Win10_22H2_English_x64v1.iso" -Resolve
+# Check and create the directory if it doesn't exist
+$DestinationDirectory = "C:\WindowsSetup"
+if (-not (Test-Path -Path $DestinationDirectory)) {
+    mkdir -Path $DestinationDirectory | Out-Null
+}
+
+# Download the Fido
+Write-Host "Downloading Fido..."
+$FidoPath = Join-Path -Path $DestinationDirectory -ChildPath "Fido.ps1"
+Invoke-WebRequest -Uri "https://raw.githubusercontent.com/pbatard/Fido/refs/heads/master/Fido.ps1" -OutFile $FidoPath -Verbose
+
+# Verify the script exists in the destination directory
+Write-Host "Checking if Fido.ps1 exists in $DestinationDirectory..."
+if (Test-Path -Path (Join-Path -Path $DestinationDirectory -ChildPath "Fido.ps1")) {
+    Write-Host "Fido.ps1 is ready at $DestinationDirectory."
+} else {
+    Write-Error "Failed to locate Fido.ps1 in $DestinationDirectory."
+    exit 1
+} 
+    $IsoPath = Join-Path -Path $DestinationDirectory -ChildPath "Win10_22H2_English_x64v1.iso"
     if (-not (Test-Path $IsoPath)) {
         Write-Verbose -Message "Windows 10 ISO not found. Downloading..."
     }
@@ -55,40 +73,36 @@ function Repair-Windows {
 
 # Main script
 
+# Get disk space information
+$DestinationDirectory = "C:\WindowsSetup"
+Write-Verbose -Message "Getting disk space on C: drive"
+Get-DiskSpace
+
 # Load required modules
 Get-Module -Name Microsoft.PowerShell.Management -ErrorAction SilentlyContinue | Import-Module
 
 # Set strict mode
 Set-StrictMode -Version Latest
 
-# Define paths
-$DestinationDirectory = "C:\WindowsSetup"
-$IsoPath = Join-Path -Path $DestinationDirectory -ChildPath "Win10_22H2_English_x64v1.iso" -Resolve
-
 # Check if the operating system is Windows 10 version 22H2 (2009)
 $windowsVersion = (Get-ComputerInfo).OsVersion
 
 if ($windowsVersion -ne '10.0.19045') {
-    Write-Error -Message "This script is intended for Windows 10 version 22H2 (19045). Exiting..."
-    exit
+    Write-Host "The current Windows OS version is: $windowsVersion"
+    Write-Host "Windows 10 OS upgrade starting..."
+    Start-Sleep 3
+    Write-Host "Downloading Windows 10 22H2 iso...please be patient"
+    Start-Sleep 3
+    Download-Win10ISO
 }
 
-# Check if destination directory exists, if not create it
-if (-not (Test-Path -Path $DestinationDirectory)) {
-    New-Item -ItemType Directory -Path $DestinationDirectory | Out-Null
+Write-Host "Verifying if the iso file exists..."
+$IsoPath = Join-Path -Path $DestinationDirectory -ChildPath "Win10_22H2_English_x64v1.iso"
+if (-not(Test-Path -Path $IsoPath)) {
+    Write-Host "Windows 10 iso file not found, script exiting..."
+    exit 1
 }
 
-# Copy required files to the destination directory
-Write-Verbose -Message "Copying required files to the destination directory"
-Copy-Item -Path $EditorConfigFile -Destination $DestinationDirectory -Verbose -Force
-Copy-Item -Path $Fido -Destination $DestinationDirectory -Verbose -Force
-
-# Get disk space information
-Write-Verbose -Message "Getting disk space on C: drive"
-$DiskSpaceInfo = Get-DiskSpace -Path "C:\"
-$DiskSpaceInfo | Format-List
-
-Download-Win10ISO -DestinationDirectory $DestinationDirectory
 
 # Mount the ISO file
 $mountJob = Mount-DiskImage -ImagePath $IsoPath -PassThru -Verbose
