@@ -31,7 +31,28 @@ function Start-AdvancedSystemCleanup {
     Write-Host "Initial free space: $initialFreeSpace GB" -ForegroundColor Cyan
 
     # Define cleanup locations with descriptions
+    #$LoggedInUser = quser | ForEach-Object { ($_ -split '\s{2,}')[0].TrimStart('>', ' ') } | Where-Object { $_ -notmatch 'USERNAME' }
+    try {
+    # Try using 'quser'
     $LoggedInUser = quser | ForEach-Object { ($_ -split '\s{2,}')[0].TrimStart('>', ' ') } | Where-Object { $_ -notmatch 'USERNAME' }
+    	if (-not $LoggedInUser) {
+        	throw "No users found with quser."
+    	}
+    } catch {
+    # If 'quser' fails, fall back to 'Get-WmiObject'
+    $LoggedInUser = (Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty UserName)
+    	if (-not $LoggedInUser) {
+        	throw "Failed to retrieve logged-in user information."
+    	}
+    }
+
+   # Output the result
+   	if ($LoggedInUser) {
+    Write-Host "Logged-in User(s): $LoggedInUser"
+	} else {
+    Write-Host "No logged-in users found."
+    }
+    
     $LocalAppDataTempFolder = "$env:SystemDrive\Users\$LoggedInUser\appdata\local\Temp"
     $LocalSoftwareDistributionFolder = "$env:SystemRoot\SoftwareDistribution"
     $WindowsExplorerCacheFolder = "$env:SystemDrive\Users\$LoggedInUser\appdata\local\Microsoft\Windows\Explorer"
@@ -95,11 +116,11 @@ function Start-AdvancedSystemCleanup {
 
     if (-not $DryRun) {
         Write-Host "`nRecommendation: Please restart your computer to complete the cleanup process." -ForegroundColor Yellow
+    	}
     }
-}
 
 
-function Scan-LargeFiles {
+    function Scan-LargeFiles {
     param (
         [string]$Path = "C:\",
         [int]$MinSizeGB = 1
