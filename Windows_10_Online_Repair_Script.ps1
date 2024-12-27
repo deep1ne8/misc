@@ -20,7 +20,7 @@ function Download-Win10ISO {
     param (
         [Parameter(Mandatory=$true)]
         [string]
-        $DestinationDirectory
+        $DestinationDirectory = "C:\WindowsSetup"
     )
 
 # Check and create the directory if it doesn't exist
@@ -76,7 +76,7 @@ function Repair-Windows {
 # Get disk space information
 $DestinationDirectory = "C:\WindowsSetup"
 Write-Verbose -Message "Getting disk space on C: drive"
-Get-DiskSpace
+Get-DiskSpace -Path "C"
 
 # Load required modules
 Get-Module -Name Microsoft.PowerShell.Management -ErrorAction SilentlyContinue | Import-Module
@@ -93,7 +93,7 @@ if ($windowsVersion -ne '10.0.19045') {
     Start-Sleep 3
     Write-Host "Downloading Windows 10 22H2 iso...please be patient"
     Start-Sleep 3
-    Download-Win10ISO
+    Download-Win10ISO -
 }
 
 Write-Host "Verifying if the iso file exists..."
