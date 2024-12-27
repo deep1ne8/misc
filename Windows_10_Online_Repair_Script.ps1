@@ -1,13 +1,5 @@
 # Function to retrieve disk space information for the specified path
 function Get-DiskSpace {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory=$true, Position=0)]
-        [ValidateScript({Test-Path $_})]
-        [string]
-        $Path
-    )
-
     $diskSpace = Get-PSDrive -Name C | Select-Object Root,
         @{Name="Used(GB)"; Expression={[math]::Round(($_.Used / 1GB), 2)}},
         @{Name="Free(GB)"; Expression={[math]::Round(($_.Free / 1GB), 2)}}
@@ -47,7 +39,7 @@ if (Test-Path -Path (Join-Path -Path $DestinationDirectory -ChildPath "Fido.ps1"
         Write-Verbose -Message "Windows 10 ISO not found. Downloading..."
     }
     $userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-    &$FidoCommand -Win "10" -Rel "22H2" -Ed "Pro" -Lang "Eng" -Arch "x64" -UserAgent $userAgent
+    & $FidoPath -Win "10" -Rel "22H2" -Ed "Pro" -Lang "Eng" -Arch "x64" -UserAgent $userAgent
 }
 
 # Function to repair Windows using DISM
