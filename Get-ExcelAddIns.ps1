@@ -17,9 +17,31 @@ function Get-ExcelAddins {
     $username = $loggedUser
     }
 
-    # Get the logged-in user's SID using CIM
-    $GetloggedInUserSID = (Get-CimInstance -ClassName Win32_UserAccount -Filter "LocalAccount=True" | Where-Object { $_.Name -eq $env:USERNAME }).SID
-    $LoggedInUserSID = $GetloggedInUserSID
+
+    # Attempt to get the logged-in user's SID using CIM, fallback to WMI if it fails
+    try {
+    # Use CIM to retrieve the SID
+    $LoggedInUserSID = (Get-CimInstance -ClassName Win32_UserAccount -Filter "LocalAccount=True" | Where-Object { $_.Name -eq $env:USERNAME }).SID
+    if (-not $LoggedInUserSID) {
+        throw "CIM returned null SID."
+    }
+    Write-Output "SID retrieved using CIM: $LoggedInUserSID"
+    } catch {
+    Write-Output "CIM method failed. Attempting WMI..."
+    try {
+        # Fallback to WMI
+        $LoggedInUserSID = (Get-WmiObject -Class Win32_UserAccount -Filter "LocalAccount=True" | Where-Object { $_.Name -eq $env:USERNAME }).SID
+        if (-not $LoggedInUserSID) {
+            throw "WMI returned null SID."
+        }
+        Write-Output "SID retrieved using WMI: $LoggedInUserSID"
+    } catch {
+        # If both methods fail
+        Write-Output "Failed to retrieve SID using both CIM and WMI. Error: $_"
+        $LoggedInUserSID = $null
+        }
+    }
+
     $UserSID = $LoggedInUserSID
 
     # Log the user SID
