@@ -173,7 +173,7 @@ function Start-AdvancedSystemCleanup {
     }
 }
 
-Scan-LargeFilesWithRobocopy -SourcePath "C:\" -DestinationPath "D:\Temp"
+
 
 #Scan-LargeFiles -Path "C:\" -MinSizeGB 1
 
@@ -204,7 +204,7 @@ function Show-CleanupMenu {
         }
         "3" {
             Write-Host "`nRunning large file scanner..." -ForegroundColor Yellow
-            Scan-LargeFiles -Path "C:\" -MinSizeGB 1
+            Scan-LargeFilesWithRobocopy -SourcePath "C:\" -DestinationPath "D:\Temp"
             Show-ReturnMenu
         }
         "4" {
