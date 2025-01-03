@@ -111,6 +111,7 @@ function Start-AdvancedSystemCleanup {
     
     # Summary
     Write-Host "`nCleanup Summary:" -ForegroundColor Cyan
+    Write-Host "Logged-in User(s): $LoggedInUser" -ForegroundColor White
     Write-Host "Hostname: $(hostname)" -ForegroundColor Yellow
     Write-Host "Initial free space: $initialFreeSpace GB" -ForegroundColor White
     Write-Host "Final free space: $finalFreeSpace GB" -ForegroundColor White
