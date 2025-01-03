@@ -123,47 +123,57 @@ function Start-AdvancedSystemCleanup {
     }
 
 
-    function Scan-LargeFiles {
+    function Scan-LargeFilesWithRobocopy {
     param (
-        [string]$Path = "C:\",
-        [int]$MinSizeGB = 1
+        [string]$SourcePath = "C:\",               # Source directory to scan
+        [string]$DestinationPath = "D:\Temp",      # Destination directory (doesn't matter, we use /L for list mode)
+        [int64]$SizeThresholdBytes = 1073741824    # Size threshold in bytes (1GB)
     )
 
-    Write-Host "`nScanning for large files in $Path. Can take a long time to scan, be patient..." -ForegroundColor Yellow
-
     try {
-        $largeFiles = @()
-        $items = Get-ChildItem -Path $Path -Recurse -File -ErrorAction SilentlyContinue
-        $totalItems = $items.Count
-        $progressCounter = 0
+        Write-Host "`n"
+        Write-Host "Starting scan for files larger than $([math]::Round($SizeThresholdBytes / 1GB, 2)) GB in path: $SourcePath" -ForegroundColor Cyan
+        Write-Host "`n"
+        
+        # Run robocopy with /L to list files larger than the threshold
+        $robocopyCommand = "robocopy $SourcePath $DestinationPath /L /MIN:$SizeThresholdBytes"
+        $robocopyOutput = & cmd.exe /c $robocopyCommand
 
-        foreach ($item in $items) {
-            $progressCounter++
-            Write-Progress -Activity "Scanning files" -Status "Processing item $progressCounter of $totalItems" -PercentComplete (($progressCounter / $totalItems) * 100)
+        # Parse robocopy output to extract file paths and sizes
+        $robocopyOutput | ForEach-Object {
+            # Match lines that show "New File" with the file size (size will be the 3rd part)
+            if ($_ -match "\s+New\s+File\s+([0-9\.]+)\s+(g|m)\s+(.+)$") {
+                $fileSize = [double]$matches[1]
+                $fileUnit = $matches[2]
+                $filePath = $matches[3].Trim()
 
-            $sizeGB = [math]::Round($item.Length / 1GB, 2)
-            if ($sizeGB -ge $MinSizeGB) {
-                $largeFiles += [PSCustomObject]@{
-                    File = $item.FullName
-                    SizeGB = $sizeGB
+                # Convert size to bytes (if in GB, convert to bytes)
+                if ($fileUnit -eq "g") {
+                    $fileSizeBytes = $fileSize * 1GB
+                }
+                elseif ($fileUnit -eq "m") {
+                    $fileSizeBytes = $fileSize * 1MB
+                }
+
+                if ($fileSizeBytes -gt $SizeThresholdBytes) {
+                    # Display the full file path
+                    $fullPath = Join-Path -Path $SourcePath -ChildPath $filePath
+                    Write-Host "Large File Found: $fullPath - Size: $([math]::Round($fileSizeBytes / 1GB, 2)) GB" -ForegroundColor Yellow
+                    Write-Host "`n"
                 }
             }
         }
-
-        Write-Progress -Activity "Scanning files" -Status "Completed" -PercentComplete 100
-
-        if ($largeFiles.Count -gt 0) {
-            Write-Host "`nLarge files found:" -ForegroundColor Cyan
-            foreach ($file in $largeFiles) {
-                Write-Host "$($file.File) - $($file.SizeGB) GB" -ForegroundColor Green
-            }
-        } else {
-            Write-Host "No files larger than $MinSizeGB GB found in $Path." -ForegroundColor Cyan
-        }
-    } catch {
-        Write-Host "Error scanning for large files: $_" -ForegroundColor Red
+        
+        Write-Host "Scan completed." -ForegroundColor Green
+        Write-Host "`n"
+    }
+    catch {
+        Write-Host "Error occurred: $_" -ForegroundColor Red
+        Write-Host "`n"
     }
 }
+
+Scan-LargeFilesWithRobocopy -SourcePath "C:\" -DestinationPath "D:\Temp"
 
 #Scan-LargeFiles -Path "C:\" -MinSizeGB 1
 
