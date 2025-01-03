@@ -175,9 +175,6 @@ function Start-AdvancedSystemCleanup {
 
 
 
-#Scan-LargeFiles -Path "C:\" -MinSizeGB 1
-
-
 # Menu for Dry-Run
 function Show-CleanupMenu {
     cls
