@@ -180,20 +180,27 @@ $usersPath = "C:\Users"
 $daysOld = 90
 $totalSpace = 0
 
+# Exclude specific system or temporary directories
+$excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User")
+
 # Progress bar setup
-$totalProfiles = (Get-ChildItem -Path $usersPath -Directory).Count
+$userProfiles = Get-ChildItem -Path $usersPath -Directory | Where-Object { $_.Name -notin $excludeProfiles }
+$totalProfiles = $userProfiles.Count
 $currentProfile = 0
 
 # Enumerate user profiles
-foreach ($profile in Get-ChildItem -Path $usersPath -Directory) {
+foreach ($profile in $userProfiles) {
     $currentProfile++
     Write-Progress -Activity "Scanning Profiles" -Status "$($currentProfile)/$($totalProfiles) profiles scanned" -PercentComplete (($currentProfile / $totalProfiles) * 100)
     
     try {
-        $lastWriteTime = (Get-Item $profile.FullName).LastWriteTime
+        # Verify the path and sanitize if necessary
+        $sanitizedPath = [System.IO.Path]::GetFullPath($profile.FullName)
+        $lastWriteTime = (Get-Item $sanitizedPath).LastWriteTime
+        
         if ((Get-Date).AddDays(-$daysOld) -gt $lastWriteTime) {
-            $profilePath = "\\?\$($profile.FullName)" # Add long path prefix
-            $profileSize = (Get-ChildItem -Path $profilePath -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+            $longPath = "\\?\$sanitizedPath" # Add long path prefix
+            $profileSize = (Get-ChildItem -Path $longPath -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
             $totalSpace += $profileSize
         }
     } catch {
@@ -205,6 +212,7 @@ foreach ($profile in Get-ChildItem -Path $usersPath -Directory) {
 $totalSpaceGB = [math]::Round($totalSpace / 1GB, 2)
 Write-Host "`nTotal Space Used by Profiles Older Than $daysOld Days: $totalSpaceGB GB" -ForegroundColor Green
 }
+
 
 # Menu for Dry-Run
 function Show-CleanupMenu {
