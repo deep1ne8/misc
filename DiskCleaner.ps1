@@ -174,6 +174,51 @@ function Start-AdvancedSystemCleanup {
     }
 }
 
+function LIstUserProfiles {
+# Parameters
+$usersPath = "C:\Users"
+$daysOld = 90
+$profileInfo = @()
+$totalSpace = 0
+
+# Progress bar setup
+$totalProfiles = (Get-ChildItem -Path $usersPath -Directory).Count
+$currentProfile = 0
+
+# Enumerate user profiles
+foreach ($profile in Get-ChildItem -Path $usersPath -Directory) {
+    $currentProfile++
+    Write-Progress -Activity "Scanning Profiles" -Status "$($currentProfile)/$($totalProfiles) profiles scanned" -PercentComplete (($currentProfile / $totalProfiles) * 100)
+    
+    try {
+        $lastWriteTime = (Get-Item $profile.FullName).LastWriteTime
+        if ((Get-Date).AddDays(-$daysOld) -gt $lastWriteTime) {
+            $profileSize = (Get-ChildItem -Path $profile.FullName -Recurse -Force | Measure-Object -Property Length -Sum).Sum
+            $profileSizeMB = [math]::Round($profileSize / 1MB, 2)
+            $totalSpace += $profileSize
+            $profileInfo += [PSCustomObject]@{
+                ProfileName = $profile.Name
+                LastAccessed = $lastWriteTime
+                SizeMB = $profileSizeMB
+            }
+        }
+    } catch {
+        Write-Host "Error processing $($profile.FullName): $_" -ForegroundColor Red
+    }
+}
+
+# Display results
+if ($profileInfo.Count -gt 0) {
+    Write-Host "`nProfiles older than $daysOld days:" -ForegroundColor Yellow
+    $profileInfo | Format-Table -AutoSize
+    $totalSpaceMB = [math]::Round($totalSpace / 1MB, 2)
+    Write-Host "`nTotal Space Used: $totalSpaceMB MB" -ForegroundColor Green
+	} else {
+    Write-Host "`nNo profiles older than $daysOld days found." -ForegroundColor Green
+	}
+
+}
+
 
 
 # Menu for Dry-Run
@@ -185,7 +230,8 @@ function Show-CleanupMenu {
     Write-Host "1. Run Cleanup in Dry-Run Mode"
     Write-Host "2. Run Cleanup Normally"
     Write-Host "3. Run Large File Scanner"
-    Write-Host "4. Exit"
+    Write-Host "4. Run Large User Profiles scanner"
+    Write-Host "5. Exit"
     Write-Host ""
 
     $choice = Read-Host "Enter your choice (1-4)"
@@ -206,9 +252,15 @@ function Show-CleanupMenu {
             Show-ReturnMenu
         }
         "4" {
-            Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
-            return
+            Write-Host "`nRunning large user profile scanner..." -ForegroundColor Yellow
+            LIstUserProfiles
+	    Show-ReturnMenu
         }
+	"5" {
+ 	    Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
+      	    return
+	    Show-ReturnMenu
+	}
         default {
             Write-Host "Invalid choice, please try again." -ForegroundColor Red
             Show-ReturnMenu
