@@ -178,7 +178,6 @@ function LIstUserProfiles {
 # Parameters
 $usersPath = "C:\Users"
 $daysOld = 90
-$profileInfo = @()
 $totalSpace = 0
 
 # Progress bar setup
@@ -193,33 +192,19 @@ foreach ($profile in Get-ChildItem -Path $usersPath -Directory) {
     try {
         $lastWriteTime = (Get-Item $profile.FullName).LastWriteTime
         if ((Get-Date).AddDays(-$daysOld) -gt $lastWriteTime) {
-            $profileSize = (Get-ChildItem -Path $profile.FullName -Recurse -Force | Measure-Object -Property Length -Sum).Sum
-            $profileSizeMB = [math]::Round($profileSize / 1MB, 2)
+            $profilePath = "\\?\$($profile.FullName)" # Add long path prefix
+            $profileSize = (Get-ChildItem -Path $profilePath -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
             $totalSpace += $profileSize
-            $profileInfo += [PSCustomObject]@{
-                ProfileName = $profile.Name
-                LastAccessed = $lastWriteTime
-                SizeMB = $profileSizeMB
-            }
         }
     } catch {
         Write-Host "Error processing $($profile.FullName): $_" -ForegroundColor Red
     }
 }
 
-# Display results
-if ($profileInfo.Count -gt 0) {
-    Write-Host "`nProfiles older than $daysOld days:" -ForegroundColor Yellow
-    $profileInfo | Format-Table -AutoSize
-    $totalSpaceMB = [math]::Round($totalSpace / 1MB, 2)
-    Write-Host "`nTotal Space Used: $totalSpaceMB MB" -ForegroundColor Green
-	} else {
-    Write-Host "`nNo profiles older than $daysOld days found." -ForegroundColor Green
-	}
-
+# Convert total space to GB and display
+$totalSpaceGB = [math]::Round($totalSpace / 1GB, 2)
+Write-Host "`nTotal Space Used by Profiles Older Than $daysOld Days: $totalSpaceGB GB" -ForegroundColor Green
 }
-
-
 
 # Menu for Dry-Run
 function Show-CleanupMenu {
