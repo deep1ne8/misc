@@ -31,7 +31,7 @@ function Uninstall-App {
             $app.Uninstall() | Out-Null
             Write-Host "$AppName uninstalled successfully."
         } catch {
-            Write-Host "Failed to uninstall $AppName: $_"
+            Write-Host "Failed to uninstall ${AppName}: $_"
         }
     } else {
         Write-Host "$AppName not found or already uninstalled."
