@@ -174,44 +174,48 @@ function Start-AdvancedSystemCleanup {
     }
 }
 
-function LIstUserProfiles {
-# Parameters
-$usersPath = "C:\Users"
-$daysOld = 90
-$totalSpace = 0
+function ListUserProfiles {
+    # Parameters
+    $usersPath = "C:\Users"
+    $daysOld = 90
+    $totalSpace = 0
 
-# Exclude specific system or temporary directories
-$excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User")
+    # Exclude specific directories
+    $excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User", "DefaultAppPool", "zorin", "jenkins", "HvmService")
 
-# Progress bar setup
-$userProfiles = Get-ChildItem -Path $usersPath -Directory | Where-Object { $_.Name -notin $excludeProfiles }
-$totalProfiles = $userProfiles.Count
-$currentProfile = 0
-
-# Enumerate user profiles
-foreach ($profile in $userProfiles) {
-    $currentProfile++
-    Write-Progress -Activity "Scanning Profiles" -Status "$($currentProfile)/$($totalProfiles) profiles scanned" -PercentComplete (($currentProfile / $totalProfiles) * 100)
-    
-    try {
-        # Verify the path and sanitize if necessary
-        $sanitizedPath = [System.IO.Path]::GetFullPath($profile.FullName)
-        $lastWriteTime = (Get-Item $sanitizedPath).LastWriteTime
-        
-        if ((Get-Date).AddDays(-$daysOld) -gt $lastWriteTime) {
-            $longPath = "\\?\$sanitizedPath" # Add long path prefix
-            $profileSize = (Get-ChildItem -Path $longPath -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
-            $totalSpace += $profileSize
-        }
-    } catch {
-        Write-Host "Error processing $($profile.FullName): $_" -ForegroundColor Red
+    # Progress bar setup
+    $userProfiles = Get-ChildItem -Path $usersPath -Directory | Where-Object {
+        ($_.Attributes -notmatch 'Hidden|System') -and
+        $_.Name -notin $excludeProfiles
     }
+    $totalProfiles = $userProfiles.Count
+    $currentProfile = 0
+
+    # Enumerate user profiles
+    foreach ($profile in $userProfiles) {
+        $currentProfile++
+        Write-Progress -Activity "Scanning Profiles" -Status "$($currentProfile)/$($totalProfiles) profiles scanned" -PercentComplete (($currentProfile / $totalProfiles) * 100)
+        
+        try {
+            $lastWriteTime = (Get-Item $profile.FullName).LastWriteTime
+            $profileSize = (Get-ChildItem -Path $profile.FullName -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
+
+            if ($profileSize -eq 0 -or (Get-Date).AddDays(-$daysOld) -lt $lastWriteTime) {
+                Write-Host "Skipping $($profile.Name): Recently used or empty" -ForegroundColor Yellow
+                continue
+            }
+
+            $totalSpace += $profileSize
+        } catch {
+            Write-Host "Error processing $($profile.FullName): $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+
+    # Convert total space to GB and display
+    $totalSpaceGB = [math]::Round($totalSpace / 1GB, 2)
+    Write-Host "`nTotal Space Used by Profiles Older Than $daysOld Days: $totalSpaceGB GB" -ForegroundColor Green
 }
 
-# Convert total space to GB and display
-$totalSpaceGB = [math]::Round($totalSpace / 1GB, 2)
-Write-Host "`nTotal Space Used by Profiles Older Than $daysOld Days: $totalSpaceGB GB" -ForegroundColor Green
-}
 
 
 # Menu for Dry-Run
@@ -246,7 +250,7 @@ function Show-CleanupMenu {
         }
         "4" {
             Write-Host "`nRunning large user profile scanner..." -ForegroundColor Yellow
-            LIstUserProfiles
+            ListUserProfiles
 	    Show-ReturnMenu
         }
 	"5" {
