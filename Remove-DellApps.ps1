@@ -1,37 +1,44 @@
-# List of applications to uninstall
-$appsToRemove = @(
-    "Dell SupportAssist",
-    "Dell SupportAssist OS Recovery Plugin for Dell Update",
-    "Dell SupportAssist Remediation"
+# Define application details
+$applications = @(
+    @{
+        Name = "Dell SupportAssist"
+        Version = ""
+    },
+    @{
+        Name = "Dell SupportAssist OS Recovery Plugin for Dell Update"
+        Version = ""
+    },
+    @{
+        Name = "Dell SupportAssist Remediation"
+        Version = ""
+    }
 )
 
-# Registry paths for installed applications
-$registryPaths = @(
-    "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
-    "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-)
-
-foreach ($app in $appsToRemove) {
-    $appFound = $false
-    foreach ($path in $registryPaths) {
-        # Search for the application in the registry
-        $uninstallKey = Get-ChildItem -Path $path | ForEach-Object {
-            Get-ItemProperty -Path $_.PSPath | Where-Object { $_.DisplayName -eq $app }
-        }
-
-        if ($uninstallKey) {
-            $appFound = $true
-            Write-Host "Uninstalling $($uninstallKey.DisplayName)..." -ForegroundColor Yellow
-            try {
-                Start-Process -FilePath $uninstallKey.UninstallString -ArgumentList "/quiet" -Wait
-                Write-Host "$($uninstallKey.DisplayName) uninstalled successfully." -ForegroundColor Green
-            } catch {
-                Write-Host "Failed to uninstall $($uninstallKey.DisplayName): $_" -ForegroundColor Red
-            }
-        }
+# Function to uninstall the application
+function Uninstall-App {
+    param (
+        [string]$AppName,
+        [string]$AppVersion
+    )
+    Write-Host "Attempting to uninstall $AppName..."
+    $app = Get-WmiObject -Class Win32_Product | Where-Object {
+        $_.Name -eq $AppName -and ($AppVersion -eq "" -or $_.Version -eq $AppVersion)
     }
 
-    if (-not $appFound) {
-        Write-Host "$app not found in the registry." -ForegroundColor Cyan
+    if ($app) {
+        Write-Host "Uninstalling $AppName..."
+        try {
+            $app.Uninstall() | Out-Null
+            Write-Host "$AppName uninstalled successfully."
+        } catch {
+            Write-Host "Failed to uninstall $AppName: $_"
+        }
+    } else {
+        Write-Host "$AppName not found or already uninstalled."
     }
+}
+
+# Execution starts here
+foreach ($application in $applications) {
+    Uninstall-App -AppName $application.Name -AppVersion $application.Version
 }
