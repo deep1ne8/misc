@@ -5,6 +5,8 @@
 		Dry-Run Mode: Simulates cleanup actions without making changes.
 		Normal Mode: Executes the cleanup process.
   		Large File Scanner: Scans for files larger then 1GB on the C: drive
+    		User Profile Scanner
+      		Dell bloatware remover
 	
 	Features:
 		Menu Interface: User-friendly options to select the mode or exit.
@@ -13,7 +15,8 @@
 		Disk Space Reporting: Displays before-and-after disk space and space recovered.
 		Error Handling: Provides detailed error messages.
   		Large Files Scanner: Scans for files larger then 1GB on the C: drive and outputs to terminal
-    		** Scanning can take a long time to complete **
+    		Scans for user profiles older then 90 days, and their disk space consumed
+      		Remove Dell Support Assist, Remediation and OS Recovery plugin bloatware
 
 	Author: EDaniels
 	Date: 12/2024
@@ -290,7 +293,7 @@ function Show-CleanupMenu {
 	    Show-ReturnMenu
         }
 	"5" {
- 	    Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
+ 	    Write-Host "`Running Dell bloatware remover..." -ForegroundColor Yellow
       	    CheckAndUninstallDellApps
 	    Show-ReturnMenu
 	}
