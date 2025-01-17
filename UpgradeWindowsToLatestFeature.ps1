@@ -44,6 +44,8 @@ if ($Choice -eq "manual") {
 }
 
 # Ensure the setup directory exists
+Set-ExecutionPolicy UnRestricted LocalMachine -Force -Confirm:$false
+
 if (!(Test-Path "C:\WindowsSetup")) {
     Log-Verbose "Creating setup directory at C:\WindowsSetup."
     New-Item -ItemType Directory -Path "C:\WindowsSetup" | Out-Null
