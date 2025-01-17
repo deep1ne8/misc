@@ -69,37 +69,50 @@ if (!(Test-Path $DownloadPath)) {
     $URI = & C:\WindowsSetup\Fido.ps1 -Win $Version -Rel $Release -Arch x64 -Ed Pro -Lang English -GetUrl -Headers @{
     'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
-    if (-not $URI) {
-        Log-Verbose "Failed to retrieve download URL for Windows $Version $Release."
-        Write-Host "Failed to retrieve download URL. Exiting." -ForegroundColor Red
-        exit 1
-    }
-
-    # Start the BITS transfer
-    Log-Verbose "Initiating BITS transfer for Windows $Version $Release."
-    $BitsTransfer = Start-BitsTransfer -Source $URI -Destination $DownloadPath -Asynchronous -Priority Foreground -Verbose
-
-    # Wait for the download to complete
-    Do {
-        $BitsStatus = Get-BitsTransfer $BitsTransfer.JobId
-        if ($BitsStatus.JobState -ne "Transferred") {
-            Log-Verbose "BITS transfer in progress. Current state: $($BitsStatus.JobState)"
-            Start-Sleep 5
-        } else {
-            Log-Verbose "BITS transfer completed successfully."
-            Complete-BitsTransfer -BitsTransfer $BitsTransfer
-        }
-    } While ($BitsStatus.JobState -ne "Transferred")
-
-    # Verify ISO file exists after download
-    if (!(Test-Path $DownloadPath)) {
-        Log-Verbose "ISO file not found after download. Exiting."
-        Write-Host "ISO file download failed. Exiting." -ForegroundColor Red
-        exit 1
-    }
-} else {
-    Log-Verbose "ISO file already exists at $DownloadPath. Skipping download."
+# Validate the URL
+if (-not $URI -or $URI -notmatch "^https?://") {
+    Write-Host "Failed to retrieve a valid download URL. Exiting." -ForegroundColor Red
+    exit 1
 }
+
+Write-Host "Download URL successfully retrieved: $URI" -ForegroundColor Green
+
+# Define the download path
+$DownloadPath = "C:\WindowsSetup\Win_10_22H2_English_x64.iso"
+
+# Start the BITS transfer to download the file
+Write-Host "Starting BITS transfer for download..."
+try {
+    $BitsJob = Start-BitsTransfer -Source $URI -Destination $DownloadPath -Asynchronous -Priority Foreground -Verbose
+
+    # Monitor the download progress
+    Do {
+        $BitsStatus = Get-BitsTransfer -JobId $BitsJob.JobId
+        $JobState = $BitsStatus.JobState
+        $Progress = $BitsStatus.BytesTransferred / $BitsStatus.BytesTotal * 100
+
+        # Show progress and status
+        Write-Host "BITS Transfer State: $JobState, Progress: $([math]::Round($Progress, 2))%" -ForegroundColor Yellow
+        
+        # Wait before checking again
+        Start-Sleep -Seconds 5
+    } While ($JobState -ne "Transferred")
+
+    # Complete the BITS transfer
+    Complete-BitsTransfer -BitsTransfer $BitsJob
+    Write-Host "BITS transfer completed successfully." -ForegroundColor Green
+} catch {
+    Write-Host "Error during BITS transfer: $_" -ForegroundColor Red
+    exit 1
+}
+
+# Verify the file exists after download
+if (!(Test-Path $DownloadPath)) {
+    Write-Host "Download failed. ISO file not found at $DownloadPath." -ForegroundColor Red
+    exit 1
+}
+
+Write-Host "File downloaded and verified: $DownloadPath" -ForegroundColor Green
 
 # Mount the ISO and extract setup files
 try {
