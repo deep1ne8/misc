@@ -16,7 +16,7 @@
 		Error Handling: Provides detailed error messages.
   		Large Files Scanner: Scans for files larger then 1GB on the C: drive and outputs to terminal
     		Scans for user profiles older then 90 days, and their disk space consumed
-      		Remove Dell Support Assist, Remediation and OS Recovery plugin bloatware
+      		Removes Dell Support Assist, Remediation and OS Recovery plugin bloatware
 
 	Author: EDaniels
 	Date: 12/2024
