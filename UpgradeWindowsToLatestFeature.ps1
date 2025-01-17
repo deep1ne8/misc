@@ -53,15 +53,17 @@ if (!(Test-Path "C:\WindowsSetup")) {
 
 # Define file paths and URI
 $DownloadPath = "C:\WindowsSetup\Win_${Version}_${Release}_English_x64v1.iso"
+$DownloadFido = Invoke-WebRequest -Uri "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Fido.ps1" -OutFile "C:\WindowsSetup\Fido.ps1" -Verbose -UseBasicParsing
 if (!(Test-Path .\Fido.ps1)) {
     Write-Host "Fido.ps1 is not found in the current directory." -ForegroundColor Red
-    exit 1
+    Write-Host "Downloading Fido..."
+    $DownloadFido
 }
 
 # Check if the ISO file already exists
 if (!(Test-Path $DownloadPath)) {
     Log-Verbose "ISO not found at $DownloadPath. Starting download..."
-    $URI = .\Fido.ps1 -Win $Version -Rel $Release -Arch x64 -Ed Pro -Lang English -GetUrl -Headers @{
+    $URI = & .\Fido.ps1 -Win $Version -Rel $Release -Arch x64 -Ed Pro -Lang English -GetUrl -Headers @{
     'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
 
     if (-not $URI) {
