@@ -181,7 +181,7 @@ function ListUserProfiles {
     $totalSpace = 0
 
     # Exclude specific directories
-    $excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User", "DefaultAppPool", "zorin", "jenkins", "HvmService")
+    $excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User", "DefaultAppPool", "HvmService")
 
     # Progress bar setup
     $userProfiles = Get-ChildItem -Path $usersPath -Directory | Where-Object {
@@ -190,6 +190,9 @@ function ListUserProfiles {
     }
     $totalProfiles = $userProfiles.Count
     $currentProfile = 0
+
+    # Create an array to store results
+    $results = @()
 
     # Enumerate user profiles
     foreach ($profile in $userProfiles) {
@@ -200,21 +203,36 @@ function ListUserProfiles {
             $lastWriteTime = (Get-Item $profile.FullName).LastWriteTime
             $profileSize = (Get-ChildItem -Path $profile.FullName -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
 
-            if ($profileSize -eq 0 -or (Get-Date).AddDays(-$daysOld) -lt $lastWriteTime) {
+            # Check if profile is older than 90 days
+            if ((Get-Date).AddDays(-$daysOld) -gt $lastWriteTime -and $profileSize -gt 0) {
+                $profileSizeGB = [math]::Round($profileSize / 1GB, 2)
+                $results += [PSCustomObject]@{
+                    ProfileName = $profile.Name
+                    LastUsed    = $lastWriteTime
+                    SpaceUsedGB = $profileSizeGB
+                }
+                $totalSpace += $profileSize
+            } else {
                 Write-Host "Skipping $($profile.Name): Recently used or empty" -ForegroundColor Yellow
-                continue
             }
-
-            $totalSpace += $profileSize
         } catch {
             Write-Host "Error processing $($profile.FullName): $($_.Exception.Message)" -ForegroundColor Red
         }
+    }
+
+    # Display results
+    if ($results.Count -gt 0) {
+        Write-Host "`nProfiles older than $daysOld days:" -ForegroundColor Cyan
+        $results | Format-Table -AutoSize
+    } else {
+        Write-Host "`nNo profiles older than $daysOld days found." -ForegroundColor Yellow
     }
 
     # Convert total space to GB and display
     $totalSpaceGB = [math]::Round($totalSpace / 1GB, 2)
     Write-Host "`nTotal Space Used by Profiles Older Than $daysOld Days: $totalSpaceGB GB" -ForegroundColor Green
 }
+
 
 
 
