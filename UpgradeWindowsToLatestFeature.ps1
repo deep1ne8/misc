@@ -77,8 +77,7 @@ if (!(Test-Path $DownloadPath)) {
 
     # Start the BITS transfer
     Log-Verbose "Initiating BITS transfer for Windows $Version $Release."
-    $BitsTransfer = Start-BitsTransfer -Source $URI -Destination $DownloadPath -Asynchronous -Priority Foreground -Headers @{
-    'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'} -Verbose
+    $BitsTransfer = Start-BitsTransfer -Source $URI -Destination $DownloadPath -Asynchronous -Priority Foreground -Verbose
 
     # Wait for the download to complete
     Do {
