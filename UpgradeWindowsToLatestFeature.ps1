@@ -63,11 +63,29 @@ if (!(Test-Path $FidoPath)) {
     Invoke-WebRequest -Uri "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Fido.ps1" -OutFile "C:\WindowsSetup\Fido.ps1" -Verbose
 }
 
+function Get-UserAgent {
+    # Uses PowerShell's prebuilt UA strings. See
+    # http://goo.gl/9IGloI
+    param (
+          [ValidateSet('Firefox','Chrome','InternetExplorer','Opera','Safari')]
+          [string]$browsertype
+    )
+    
+    if (!$browsertype) {
+      $browsers    = @('Firefox','Chrome','InternetExplorer','Opera','Safari')
+      $browsertype = Get-Random -InputObject $browsers
+    }
+  
+    [Microsoft.PowerShell.Commands.PSUserAgent]::$browsertype
+      
+  }
+
 # Check if the ISO file already exists
+$UserAgent = Get-UserAgent
 if (-not(Test-Path $DownloadPath)) {
     Log-Verbose "ISO not found at $DownloadPath. Starting download..."
     $URI = & C:\WindowsSetup\Fido.ps1 -Win $Version -Rel $Release -Arch x64 -Ed Pro -Lang English -GetUrl -Headers @{
-    'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)'}
+    'User-Agent' = $UserAgent}
     }
 
 # Validate the URL
