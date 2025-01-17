@@ -270,7 +270,7 @@ function Show-CleanupMenu {
     Write-Host "6. Exit"
     Write-Host ""
 
-    $choice = Read-Host "Enter your choice (1-4)"
+    $choice = Read-Host "Enter your choice (1-5)"
     switch ($choice) {
         "1" {
             Write-Host "`nRunning in Dry-Run mode..." -ForegroundColor Green
