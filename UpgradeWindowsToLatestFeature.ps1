@@ -100,7 +100,7 @@ try {
     } While ($JobState -ne "Transferred")
 
     # Complete the BITS transfer
-    Complete-BitsTransfer -BitsTransfer $BitsJob
+    Complete-BitsTransfer -JobId $BitsJob.JobId
     Write-Host "BITS transfer completed successfully." -ForegroundColor Green
 } catch {
     Write-Host "Error during BITS transfer: $_" -ForegroundColor Red
