@@ -82,29 +82,52 @@ Write-Host "Download URL successfully retrieved: $URI" -ForegroundColor Green
 $DownloadPath = "C:\WindowsSetup\Win_10_22H2_English_x64.iso"
 
 # Start the BITS transfer to download the file
-Write-Host "Starting BITS transfer for download..."
-try {
-    $BitsJob = Start-BitsTransfer -Source $URI -Destination $DownloadPath -Asynchronous -Priority Foreground -Verbose
+# Define the URL of the file to download and the local path to save it
+$remoteUrl = $URI
+$localPath = $DownloadPath
+$jobName = "WindowsISODownload"
 
-    # Monitor the download progress
-    Do {
-        $BitsStatus = Get-BitsTransfer -JobId $BitsJob.JobId
-        $JobState = $BitsStatus.JobState
-        $Progress = $BitsStatus.BytesTransferred / $BitsStatus.BytesTotal * 100
+# Create a new BITS job
+bitsadmin /create /download $jobName
 
-        # Show progress and status
-        Write-Host "BITS Transfer State: $JobState, Progress: $([math]::Round($Progress, 2))%" -ForegroundColor Yellow
-        
-        # Wait before checking again
-        Start-Sleep -Seconds 5
-    } While ($JobState -ne "Transferred")
+# Add the file to the BITS job
+bitsadmin /addfile $jobName $remoteUrl $localPath
 
-    # Complete the BITS transfer
-    Complete-BitsTransfer -BitsTransfer $BitsJob
-    Write-Host "BITS transfer completed successfully." -ForegroundColor Green
-} catch {
-    Write-Host "Error during BITS transfer: $_" -ForegroundColor Red
-    exit 1
+# Set the priority of the BITS job to FOREGROUND for fastest download
+bitsadmin /setpriority $jobName FOREGROUND
+
+# Resume the BITS job to start downloading
+bitsadmin /resume $jobName
+
+# Monitor the download progress
+do {
+    # Get the current state of the BITS job
+    $state = bitsadmin /getstate $jobName
+    
+    # Get the total bytes and bytes transferred
+    $totalBytes = bitsadmin /getbytestotal $jobName
+    $transferredBytes = bitsadmin /getbytestransferred $jobName
+    
+    # Calculate the progress percentage
+    if ($totalBytes -gt 0) {
+        $progress = [math]::Round(($transferredBytes / $totalBytes) * 100, 2)
+    } else {
+        $progress = 0
+    }
+    
+    # Display the progress
+    Write-Progress -Activity "Downloading $DownloadPath" -Status "$progress% Complete" -PercentComplete $progress
+    
+    # Wait for a short interval before checking the status again
+    Start-Sleep -Seconds 5
+} while ($state -eq "BG_JOB_STATE_TRANSFERRING")
+
+# Complete the BITS job if the download is finished
+if ($state -eq "BG_JOB_STATE_TRANSFERRED") {
+    bitsadmin /complete $jobName
+    Write-Output "Download completed successfully: $localPath"
+} else {
+    Write-Output "Download failed or was interrupted."
 }
 
 # Verify the file exists after download
@@ -142,7 +165,7 @@ try {
 # Cleanup ISO file
 try {
     Log-Verbose "Removing ISO file from $DownloadPath..."
-    Remove-Item $DownloadPath -Force -Verbose
+    #Remove-Item $DownloadPath -Force -Verbose
 } catch {
     Log-Verbose "Failed to remove ISO file: $_"
     Write-Host "Failed to remove ISO file: $_" -ForegroundColor Yellow
