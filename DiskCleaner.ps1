@@ -238,7 +238,7 @@ function ListUserProfiles {
 
 function CheckAndUninstallDellApps {
     # Check if the computer is a Dell system
-    $manufacturer = (Get-WmiObject -Class Win32_ComputerSystem).Manufacturer
+    $manufacturer = (Get-CimInstance -ClassName Win32_ComputerSystem).Manufacturer
 
     if ($manufacturer -like "*Dell*") {
         Write-Host "This is a Dell system. Proceeding with uninstallation of Dell apps..." -ForegroundColor Green
