@@ -233,7 +233,24 @@ function ListUserProfiles {
     Write-Host "`nTotal Space Used by Profiles Older Than $daysOld Days: $totalSpaceGB GB" -ForegroundColor Green
 }
 
+function CheckAndUninstallDellApps {
+    # Check if the computer is a Dell system
+    $manufacturer = (Get-WmiObject -Class Win32_ComputerSystem).Manufacturer
 
+    if ($manufacturer -like "*Dell*") {
+        Write-Host "This is a Dell system. Proceeding with uninstallation of Dell apps..." -ForegroundColor Green
+
+        try {
+            # Run the Dell uninstallation script
+            Invoke-Expression (Invoke-WebRequest -Uri "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Uninstall-DellApps.ps1" -UseBasicParsing).Content
+            Write-Host "Uninstallation script executed successfully." -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to execute the uninstallation script: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    } else {
+        Write-Host "This is not a Dell system. No action required." -ForegroundColor Yellow
+    }
+}
 
 
 # Menu for Dry-Run
@@ -246,7 +263,8 @@ function Show-CleanupMenu {
     Write-Host "2. Run Cleanup Normally"
     Write-Host "3. Run Large File Scanner"
     Write-Host "4. Run Large User Profiles scanner"
-    Write-Host "5. Exit"
+    Write-Host "5. Run Dell BloatWare Remover"
+    Write-Host "6. Exit"
     Write-Host ""
 
     $choice = Read-Host "Enter your choice (1-4)"
@@ -273,8 +291,12 @@ function Show-CleanupMenu {
         }
 	"5" {
  	    Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
-      	    return
+      	    CheckAndUninstallDellApps
 	    Show-ReturnMenu
+	}
+ 	"6" {
+ 	    Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
+	    return
 	}
         default {
             Write-Host "Invalid choice, please try again." -ForegroundColor Red
