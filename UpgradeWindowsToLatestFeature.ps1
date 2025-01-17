@@ -66,7 +66,7 @@ if (!(Test-Path $FidoPath)) {
 # Check if the ISO file already exists
 if (!(Test-Path $DownloadPath)) {
     Log-Verbose "ISO not found at $DownloadPath. Starting download..."
-    $URI = (Invoke-Expression -Command "& '\C:\WindowsSetup\Fido.ps1' -Win $Version -Rel $Release -Arch x64 -Ed Pro -Lang English -GetUrl -Headers @{
+    $URI = (Invoke-Expression -Command "& C:\WindowsSetup\Fido.ps1 -Win $Version -Rel $Release -Arch x64 -Ed Pro -Lang English -GetUrl -Headers @{
     'User-Agent' = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}")
 
     if (-not $URI) {
