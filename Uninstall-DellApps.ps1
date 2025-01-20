@@ -14,7 +14,7 @@ function Log-Message {
 # List of Dell applications to check and uninstall
 $appNames = @(
     "Dell SupportAssist",
-    "Dell OS Recovery Plugin for Dell Update",
+    "Dell OS Recovery Plugin*",
     "Dell SupportAssist Remediation"
 )
 
@@ -23,7 +23,7 @@ function Uninstall-UsingCim {
     param (
         [string]$appName
     )
-    $installedApp = Get-CimInstance -ClassName Win32_Product | Where-Object { $_.Name -eq $appName }
+    $installedApp = Get-CimInstance -ClassName Win32_Product | Where-Object { $_.Name -match $appName }
     if ($installedApp) {
         Log-Message "$appName is installed (CIM). Attempting to uninstall."
         $uninstallResult = $installedApp.Uninstall()
@@ -42,7 +42,7 @@ function Uninstall-UsingWmi {
     param (
         [string]$appName
     )
-    $installedApp = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -eq $appName }
+    $installedApp = Get-WmiObject -Class Win32_Product | Where-Object { $_.Name -match $appName }
     if ($installedApp) {
         Log-Message "$appName is installed (WMI). Attempting to uninstall."
         $uninstallResult = $installedApp.Uninstall()
@@ -64,3 +64,4 @@ foreach ($appName in $appNames) {
 }
 
 Log-Message "Script execution completed."
+Get-Content -Path $LogFile -Tail 100 -Wait
