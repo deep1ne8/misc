@@ -13,6 +13,7 @@ $appNames = @(
 
 # Log file for recording removal progress
 $logFile = "$env:Windows\Temp\DellSupportAssist_Uninstall.log"
+if (-not(Test-Path $logFile)){New-Item -ItemType File -Path $logFile -Force}
 
 # Function to log messages
 function Log-Message {
