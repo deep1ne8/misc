@@ -12,7 +12,7 @@ $appNames = @(
 )
 
 # Log file for recording removal progress
-$logFile = "$env:USERPROFILE\Desktop\DellSupportAssist_Uninstall.log"
+$logFile = "$env:Windows\Temp\DellSupportAssist_Uninstall.log"
 
 # Function to log messages
 function Log-Message {
