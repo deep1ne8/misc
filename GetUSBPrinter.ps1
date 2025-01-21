@@ -4,24 +4,34 @@ $SerialInfo = @()
 $Final = @()
 
 # Retrieve USB printer-related models and serials
-$USBPrinterModels = Get-WmiObject Win32_PnPEntity | Where-Object { $_.DeviceID -match "USBPRINT" } | Select-Object -ExpandProperty DeviceID
+$USBPrinterModels = Get-WmiObject Win32_PnPEntity | Where-Object { $_.DeviceID -match "USBPRINT" } | Select-Object -ExpandProperty DeviceID -ErrorAction SilentlyContinue
 $USBPrinterSerials = Get-WmiObject Win32_PnPEntity | Where-Object { 
     $_.Description -match "USB 列印支援" -or 
     $_.Description -match "USB Printing Support" -or 
     $_.Description -match "USB Composite Device" 
-} | Select-Object -ExpandProperty DeviceID
+} | Select-Object -ExpandProperty DeviceID -ErrorAction SilentlyContinue
+
+# Handle null values
+if (-not $USBPrinterModels -and -not $USBPrinterSerials) {
+    Write-Host "No USB printers detected." -ForegroundColor Yellow
+    return
+}
 
 # Extract model names from DeviceID
 foreach ($ModelDevice in $USBPrinterModels) {
-    $ModelName = $ModelDevice.Split("\")[1]
-    $ModelInfo += $ModelName
+    if ($ModelDevice) {
+        $ModelName = $ModelDevice.Split("\")[1]
+        $ModelInfo += $ModelName
+    }
 }
 
 # Extract serial numbers from DeviceID
 foreach ($SerialDevice in $USBPrinterSerials) {
-    $SerialNumber = $SerialDevice.Split("\")[2]
-    if ($SerialNumber -notmatch "&") {
-        $SerialInfo += $SerialNumber
+    if ($SerialDevice) {
+        $SerialNumber = $SerialDevice.Split("\")[2]
+        if ($SerialNumber -notmatch "&") {
+            $SerialInfo += $SerialNumber
+        }
     }
 }
 
@@ -29,8 +39,8 @@ foreach ($SerialDevice in $USBPrinterSerials) {
 $MaxLength = [Math]::Max($ModelInfo.Count, $SerialInfo.Count)
 for ($i = 0; $i -lt $MaxLength; $i++) {
     $Final += [PSCustomObject]@{
-        Model  = $ModelInfo[$i]
-        Serial = $SerialInfo[$i]
+        Model  = $ModelInfo[$i] -as [string]
+        Serial = $SerialInfo[$i] -as [string]
     }
 }
 
@@ -49,11 +59,17 @@ $WMIClass.Put()
 
 # Populate the WMI class with printer details
 foreach ($Printer in $Final) {
-    Set-WmiInstance -Path "\\.\root\cimv2:Win32_USBPrinterDetails" -Arguments @{
-        Model  = $Printer.Model
-        Serial = $Printer.Serial
+    if ($Printer.Model -and $Printer.Serial) {
+        Set-WmiInstance -Path "\\.\root\cimv2:Win32_USBPrinterDetails" -Arguments @{
+            Model  = $Printer.Model
+            Serial = $Printer.Serial
+        }
     }
 }
 
 # Output final printer details in a formatted table
-$Final | Format-Table -AutoSize
+if ($Final.Count -gt 0) {
+    $Final | Format-Table -AutoSize
+} else {
+    Write-Host "No USB printer information available to display." -ForegroundColor Yellow
+}
