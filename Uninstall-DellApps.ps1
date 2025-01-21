@@ -70,3 +70,4 @@ Log-Message "Dell SupportAssist removal process completed."
 Write-Host "Removal process completed. Check the log file at $logFile for details." -ForegroundColor Green
 
 Get-Content -Path $logFile -Wait
+Exit 1
