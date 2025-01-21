@@ -6,8 +6,8 @@ if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 
 # Define application names related to Dell SupportAssist
 $appNames = @(
-    "SupportAssist",
-    "SupportAssist OS Recovery",
+    "Dell SupportAssist",
+    "Dell SupportAssist OS Recovery Plugin for Dell Update",
     "Dell SupportAssist Remediation"
 )
 
@@ -30,12 +30,12 @@ Log-Message "Starting Dell SupportAssist removal process..."
 # Loop through each application name
 foreach ($appName in $appNames) {
     Log-Message "Checking for application: $appName"
-    $apps = Get-CimInstance -ClassName Win32_Product | Where-Object { $_.Name -like "*$appName*" }
+    $apps = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object {$_.DisplayName -match "$appName"})
     if ($apps) {
         foreach ($app in $apps) {
             Log-Message "Uninstalling $($app.Name)..."
             try {
-                $app.Uninstall()
+                $app.UninstallString()
                 Log-Message "$($app.Name) uninstalled successfully."
             } catch {
                 Log-Message "Failed to uninstall $($app.Name). Error: $_"
