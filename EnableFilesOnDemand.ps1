@@ -19,7 +19,7 @@
     Write-Host "No logged-in users found."
     }
 
-get-childitem "$env:SystemDrive\Users\$LoggedInUser\Onedrive - *\" -Force -File -Recurse -ErrorAction SilentlyContinue |
+Get-childitem -Path "$env:SystemDrive\Users\$LoggedInUser\Onedrive - *\" -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue |
 Where-Object {$_.Attributes -match 'ReparsePoint' -or $_.Attributes -eq '525344' } |
 ForEach-Object {
     attrib.exe $_.fullname +U -P /s
