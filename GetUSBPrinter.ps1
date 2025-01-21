@@ -7,7 +7,7 @@ $Final = @()
 $USBPrinterModels = Get-WmiObject Win32_PnPEntity | Where-Object { $_.DeviceID -match "USBPRINT" } | Select-Object -ExpandProperty DeviceID -ErrorAction SilentlyContinue
 $USBPrinterSerials = Get-WmiObject Win32_PnPEntity | Where-Object { 
     $_.Description -match "USB 列印支援" -or 
-    $_.Description -match "USB Printing Support" -or
+    $_.Description -match "USB Printing Support" -or 
     $_.Description -match "USB Composite Device" 
 } | Select-Object -ExpandProperty DeviceID -ErrorAction SilentlyContinue
 
@@ -71,6 +71,7 @@ try {
     Write-Error "Failed to create or modify the WMI class: $_"
     return
 }
+
 # Populate WMI class with data
 foreach ($Printer in $Final) {
     if ($Printer.Model -and $Printer.Serial) {
