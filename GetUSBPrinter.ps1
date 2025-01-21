@@ -71,9 +71,25 @@ try {
     Write-Error "Failed to create or modify the WMI class: $_"
     return
 }
-
 # Populate WMI class with data
 foreach ($Printer in $Final) {
     if ($Printer.Model -and $Printer.Serial) {
         try {
-            Set
+            Set-WmiInstance -Path "\\.\root\cimv2:Win32_USBPrinterDetails" -Arguments @{
+                Model  = $Printer.Model
+                Serial = $Printer.Serial
+            }
+        } catch {
+            Write-Warning "Failed to add printer details to WMI: $_"
+        }
+    } else {
+        Write-Warning "Incomplete printer details: Model='$($Printer.Model)', Serial='$($Printer.Serial)'"
+    }
+}
+
+# Display the results in a table
+if ($Final.Count -gt 0) {
+    $Final | Format-Table -AutoSize
+} else {
+    Write-Host "No printer details available to display." -ForegroundColor Yellow
+}
