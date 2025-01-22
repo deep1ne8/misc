@@ -49,8 +49,13 @@ Write-Host "Always available 	525344" -ForeGroundColor Green
 Write-Host "Locally Available 	ReparsePoint" -ForeGroundColor Green
 Write-Host "`n==================================================================="
 Start-Sleep -Seconds 5
-Write-Jost "`n"
+Write-Host "`n"
 Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
-Write-Output $CheckFilesAttrib
+if ($CheckFilesAttrib -ne "5248544"){
+Write-Host "Enabling files on demand"
+Get-childitem -Path '*.*' -Force -File -Recurse -Verbose | ForEach-Object { attrib.exe $_.fullname +U /s }
+Get-childitem -Path '*.*' -Force | Format-Table Name, Attributes
+}else {
+exit 1
 }
