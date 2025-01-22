@@ -59,3 +59,4 @@ Get-childitem -Path '*.*' -Force | Format-Table Name, Attributes
 }else {
 exit 1
 }
+}
