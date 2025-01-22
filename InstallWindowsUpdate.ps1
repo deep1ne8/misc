@@ -28,9 +28,10 @@ foreach ($path in $paths) {
 }
 
 # Install PSWindowsUpdate
-Set-ExecutionPolicy Bypass -Scope Process -Force
+Set-ExecutionPolicy Unrestricted -Scope LocalMachine -Force -Confirm:$false
 try {
-    Install-Module -Name PSWindowsUpdate -Scope CurrentUser -Force
+    Install-Module -Name PSWindowsUpdate  -Force -Verbose
+    Import-Module -Name PSWindowsUpdate -Force -Verbose
 } catch {
     Write-Error "Failed to install PSWindowsUpdate"
     exit 1
