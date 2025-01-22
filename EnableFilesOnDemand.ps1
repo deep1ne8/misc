@@ -43,7 +43,7 @@ Write-Host "`n"
 Write-Host "Below is the guide for the file state, according to it's attribute" -ForeGroundColor Green
 Write-Host "`n==================================================================="
 Write-Host "File State 	        Attribute" -ForeGroundColor White
-Write-Host "-----------------------------"
+Write-Host "------------------------------"
 Write-Host "Cloud-Only 	        5248544" -ForeGroundColor Green
 Write-Host "Always available 	525344" -ForeGroundColor Green
 Write-Host "Locally Available 	ReparsePoint" -ForeGroundColor Green
