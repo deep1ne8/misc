@@ -19,7 +19,11 @@
     Write-Host "No logged-in users found."
     }
 
-$CheckFilesAttrib = Get-childitem -Path "*.*" -Force | Format-Table Name,Attributes
+$CheckFilesAttrib = Get-childitem -Path "*.*" -Force | Format-Table Attributes
+if ($CheckFilesAttrib -eq "5248544"){
+	Write-Host "All the files attributes are already set to online only"
+ 	exit 1
+  }else {
 Set-Location -Path "$env:SystemDrive\Users\$LoggedInUser\Onedrive - *\" 
 Get-childitem -Path "*.*" -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue |
 Where-Object {$_.Attributes -match 'ReparsePoint' -or $_.Attributes -eq '525344' } |
@@ -38,3 +42,4 @@ Write-Host "`n==================================================================
 Write-Host "Verifying the current file state"
 Write-Host ""
 Write-Output $CheckFilesAttrib
+}
