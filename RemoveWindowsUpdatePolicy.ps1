@@ -1,0 +1,1 @@
+@("HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "HKCU:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate") | ForEach-Object { if (Test-Path $_) { Remove-Item -Path $_ -Recurse -Force; Write-Output "Removed: $_" } else { Write-Output "Not found: $_" } }
