@@ -28,43 +28,36 @@ foreach ($path in $paths) {
 }
 
 # Install PSWindowsUpdate
-Set-ExecutionPolicy Bypass -Scope Process -Force
+Set-ExecutionPolicy Unrestricted -Scope LocalMachine -Force -Confirm:$false
 try {
-    Install-Module -Name PSWindowsUpdate -Scope CurrentUser -Force
+    Install-Module -Name PSWindowsUpdate  -Force -Verbose
+    Import-Module -Name PSWindowsUpdate -Force -Verbose
 } catch {
-    Write-Error "Failed to install PSWindowsUpdate"
+    Write-Host "Failed to install PSWindowsUpdate"  -ForeGroundColor Red
     exit 1
 }
 
 # Initialize Windows Update
+Write-Host "Cleaning up Windows update components"  -ForeGroundColor Green
 try {
     Reset-WUComponents
-} catch {
-    Write-Error "Failed to initialize Windows Update"
-    exit 1
-}
-
-# Update Windows Update
-try {
-    Get-WindowsUpdate -Verbose -Install -AcceptAll
-} catch {
-    Write-Error "Failed to update Windows"
-    exit 1
-}
-
-# Suspend Bitlocker
-try {
+    Start-Sleep 3
     Disable-BitLocker -MountPoint C:\
+    Start-Sleep 3
+    Get-WindowsUpdate -Verbose -Install -AcceptAll
+    Start-Sleep 3
+    
 } catch {
-    Write-Error "Failed to disable Bitlocker"
+    Write-Host "Failed to initialize Windows Update"  -ForeGroundColor Red
     exit 1
 }
 
 # Enable automatic updates
+Write-Host "Enabling Windows Auto Updates" -ForeGroundColor Green
 try {
     Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\wuauserv\Parameters" -Name AutoUpdate -Value 1 -Force
 } catch {
-    Write-Error "Failed to enable automatic updates"
+    Write-Host "Failed to enable automatic updates"  -ForeGroundColor Red
     exit 1
 }
 

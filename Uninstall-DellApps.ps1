@@ -30,20 +30,27 @@ Log-Message "Starting Dell SupportAssist removal process..."
 # Loop through each application name
 foreach ($appName in $appNames) {
     Log-Message "Checking for application: $appName"
-    $apps = (Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object {$_.DisplayName -match "$appName"})
-    if ($apps) {
-        foreach ($app in $apps) {
-            Log-Message "Uninstalling $($app.Name)..."
+    $apps = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
+    Where-Object { $_.DisplayName -match $appName }
+
+if ($apps) {
+    foreach ($app in $apps) {
+        $uninstallString = $app.UninstallString
+        if ($uninstallString) {
+            Log-Message "Uninstalling $($app.DisplayName)..."
             try {
-                $app.UninstallString()
-                Log-Message "$($app.Name) uninstalled successfully."
+                Start-Process -FilePath "cmd.exe" -ArgumentList "/c $uninstallString /quiet" -Wait -NoNewWindow
+                Log-Message "$($app.DisplayName) uninstalled successfully."
             } catch {
-                Log-Message "Failed to uninstall $($app.Name). Error: $_"
+                Log-Message "Failed to uninstall $($app.DisplayName). Error: $_"
             }
+        } else {
+            Log-Message "No uninstall string found for $($app.DisplayName)."
         }
-    } else {
-        Log-Message "No installed applications found matching $appName."
     }
+} else {
+    Log-Message "No applications found matching the name '$appName'."
+  }
 }
 
 # Additional forced uninstallation (if needed)
