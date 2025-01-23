@@ -19,9 +19,9 @@
     Write-Host "No logged-in users found." -ForeGroundColor Red
     }
 
-$CheckFilesAttrib = Get-childitem -Path '*.*' -Force | Format-Table Attributes
+$CheckFilesAttrib = Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Format-Table Attributes 
 if ($CheckFilesAttrib -eq "5248544"){
-	Write-Host "All the files attributes are already set to online only"
+	Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
  	exit 1
   }else {
 
