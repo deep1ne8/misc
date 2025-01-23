@@ -174,6 +174,7 @@ function Start-AdvancedSystemCleanup {
     catch {
         Write-Host "Error occurred: $_" -ForegroundColor Red
         Write-Host "`n"
+        Return
     }
 }
 
@@ -290,17 +291,17 @@ function Show-CleanupMenu {
         "4" {
             Write-Host "`nRunning large user profile scanner..." -ForegroundColor Yellow
             ListUserProfiles
-	    Show-ReturnMenu
+	        Show-ReturnMenu
         }
-	"5" {
- 	    Write-Host "`Running Dell bloatware remover..." -ForegroundColor Yellow
+	    "5" {
+ 	        Write-Host "`Running Dell bloatware remover..." -ForegroundColor Yellow
       	    CheckAndUninstallDellApps
-	    Show-ReturnMenu
-	}
- 	"6" {
+	        Show-ReturnMenu
+	    }
+ 	    "6" {
  	    Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
 	    return
-	}
+	    }
         default {
             Write-Host "Invalid choice, please try again." -ForegroundColor Red
             Show-ReturnMenu
