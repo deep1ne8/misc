@@ -1,3 +1,15 @@
+<#
+
+
+____            _       _   ____  _             
+/ ___|  ___ _ __(_)_ __ | |_/ ___|| |_ __ _ _ __ 
+\___ \ / __| '__| | '_ \| __\___ \| __/ _` | '__|
+ ___) | (__| |  | | |_) | |_ ___) | || (_| | |   
+|____/ \___|_|  |_| .__/ \__|____/ \__\__,_|_|   
+                  |_|                            
+
+#>
+
 $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/DiskCleaner.ps1"; Description = "DiskCleaner" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/EnableFilesOnDemand.ps1"; Description = "EnableFilesOnDemand" },
