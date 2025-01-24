@@ -127,7 +127,7 @@ function Start-AdvancedSystemCleanup {
     }
 
 
-    function Scan-LargeFilesWithRobocopy {
+    function LargeFiles {
     param (
         [string]$SourcePath = "C:\",               # Source directory to scan
         [string]$DestinationPath = "D:\Temp",      # Destination directory (doesn't matter, we use /L for list mode)
@@ -259,7 +259,7 @@ function CheckAndUninstallDellApps {
 
 # Menu for Dry-Run
 function Show-CleanupMenu {
-    cls
+    Clear-Host
     Write-Host "==============================" -ForegroundColor Cyan
     Write-Host "  Advanced System Cleanup Menu" -ForegroundColor Yellow
     Write-Host "==============================" -ForegroundColor Cyan
@@ -285,7 +285,7 @@ function Show-CleanupMenu {
         }
         "3" {
             Write-Host "`nRunning large file scanner..." -ForegroundColor Yellow
-            Scan-LargeFilesWithRobocopy -SourcePath "C:\" -DestinationPath "D:\Temp"
+            LargeFiles -SourcePath "C:\" -DestinationPath "D:\Temp"
             Show-ReturnMenu
         }
         "4" {
