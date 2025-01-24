@@ -25,20 +25,20 @@ function Show-ScriptStarZMenu {
     Clear-Host
     Write-Host "================================================================"
     Write-Host "================================================================"
-    Write-Host "==========  ____            _       _   ____  _              ===" -ForegroundColor Yellow
-    Write-Host "========== / ___|  ___ _ __(_)_ __ | |_/ ___|| |_ __ _ _ __  ===" -ForegroundColor Yellow
-    Write-Host "========== \___ \ / __| '__| | '_ \| __\___ \| __/ _` | '__| ===" -ForegroundColor Yellow
-    Write-Host "==========  ___) | (__| |  | | |_) | |_ ___) | || (_| | |    ===" -ForegroundColor Yellow
-    Write-Host "========== |____/ \___|_|  |_| .__/ \__|____/ \__\__,_|_|    ===" -ForegroundColor Yellow
-    Write-Host "==========                   |_|                             ===" -ForegroundColor Yellow
+    Write-Host "==========  ____            _       _   ____  _              ===" -ForegroundColor Red
+    Write-Host "========== / ___|  ___ _ __(_)_ __ | |_/ ___|| |_ __ _ _ __  ===" -ForegroundColor Red
+    Write-Host "========== \___ \ / __| '__| | '_ \| __\___ \| __/ _` | '__|    ===" -ForegroundColor Red
+    Write-Host "==========  ___) | (__| |  | | |_) | |_ ___) | || (_| | |    ===" -ForegroundColor Red
+    Write-Host "========== |____/ \___|_|  |_| .__/ \__|____/ \__\__,_|_|    ===" -ForegroundColor Red
+    Write-Host "==========                   |_|                             ===" -ForegroundColor Red
     Write-Host "================================================================"
     Write-Host "================================================================"
     Write-Host "`n"
     Write-Host "========== PowerShell scripts for system maintenance: ==========" -ForegroundColor Green
     Write-Host "----------------------------------------------------------------"
 
-    Write-Host "========== Choose a script to run: =============================" -ForegroundColor Green
-    Write-Host "----------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "=================== Choose a script to run: ====================" -ForegroundColor White
+    Write-Host "----------------------------------------------------------------" -ForegroundColor Yellow
     Write-Host "`n"
     Write-Host ""
 
