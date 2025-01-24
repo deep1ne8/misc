@@ -8,7 +8,7 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/DeployPrinter.ps1"; Description = "DeployPrinter" }
 )
 
-function Run-ScriptFromUrl {
+function InitiateScriptFromUrl {
     param (
         [string]$Url
     )
@@ -22,7 +22,7 @@ function Run-ScriptFromUrl {
 }
 
 function Show-ScriptStarZMenu {
-    cls
+    Clear-Host
     Write-Host "==============================" -ForegroundColor Cyan
     Write-Host "       ScriptStar             " -ForegroundColor Yellow
     Write-Host "==============================" -ForegroundColor Cyan
@@ -37,13 +37,13 @@ function Show-ScriptStarZMenu {
 
     $choice = Read-Host "Enter your choice (1-8)"
     switch ($choice) {
-        "1" { Run-ScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
-        "2" { Run-ScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
-        "3" { Run-ScriptFromUrl $GitHubScripts[2].ScriptUrl; Show-ReturnMenu }
-        "4" { Run-ScriptFromUrl $GitHubScripts[3].ScriptUrl; Show-ReturnMenu }
-        "5" { Run-ScriptFromUrl $GitHubScripts[4].ScriptUrl; Show-ReturnMenu }
-        "6" { Run-ScriptFromUrl $GitHubScripts[5].ScriptUrl; Show-ReturnMenu }
-        "7" { Run-ScriptFromUrl $GitHubScripts[6].ScriptUrl; Show-ReturnMenu }
+        "1" { InitiateScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
+        "2" { InitiateScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
+        "3" { InitiateScriptFromUrl $GitHubScripts[2].ScriptUrl; Show-ReturnMenu }
+        "4" { InitiateScriptFromUrl $GitHubScripts[3].ScriptUrl; Show-ReturnMenu }
+        "5" { InitiateScriptFromUrl $GitHubScripts[4].ScriptUrl; Show-ReturnMenu }
+        "6" { InitiateScriptFromUrl $GitHubScripts[5].ScriptUrl; Show-ReturnMenu }
+        "7" { InitiateScriptFromUrl $GitHubScripts[6].ScriptUrl; Show-ReturnMenu }
         "8" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
