@@ -1,16 +1,3 @@
-Write-Host "================================================================"
-Write-Host "================================================================"
-Write-Host "==========  ____            _       _   ____  _                 "
-Write-Host "========== / ___|  ___ _ __(_)_ __ | |_/ ___|| |_ __ _ _ __     "
-Write-Host "========== \___ \ / __| '__| | '_ \| __\___ \| __/ _` | '__|    "
-Write-Host "==========  ___) | (__| |  | | |_) | |_ ___) | || (_| | |       "
-Write-Host "========== |____/ \___|_|  |_| .__/ \__|____/ \__\__,_|_|       "
-Write-Host "==========                   |_|                                "
-Write-Host "================================================================"
-Write-Host "================================================================"
-Write-Host "========== PowerShell scripts for system maintenance:           "
-Write-Host "----------------------------------------------------------------"
-
 $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/DiskCleaner.ps1"; Description = "DiskCleaner" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/EnableFilesOnDemand.ps1"; Description = "EnableFilesOnDemand" },
@@ -36,9 +23,18 @@ function InitiateScriptFromUrl {
 
 function Show-ScriptStarZMenu {
     Clear-Host
-    Write-Host "==============================" -ForegroundColor Cyan
-    Write-Host "       ScriptStar             " -ForegroundColor Yellow
-    Write-Host "==============================" -ForegroundColor Cyan
+    Write-Host "================================================================"
+    Write-Host "================================================================"
+    Write-Host "==========  ____            _       _   ____  _                 " -ForegroundColor Yellow
+    Write-Host "========== / ___|  ___ _ __(_)_ __ | |_/ ___|| |_ __ _ _ __     " -ForegroundColor Yellow
+    Write-Host "========== \___ \ / __| '__| | '_ \| __\___ \| __/ _` | '__|    " -ForegroundColor Yellow
+    Write-Host "==========  ___) | (__| |  | | |_) | |_ ___) | || (_| | |       " -ForegroundColor Yellow
+    Write-Host "========== |____/ \___|_|  |_| .__/ \__|____/ \__\__,_|_|       " -ForegroundColor Yellow
+    Write-Host "==========                   |_|                                " -ForegroundColor Yellow
+    Write-Host "================================================================"
+    Write-Host "================================================================"
+    Write-Host "========== PowerShell scripts for system maintenance:           " -ForegroundColor Green
+    Write-Host "----------------------------------------------------------------"
     $index = 1
     foreach ($script in $GitHubScripts) {
         Write-Host "$index. $($script.Description)" -ForegroundColor Green
