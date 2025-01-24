@@ -16,7 +16,7 @@ $logFile = "$env:Windows\Temp\DellSupportAssist_Uninstall.log"
 if (-not(Test-Path $logFile)){New-Item -ItemType File -Path $logFile -Force}
 
 # Function to log messages
-function Log-Message {
+function MessageLogger {
     param (
         [string]$Message
     )
@@ -25,55 +25,69 @@ function Log-Message {
     Write-Host $Message
 }
 
-Log-Message "Starting Dell SupportAssist removal process..."
+MessageLogger "Starting Dell SupportAssist removal process..."
 
 # Loop through each application name
 foreach ($appName in $appNames) {
-    Log-Message "Checking for application: $appName"
+    MessageLogger "Checking for application: $appName"
     $apps = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
     Where-Object { $_.DisplayName -match $appName }
 
-if ($apps) {
+    if ($null -eq $apps) {
+        MessageLogger "No applications found matching the name '$appName'."
+        continue
+    }
+
     foreach ($app in $apps) {
+        if ($null -eq $app) {
+            MessageLogger "Null application reference encountered. Skipping."
+            continue
+        }
+
         $uninstallString = $app.UninstallString
-        if ($uninstallString) {
-            Log-Message "Uninstalling $($app.DisplayName)..."
-            try {
-                Start-Process -FilePath "cmd.exe" -ArgumentList "/c $uninstallString /quiet" -Wait -NoNewWindow
-                Log-Message "$($app.DisplayName) uninstalled successfully."
-            } catch {
-                Log-Message "Failed to uninstall $($app.DisplayName). Error: $_"
-            }
-        } else {
-            Log-Message "No uninstall string found for $($app.DisplayName)."
+        if ($null -eq $uninstallString) {
+            MessageLogger "No uninstall string found for $($app.DisplayName)."
+            continue
+        }
+
+        try {
+            MessageLogger "Uninstalling $($app.DisplayName)..."
+            Start-Process -FilePath "cmd.exe" -ArgumentList "/c $uninstallString /quiet" -Wait -NoNewWindow
+            MessageLogger "$($app.DisplayName) uninstalled successfully."
+        } catch {
+            MessageLogger "Failed to uninstall $($app.DisplayName). Error: $_"
+            Write-Host "Exception: $_" -ForegroundColor Red
         }
     }
-} else {
-    Log-Message "No applications found matching the name '$appName'."
-  }
 }
 
 # Additional forced uninstallation (if needed)
 # Remove registry entries related to SupportAssist
-Log-Message "Removing leftover registry entries..."
+MessageLogger "Removing leftover registry entries..."
 $regKeys = @(
     "HKLM:\SOFTWARE\Dell\SupportAssist",
     "HKLM:\SOFTWARE\WOW6432Node\Dell\SupportAssist"
 )
 foreach ($key in $regKeys) {
+    if ($null -eq $key) {
+        MessageLogger "Null registry key encountered. Skipping."
+        continue
+    }
+
     if (Test-Path $key) {
         try {
-            Remove-Item -Path $key -Recurse -Force -Verbose
-            Log-Message "Registry key $key removed successfully."
+            Remove-Item -Path $key -Recurse -Force -ErrorAction Stop -Verbose
+            MessageLogger "Registry key $key removed successfully."
         } catch {
-            Log-Message "Failed to remove registry key $key. Error: $_"
+            MessageLogger "Failed to remove registry key $key. Error: $_"
+            Write-Host "Exception: $_" -ForegroundColor Red
         }
     } else {
-        Log-Message "Registry key $key not found."
+        MessageLogger "Registry key $key not found."
     }
 }
 
-Log-Message "Dell SupportAssist removal process completed."
+MessageLogger "Dell SupportAssist removal process completed."
 Write-Host "Removal process completed. Check the log file at $logFile for details." -ForegroundColor Green
 
 Get-Content -Path $logFile -Wait
