@@ -19,7 +19,7 @@
     Write-Host "No logged-in users found." -ForeGroundColor Red
     }
 
-$CheckFilesAttrib = $CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Format-Table Attributes, Mode, Name, Length, CreationTime
+$CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Format-Table Attributes
 if ($CheckFilesAttrib -eq "5248544"){
 	Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
  	exit 1
@@ -33,11 +33,7 @@ if (-not $OneDrivePath) {
 }
 Set-Location -Path $OneDrivePath
 Start-Sleep -Seconds 3
-Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue |
-Where-Object {$_.Attributes -match 'ReparsePoint' -or $_.Attributes -eq '525344' } |
-ForEach-Object {
-    attrib.exe $_.fullname +U /s
-}
+
 Start-Sleep -Seconds 5
 Write-Host "`n"
 Write-Host "Below is the guide for the file state, according to it's attribute" -ForeGroundColor Green
@@ -52,11 +48,23 @@ Start-Sleep -Seconds 5
 Write-Host "`n"
 Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
-if ($CheckFilesAttrib -ne "5248544"){
+
 Write-Host "Enabling files on demand"
-Get-childitem -Path '*.*' -Force -File -Recurse -Verbose | ForEach-Object { attrib.exe $_.fullname +U /s }
-Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Format-Table Attributes, Mode, Name, Length, CreationTime
-}else {
-exit 1
-  }
+Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue |
+Where-Object {$_.Attributes -match 'ReparsePoint' -or $_.Attributes -eq '525344' } |
+ForEach-Object {
+    attrib.exe $_.fullname +U /s
 }
+
+Write-Host "`n"
+Write-Host "Verifying the updated file state" -ForeGroundColor Green
+Write-Host ""
+Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5248544' } Format-Table Attributes, Mode, Name, Length, CreationTime
+
+}else {
+    Write-Host "OneDrive folder not found for user $LoggedInUser." -ForeGroundColor Red
+    exit 1
+}
+
+
+
