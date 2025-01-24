@@ -89,8 +89,9 @@ foreach ($key in $regKeys) {
 
 MessageLogger "Dell SupportAssist removal process completed."
 Write-Host "Removal process completed. Check the log file at $logFile for details." -ForegroundColor Green
-Get-Content -Path $logFile -Verbose
+$LogContents = Get-Content -Path $LogFile -Tail 100
+Write-Output $LogContents
 
 # End of script execution
-exit 1
+return
 
