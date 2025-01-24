@@ -19,7 +19,7 @@
     Write-Host "No logged-in users found." -ForeGroundColor Red
     }
 
-$CheckFilesAttrib = Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Format-Table Attributes 
+$CheckFilesAttrib = $CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Format-Table Attributes, Mode, Name, Length, CreationTime
 if ($CheckFilesAttrib -eq "5248544"){
 	Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
  	exit 1
@@ -55,7 +55,7 @@ Write-Host ""
 if ($CheckFilesAttrib -ne "5248544"){
 Write-Host "Enabling files on demand"
 Get-childitem -Path '*.*' -Force -File -Recurse -Verbose | ForEach-Object { attrib.exe $_.fullname +U /s }
-Get-childitem -Path '*.*' -Force | Format-Table Name, Attributes
+Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Format-Table Attributes, Mode, Name, Length, CreationTime
 }else {
 exit 1
   }
