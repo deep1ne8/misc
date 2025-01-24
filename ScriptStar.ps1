@@ -35,6 +35,13 @@ function Show-ScriptStarZMenu {
     Write-Host "================================================================"
     Write-Host "========== PowerShell scripts for system maintenance:           " -ForegroundColor Green
     Write-Host "----------------------------------------------------------------"
+
+    Write-Host "========== Choose a script to run: =============================" -ForegroundColor Green
+    Write-Host "----------------------------------------------------------------" -ForegroundColor Cyan
+    Write-Host "`n"
+    Write-Host ""
+
+
     $index = 1
     foreach ($script in $GitHubScripts) {
         Write-Host "$index. $($script.Description)" -ForegroundColor Green
@@ -42,7 +49,7 @@ function Show-ScriptStarZMenu {
     }
     Write-Host "8. Exit" -ForegroundColor Red
     Write-Host ""
-    Write-Host "==============================" -ForegroundColor Cyan
+    Write-Host "================================================================" -ForegroundColor Cyan
 
     $choice = Read-Host "Enter your choice (1-8)"
     switch ($choice) {
