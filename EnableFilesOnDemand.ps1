@@ -1,16 +1,40 @@
-    try {
-    # Try using 'quser'
+try {
+    # Try using 'quser' to get logged-in users
     $LoggedInUser = quser | ForEach-Object { ($_ -split '\s{2,}')[0].TrimStart('>', ' ') } | Where-Object { $_ -notmatch 'USERNAME' }
-    	if (-not $LoggedInUser) {
-        	throw "No users found with quser."
-    	}
-    } catch {
-    # If 'quser' fails, fall back to 'Get-WmiObject'
-    $LoggedInUser = (Get-WmiObject -Class Win32_ComputerSystem | Select-Object -ExpandProperty UserName)
-    	if (-not $LoggedInUser) {
-        	throw "Failed to retrieve logged-in user information."
-    	}
+    if (-not $LoggedInUser) {
+        throw "No users found with quser."
     }
+} catch {
+    try {
+        # If 'quser' fails, fall back to 'Get-CimInstance'
+        $LoggedInUser = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName
+        if (-not $LoggedInUser) {
+            throw "No logged-in user found with CIM."
+        }
+    } catch {
+        throw "Failed to retrieve logged-in user information using both methods."
+    }
+}
+
+# Ensure username is sanitized for use in paths
+if ($LoggedInUser -match '\\') {
+    # If the username contains a domain (e.g., DOMAIN\User), split and extract the username
+    $LoggedInUser = $LoggedInUser -replace '^.*\\', ''
+}
+
+# Construct user profile path
+$UserProfilePath = Join-Path -Path "$env:SystemDrive\Users" -ChildPath $LoggedInUser
+
+# Output results
+if (Test-Path $UserProfilePath) {
+    Write-Output "Logged-in User: $LoggedInUser"
+    Write-Output "User Profile Path: $UserProfilePath"
+} else {
+    Write-Output "User profile path not found: $UserProfilePath"
+}
+
+
+
 
    # Output the result
    	if ($LoggedInUser) {
