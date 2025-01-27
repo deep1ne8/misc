@@ -1,6 +1,7 @@
 # Enable Files On Demand
 
-
+Write-Host "Getting user profile folder..." -ForegroundColor Green
+Write-Host ""
 # Get the logged-in username (domain\username format)
 $LoggedInUser = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName
 
@@ -14,6 +15,8 @@ if ($LoggedInUser -match '\\') {
         $_.Name -like $UserName
     }
 
+    Write-Host "Getting user profile folder for: $UserName" -ForegroundColor Yellow
+    Write-Host ""
     if ($UserProfileFolder) {
         Write-Host "User Profile Folder: $($UserProfileFolder.FullName)" -ForegroundColor Green
     } else {
@@ -24,16 +27,25 @@ if ($LoggedInUser -match '\\') {
 }
 
 # Resolve OneDrive path dynamically
+
+Write-Host "Getting OneDrive folder path for: $UserName" -ForegroundColor Yellow
+Write-Host ""
 try {
     $OneDrivePath = (Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction Stop | Where-Object { $_.Name -like "OneDrive - *" }).FullName
 } catch {
     throw "OneDrive folder path not found for user $LoggedInUser."
 }
 
+Write-Host "OneDrive Folder Path: $OneDrivePath" -ForegroundColor Green
 Set-Location -Path $OneDrivePath
 Start-Sleep -Seconds 3
 Write-Host "`n"
 
+Write-Host "Verifying the current file state" -ForeGroundColor Green
+Write-Host ""
+
+Write-Host "Enabling files on demand" -ForegroundColor Green
+Write-Host ""
 # Check if files are online only
 $CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Format-Table Attributes
 if ($CheckFilesAttrib -eq "5248544"){
@@ -56,7 +68,7 @@ Write-Host "`n"
 Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
 
-Write-Host "Enabling files on demand"
+Write-Host "Enabling files on demand" -ForegroundColor Green
 try {
     Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction Stop | 
     Where-Object {$_.Attributes -match 'ReparsePoint' -or $_.Attributes -eq '525344' } | 
