@@ -6,7 +6,8 @@ $LoggedInUser = (Get-CimInstance -ClassName Win32_ComputerSystem).UserName
 
 if ($LoggedInUser -match '\\') {
     # Extract the username part (remove the domain prefix)
-    $UserName = $LoggedInUser -replace '^.*\\', ''
+    #$UserName = $LoggedInUser -replace '^.*\\', ''
+    $UserName = $LoggedInUser
 
     # Get the profile folder path
     $UserProfileFolder = Get-ChildItem "$env:SystemDrive\Users" | Where-Object {
