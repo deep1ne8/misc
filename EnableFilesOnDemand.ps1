@@ -94,6 +94,7 @@ try {
     Get-ChildItem -Path '*.*' -Force -ErrorAction Stop | Where-Object {$_.Attributes -eq '5248544' } Format-Table Attributes, Mode, Name, Length, CreationTime
 } catch {
     Write-Host "Error occurred while verifying the updated file state: $_" -ForeGroundColor Red
+    }
 }
 
 #else {
