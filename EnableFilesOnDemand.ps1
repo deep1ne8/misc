@@ -12,7 +12,7 @@ if ($LoggedInUser -match '\\') {
 
     # Get the profile folder path
     $UserProfileFolder = Get-ChildItem "$env:SystemDrive\Users" | Where-Object {
-        $_.Name -like $UserName
+        $_.Name -like "$UserName*"
     }
 
     Write-Host "Getting user profile folder for: $UserName" -ForegroundColor Yellow
