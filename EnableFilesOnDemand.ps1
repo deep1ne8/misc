@@ -70,7 +70,7 @@ Write-Host ""
 
 Write-Host "Enabling files on demand" -ForegroundColor Green
 try {
-    Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction Stop | 
+    Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | 
     Where-Object {$_.Attributes -match 'ReparsePoint' -or $_.Attributes -eq '525344' } | 
     ForEach-Object {
         attrib.exe $_.fullname +U /s
@@ -83,7 +83,7 @@ Write-Host "`n"
 Write-Host "Verifying the updated file state" -ForeGroundColor Green
 Write-Host ""
 try {
-    Get-ChildItem -Path '*.*' -Force -ErrorAction Stop | Where-Object {$_.Attributes -eq '5248544' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+    Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5248544' } | Format-Table Attributes, Mode, Name, Length, CreationTime
 } catch {
     Write-Host "Error occurred while verifying the updated file state: $_" -ForeGroundColor Red
     }
