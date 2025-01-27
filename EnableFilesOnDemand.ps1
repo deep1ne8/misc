@@ -44,10 +44,12 @@ Write-Host "`n"
 Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
 
+Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5248544' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+Write-Host "`n"
 Write-Host "Enabling files on demand" -ForegroundColor Green
 Write-Host ""
 # Check if files are online only
-$CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Format-Table Attributes
+$CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Format-Table Attributes
 if ($CheckFilesAttrib -eq "5248544"){
 	Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
  	exit 1
@@ -83,7 +85,7 @@ Write-Host "`n"
 Write-Host "Verifying the updated file state" -ForeGroundColor Green
 Write-Host ""
 try {
-    Get-ChildItem -Path '*.*' -Force -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5248544' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+    Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5248544' } | Format-Table Attributes, Mode, Name, Length, CreationTime
 } catch {
     Write-Host "Error occurred while verifying the updated file state: $_" -ForeGroundColor Red
     }
