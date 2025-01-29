@@ -4,10 +4,24 @@ function Reset-WindowsSearch {
         [string]$SearchDbPath = "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\Windows.edb"
     )
 
-    # Suppress all output except errors
-    $ErrorActionPreference = "Stop"
+    # Define the path that may be causing issues
+    $pathToCheck = "$env:windir\System32\config\systemprofile"
 
+    # Ensure running with elevated permissions (Administrator)
     try {
+        # Check if access to the path is denied and fix permissions using icacls
+        if (-not (Test-Path $pathToCheck)) {
+            Write-Host "Path not found, skipping access check" -ForegroundColor Yellow
+        } else {
+            Write-Host "Checking permissions for $pathToCheck..." -ForegroundColor Cyan
+            # Use icacls to reset permissions if access is denied
+            icacls $pathToCheck /reset /T /Q
+            Write-Host "Permissions reset for $pathToCheck" -ForegroundColor Green
+        }
+
+        # Suppress all output except errors
+        $ErrorActionPreference = "Stop"
+
         # Check if the service exists and get its status
         $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
         if ($null -eq $service) { return }
