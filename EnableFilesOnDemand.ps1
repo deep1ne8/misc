@@ -47,7 +47,7 @@ Write-Host "`n"
 Start-Sleep -Seconds 3
 
 # Check if files are always available
-$CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '525344' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+$CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Format-Table Attributes, Mode, Name, Length, CreationTime
 Write-Host "`n"
 Write-Host $CurrentFileState
 Write-Host "`n"
@@ -56,11 +56,11 @@ Write-Host "`n"
 Write-Host "Enabling files on demand" -ForegroundColor Green
 Write-Host ""
 # Check if files are online only
-$CheckFilesAttrib = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5258544' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes
+$CheckFilesAttrib = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5258544'} | Format-Table Attributes
 if ($CheckFilesAttrib -eq "5248544"){
 	        Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
- 	exit 1
-  }else {   Write-Host "All the files attributes are not set to online only" -ForegroundColor Green
+ 	return
+  }else {   Write-Host "All the files attributes are not set to online only" -ForegroundColor Red
   Start-Sleep -Seconds 3
 
 # Enable files on demand by removing ReparsePoint attribute
@@ -75,7 +75,7 @@ Write-Host "Locally Available 	ReparsePoint" -ForeGroundColor Green
 Write-Host "`n==================================================================="
 Start-Sleep -Seconds 5
 Write-Host "`n"
-Write-Host "Verifying the current file state" -ForeGroundColor Green
+Write-Host "Changing the file state" -ForeGroundColor Green
 Write-Host ""
 Start-Sleep -Seconds 3
 try {
@@ -85,16 +85,17 @@ try {
     }
 } catch {
     Write-Host "Error occurred while enabling files on demand: $_" -ForeGroundColor Red
+    return
 }  
 try { 
     Write-Host "Verifying the updated file state" -ForeGroundColor Green
     Write-Host ""
     Start-Sleep -Seconds 3
-    if ($CurrentFileState -eq "8248544") {
+    if ($CurrentFileState -eq "5248544") {
         Write-Host "All the files attributes are set to online only" -ForegroundColor Green
         return
     } else {
-        Write-Host "All the files attributes are not set to online only" -ForegroundColor Green
+        Write-Host "All the files attributes are not set to online only" -ForegroundColor Red
         Start-Sleep -Seconds 3
         return
     }
