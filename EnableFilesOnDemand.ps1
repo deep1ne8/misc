@@ -92,15 +92,15 @@ try {
     Start-Sleep -Seconds 3
     if ($CurrentFileState -eq "8248544") {
         Write-Host "All the files attributes are set to online only" -ForegroundColor Green
-        exit 1
+        return
     } else {
         Write-Host "All the files attributes are not set to online only" -ForegroundColor Green
         Start-Sleep -Seconds 3
-        exit 0
+        return
     }
 } catch {
     Write-Host "Error occurred while verifying the updated file state: $_" -ForeGroundColor Red
-    exit 1
+    return
         }
 }
 
