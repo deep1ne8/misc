@@ -41,21 +41,28 @@ Set-Location -Path $OneDrivePath
 Start-Sleep -Seconds 3
 Write-Host "`n"
 
-Write-Host "Verifying the current file state" -ForeGroundColor Green
-Write-Host ""
+Write-Host "Getting the current file state" -ForeGroundColor Green
+Wite-Host "`n"
+Start-Sleep -Seconds 3
 
-Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '525344' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+# Check if files are always available
+$CurrentFileState = Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '525344' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes, Mode, Name, Length, CreationTime
 Write-Host "`n"
+Write-Host $CurrentFileState
+Write-Host "`n"
+
+
 Write-Host "Enabling files on demand" -ForegroundColor Green
 Write-Host ""
 # Check if files are online only
-$CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Format-Table Attributes
+$CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5258544' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes
 if ($CheckFilesAttrib -eq "5248544"){
-	Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
+	        Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
  	exit 1
-  }else {
+  }else {   Write-Host "All the files attributes are not set to online only" -ForegroundColor Green
+  Start-Sleep -Seconds 3
 
-Start-Sleep -Seconds 3
+# Enable files on demand by removing ReparsePoint attribute
 Write-Host "`n"
 Write-Host "Below is the guide for the file state, according to it's attribute" -ForeGroundColor Green
 Write-Host "`n==================================================================="
@@ -69,26 +76,31 @@ Start-Sleep -Seconds 5
 Write-Host "`n"
 Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
-
-Write-Host "Enabling files on demand" -ForegroundColor Green
+Start-Sleep -Seconds 3
 try {
-    Get-childitem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | 
-    Where-Object {$_.Attributes -match 'ReparsePoint' -or $_.Attributes -eq '525344' } | 
+    Write-Host $CurrentFileState | 
     ForEach-Object {
         attrib.exe $_.fullname +U /s
     }
 } catch {
     Write-Host "Error occurred while enabling files on demand: $_" -ForeGroundColor Red
-}
-
-Write-Host "`n"
-Write-Host "Verifying the updated file state" -ForeGroundColor Green
-Write-Host ""
-try {
-    Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5248544' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+}  
+try { 
+    Write-Host "Verifying the updated file state" -ForeGroundColor Green
+    Write-Host ""
+    Start-Sleep -Seconds 3
+    if ($CurrentFileState -eq "8248544") {
+        Write-Host "All the files attributes are set to online only" -ForegroundColor Green
+        exit 1
+    } else {
+        Write-Host "All the files attributes are not set to online only" -ForegroundColor Green
+        Start-Sleep -Seconds 3
+        exit 0
+    }
 } catch {
     Write-Host "Error occurred while verifying the updated file state: $_" -ForeGroundColor Red
-    }
+    exit 1
+        }
 }
 
 #else {
