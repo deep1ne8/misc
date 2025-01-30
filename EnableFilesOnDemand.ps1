@@ -82,7 +82,7 @@ try {
     Write-Output $CurrentFileState | ForEach-Object {
         if ($_.Attributes -eq "525344") {
             $attrib = New-Object System.IO.FileInfo($_.FullName)
-            if ($attrib.Attributes.ToString() -eq "ReparsePoint") {
+            if ($attrib.Attributes.ToString() -eq "525344") {
                 attrib.exe +U $_.FullName
                 Write-Host "File state changed to cloud-only: $($_.FullName)" -ForeGroundColor Green
                 return
