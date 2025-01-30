@@ -44,7 +44,7 @@ Write-Host "`n"
 Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
 
-Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5248544' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '525344' } | Format-Table Attributes, Mode, Name, Length, CreationTime
 Write-Host "`n"
 Write-Host "Enabling files on demand" -ForegroundColor Green
 Write-Host ""
