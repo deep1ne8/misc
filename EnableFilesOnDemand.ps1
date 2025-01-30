@@ -46,16 +46,16 @@ Wite-Host "`n"
 Start-Sleep -Seconds 3
 
 # Check if files are always available
-$CurrentFileState = Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '525344' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes, Mode, Name, Length, CreationTime
+$CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '525344' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes, Mode, Name, Length, CreationTime
 Write-Host "`n"
-Write-Host $CurrentFileState
+Write-Output $CurrentFileState
 Write-Host "`n"
 
 
 Write-Host "Enabling files on demand" -ForegroundColor Green
 Write-Host ""
 # Check if files are online only
-$CheckFilesAttrib = Get-ChildItem -Path '*.*' -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5258544' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes
+$CheckFilesAttrib = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5258544' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes
 if ($CheckFilesAttrib -eq "5248544"){
 	        Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
  	exit 1
@@ -78,7 +78,7 @@ Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
 Start-Sleep -Seconds 3
 try {
-    Write-Host $CurrentFileState | 
+    Write-Output $CurrentFileState | 
     ForEach-Object {
         attrib.exe $_.fullname +U /s
     }
