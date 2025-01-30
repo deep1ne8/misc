@@ -42,31 +42,27 @@ Set-Location -Path $OneDrivePath
 Start-Sleep -Seconds 3
 Write-Host "`n"
 
-Write-Host "Getting the current file state" -ForeGroundColor Green
-Write-Host "`n"
-Start-Sleep -Seconds 3
-
-# Check if files are always available
+# Get the current state of files in the directory
 $CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | 
-    Select-Object Name, Attributes, Mode, Length, CreationTime
+    Select-Object FullName, Name, Attributes, Mode, Length, CreationTime
 
 Write-Host "`nCurrent File State:`n" -ForegroundColor Cyan
 $CurrentFileState | Format-Table -AutoSize
 Write-Host "`n"
 Start-Sleep -Seconds 3
 
-Write-Host "Checking if files are online-only..." -ForegroundColor Green
+Write-Host "Checking if all files are online-only..." -ForegroundColor Green
 Write-Host ""
 
-# Identify files with the 'Online Only' attribute
-$OnlineOnlyFiles = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | 
-    Where-Object { ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) }
+# Identify files that are **not** online-only
+$NotOnlineOnlyFiles = $CurrentFileState | 
+    Where-Object { ([int]$_.Attributes -ne 5248544) }  # Ensure they are NOT cloud-only
 
-if ($OnlineOnlyFiles.Count -gt 0) {
-    Write-Host "All files are already set to online-only." -ForegroundColor Green
+if ($NotOnlineOnlyFiles.Count -eq 0) {
+    Write-Host "✅ All files are already set to online-only." -ForegroundColor Green
     return
 } else {
-    Write-Host "Some files are not online-only. Attempting to enable files on demand..." -ForegroundColor Red
+    Write-Host "❌ Some files are not online-only. Preparing to update..." -ForegroundColor Red
     Start-Sleep -Seconds 3
 }
 
@@ -86,23 +82,24 @@ Write-Host "`nUpdating file states..." -ForegroundColor Green
 Start-Sleep -Seconds 3
 
 try {
-    foreach ($File in $CurrentFileState) {
-        $FilePath = $File.Name
-        $Attributes = [System.IO.FileAttributes]$File.Attributes
+    foreach ($File in $NotOnlineOnlyFiles) {
+        $FilePath = $File.FullName
+        $Attributes = [int]$File.Attributes
 
-        if ($Attributes -band [System.IO.FileAttributes]::Offline) {
-            Write-Host "File '$FilePath' is already cloud-only." -ForegroundColor Green
+        if ($Attributes -eq 5248544) {
+            Write-Host "✅ File '$FilePath' is already cloud-only." -ForegroundColor Green
         } else {
             attrib.exe +U "$FilePath"
-            Write-Host "File '$FilePath' state changed to cloud-only." -ForegroundColor Green
+            Write-Host "🔄 File '$FilePath' state changed to cloud-only." -ForegroundColor Green
         }
     }
 } catch {
-    Write-Host "Error occurred while enabling files on demand: $_" -ForegroundColor Red
+    Write-Host "❌ Error occurred while enabling files on demand: $_" -ForegroundColor Red
     return
 }
 
-Write-Host "`nProcess completed successfully." -ForegroundColor Cyan
+Write-Host "`n✅ Process completed successfully." -ForegroundColor Cyan
+
 
 
 
