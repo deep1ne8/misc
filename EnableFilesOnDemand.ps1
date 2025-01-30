@@ -79,7 +79,7 @@ Write-Host "Changing the file state" -ForeGroundColor Green
 Write-Host ""
 Start-Sleep -Seconds 3
 try {
-    $CurrentFileState | ForEach-Object {
+    Write-Output $CurrentFileState | ForEach-Object {
         if (Test-Path $_.FullName) {
             attrib.exe +U $_.FullName
         }
