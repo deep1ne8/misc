@@ -90,6 +90,4 @@ function Show-ReturnMenu {
     }
 }
 
-# Start the script menu
-Write-Host "Welcome to the PowerShell script menu!" -BackgroundColor DarkGreen -ForegroundColor White
 Show-ScriptStarZMenu
