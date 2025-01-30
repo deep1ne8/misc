@@ -49,7 +49,7 @@ Start-Sleep -Seconds 3
 # Check if files are always available
 $CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '525344' -or $_.Attributes -eq 'ReparsePoint' } | Format-Table Attributes, Mode, Name, Length, CreationTime
 Write-Host "`n"
-Write-Output $CurrentFileState
+Write-Host $CurrentFileState
 Write-Host "`n"
 
 
@@ -79,7 +79,7 @@ Write-Host "Verifying the current file state" -ForeGroundColor Green
 Write-Host ""
 Start-Sleep -Seconds 3
 try {
-    Write-Output $CurrentFileState | 
+    Write-Host $CurrentFileState | 
     ForEach-Object {
         attrib.exe $_.fullname +U /s
     }
