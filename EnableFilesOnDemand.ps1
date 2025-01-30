@@ -47,59 +47,63 @@ Write-Host "`n"
 Start-Sleep -Seconds 3
 
 # Check if files are always available
-$CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Format-Table Attributes, Mode, Name, Length, CreationTime
-Write-Host "`n"
-Write-Output $CurrentFileState
+$CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | 
+    Select-Object Name, Attributes, Mode, Length, CreationTime
+
+Write-Host "`nCurrent File State:`n" -ForegroundColor Cyan
+$CurrentFileState | Format-Table -AutoSize
 Write-Host "`n"
 Start-Sleep -Seconds 3
 
-Write-Host "Enabling files on demand" -ForegroundColor Green
+Write-Host "Checking if files are online-only..." -ForegroundColor Green
 Write-Host ""
-# Check if files are online only
-$CheckFilesAttrib = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Attributes -eq '5258544'} | Format-Table Attributes
-if ($CheckFilesAttrib -eq "5248544"){
-	        Write-Host "All the files attributes are already set to online only" -ForegroundColor Green
- 	return
-  }else {   Write-Host "All the files attributes are not set to online only" -ForegroundColor Red
-  Start-Sleep -Seconds 3
 
-# Enable files on demand by removing ReparsePoint attribute
-Write-Host "`n"
-Write-Host "Below is the guide for the file state, according to it's attribute" -ForeGroundColor Green
-Write-Host "`n==================================================================="
-Write-Host "File State 	        Attribute" -ForeGroundColor White
-Write-Host "------------------------------"
-Write-Host "Cloud-Only 	        5248544" -ForeGroundColor Green
-Write-Host "Always available 	525344" -ForeGroundColor Green
-Write-Host "Locally Available 	ReparsePoint" -ForeGroundColor Green
-Write-Host "`n==================================================================="
+# Identify files with the 'Online Only' attribute
+$OnlineOnlyFiles = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -ErrorAction SilentlyContinue | 
+    Where-Object { ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) }
+
+if ($OnlineOnlyFiles.Count -gt 0) {
+    Write-Host "All files are already set to online-only." -ForegroundColor Green
+    return
+} else {
+    Write-Host "Some files are not online-only. Attempting to enable files on demand..." -ForegroundColor Red
+    Start-Sleep -Seconds 3
+}
+
+# File attribute reference guide
+Write-Host "`nFile Attribute Guide:" -ForegroundColor Cyan
+Write-Host "==========================================" 
+Write-Host "File State            | Attribute Value" -ForegroundColor White
+Write-Host "------------------------------------------"
+Write-Host "Cloud-Only           | 5248544" -ForegroundColor Green
+Write-Host "Always Available     | 525344" -ForegroundColor Yellow
+Write-Host "Locally Available    | ReparsePoint" -ForegroundColor Red
+Write-Host "==========================================`n"
 Start-Sleep -Seconds 5
-Write-Host "`n"
-Write-Host "Changing the file state" -ForeGroundColor Green
-Write-Host ""
+
+# Enable files on demand (Change state to Cloud-Only)
+Write-Host "`nUpdating file states..." -ForegroundColor Green
 Start-Sleep -Seconds 3
+
 try {
-    Write-Output $CurrentFileState | ForEach-Object {
-        if ($_.Attributes -eq "525344") {
-            $attrib = New-Object System.IO.FileInfo($_.FullName)
-            if ($attrib.Attributes.ToString() -eq "525344") {
-                attrib.exe +U $_.FullName
-                Write-Host "File state changed to cloud-only: $($_.FullName)" -ForeGroundColor Green
-                return
-            }else{
-                Write-Host "File state is already cloud-only: $($_.FullName)" -ForeGroundColor Green
-                return
-            }else{
-            Write-Host "Error: No cloud-only files found in the current directory." -ForeGroundColor Red
-                return
-            }
+    foreach ($File in $CurrentFileState) {
+        $FilePath = $File.Name
+        $Attributes = [System.IO.FileAttributes]$File.Attributes
+
+        if ($Attributes -band [System.IO.FileAttributes]::Offline) {
+            Write-Host "File '$FilePath' is already cloud-only." -ForegroundColor Green
+        } else {
+            attrib.exe +U "$FilePath"
+            Write-Host "File '$FilePath' state changed to cloud-only." -ForegroundColor Green
         }
     }
-}catch {
-    Write-Host "Error occurred while enabling files on demand: $_" -ForeGroundColor Red
+} catch {
+    Write-Host "Error occurred while enabling files on demand: $_" -ForegroundColor Red
     return
-    }
-  }
+}
+
+Write-Host "`nProcess completed successfully." -ForegroundColor Cyan
+
 
 
 
