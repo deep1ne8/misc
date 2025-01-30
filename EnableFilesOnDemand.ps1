@@ -79,14 +79,17 @@ Write-Host "Changing the file state" -ForeGroundColor Green
 Write-Host ""
 Start-Sleep -Seconds 3
 try {
-    Write-Output $CurrentFileState | 
-    ForEach-Object {
-        attrib.exe $_.fullname +U /s
+    $CurrentFileState | ForEach-Object {
+        if (Test-Path $_.FullName) {
+            attrib.exe +U $_.FullName
+        }
     }
-} catch {
+}catch {
     Write-Host "Error occurred while enabling files on demand: $_" -ForeGroundColor Red
     return
-}  
+}
+
+
 try { 
     Write-Host "Verifying the updated file state" -ForeGroundColor Green
     Write-Host ""
@@ -94,17 +97,24 @@ try {
     if ($CurrentFileState -eq "5248544") {
         Write-Host "All the files attributes are set to online only" -ForegroundColor Green
         return
-    } else {
+    }else {
         Write-Host "All the files attributes are not set to online only" -ForegroundColor Red
         Start-Sleep -Seconds 3
         return
-    }
-} catch {
+    }catch {
     Write-Host "Error occurred while verifying the updated file state: $_" -ForeGroundColor Red
     return
+    }
+} finally {
+    # Reset the file attributes to ReparsePoint
+    if ($CheckFilesAttrib -eq "5248544"){
+        Write-Host "All the files attributes are syccessfully set to online only" -ForegroundColor Green
+        Write-Output $CurrentFileState
         }
-
+    }
 }
+
+
 
 
 
