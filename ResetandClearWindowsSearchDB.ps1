@@ -43,7 +43,7 @@ function Reset-WindowsSearch {
         Start-Process "control.exe" -ArgumentList "/name Microsoft.IndexingOptions" -WindowStyle Hidden
     } catch {
         # Error handling if needed (optional)
-        # Write-Host "Error: $_" -ForegroundColor Red
+        Write-Host "Error: $_" -ForegroundColor Red
     }
 }
 
