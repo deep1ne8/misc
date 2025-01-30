@@ -80,39 +80,26 @@ Write-Host ""
 Start-Sleep -Seconds 3
 try {
     Write-Output $CurrentFileState | ForEach-Object {
-        if (Test-Path $_.FullName) {
-            attrib.exe +U $_.FullName
+        if ($_.Attributes -eq "525344") {
+            $attrib = New-Object System.IO.FileInfo($_.FullName)
+            if ($attrib.Attributes.ToString() -eq "ReparsePoint") {
+                attrib.exe +U $_.FullName
+                Write-Host "File state changed to cloud-only: $($_.FullName)" -ForeGroundColor Green
+                return
+            }else{
+                Write-Host "File state is already cloud-only: $($_.FullName)" -ForeGroundColor Green
+                return
+            }else{
+            Write-Host "Error: No cloud-only files found in the current directory." -ForeGroundColor Red
+                return
+            }
         }
     }
 }catch {
     Write-Host "Error occurred while enabling files on demand: $_" -ForeGroundColor Red
     return
-}
-
-
-try { 
-    Write-Host "Verifying the updated file state" -ForeGroundColor Green
-    Write-Host ""
-    Start-Sleep -Seconds 3
-    if ($CurrentFileState -eq "5248544") {
-        Write-Host "All the files attributes are set to online only" -ForegroundColor Green
-        return
-    }else {
-        Write-Host "All the files attributes are not set to online only" -ForegroundColor Red
-        Start-Sleep -Seconds 3
-        return
-    }catch {
-    Write-Host "Error occurred while verifying the updated file state: $_" -ForeGroundColor Red
-    return
     }
-} finally {
-    # Reset the file attributes to ReparsePoint
-    if ($CheckFilesAttrib -eq "5248544"){
-        Write-Host "All the files attributes are syccessfully set to online only" -ForegroundColor Green
-        Write-Output $CurrentFileState
-        }
-    }
-}
+  }
 
 
 
