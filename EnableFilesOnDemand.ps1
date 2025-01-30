@@ -104,11 +104,6 @@ try {
         }
 }
 
-#else {
-#    Write-Host "OneDrive folder not found for user $LoggedInUser." -ForeGroundColor Red
-#    exit 1
-#}
-
 
 
 
