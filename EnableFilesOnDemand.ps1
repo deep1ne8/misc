@@ -19,6 +19,7 @@ if ($LoggedInUser -match '\\') {
     Write-Host ""
     if ($UserProfileFolder) {
         Write-Host "User Profile Folder: $($UserProfileFolder.FullName)" -ForegroundColor Green
+        Write-Host ""
     } else {
         Write-Host "No matching user profile folder found for: $UserName" -ForegroundColor Yellow
     }
@@ -42,7 +43,7 @@ Start-Sleep -Seconds 3
 Write-Host "`n"
 
 Write-Host "Getting the current file state" -ForeGroundColor Green
-Wite-Host "`n"
+Write-Host "`n"
 Start-Sleep -Seconds 3
 
 # Check if files are always available
