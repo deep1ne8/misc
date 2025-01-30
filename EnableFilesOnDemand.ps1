@@ -51,7 +51,7 @@ $CurrentFileState = Get-ChildItem -Path $PWD -Force -File -Recurse -Verbose -Err
 Write-Host "`n"
 Write-Output $CurrentFileState
 Write-Host "`n"
-
+Start-Sleep -Seconds 3
 
 Write-Host "Enabling files on demand" -ForegroundColor Green
 Write-Host ""
