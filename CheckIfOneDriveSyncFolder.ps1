@@ -1,36 +1,55 @@
-# Function to prompt user for directory selection
-function Get-DirectoryPath {
-    Write-Host "Select an option to provide the directory path:" -ForegroundColor Cyan
-    Write-Host "1. Enter the directory path manually"
-    Write-Host "2. Browse and select a directory"
-    $choice = Read-Host "Enter your choice (1 or 2)"
+# Function to display a browsable directory listing
+function Get-BrowsableDirectory {
+    param (
+        [string]$currentPath = [Environment]::GetFolderPath("Desktop")
+    )
 
-    if ($choice -eq 1) {
-        # Prompt user to manually enter the directory path
-        $dirToCheck = Read-Host "Enter the full path of the directory"
-    } elseif ($choice -eq 2) {
-        # Use a folder browser dialog to select the directory
-        Add-Type -AssemblyName System.Windows.Forms
-        $folderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
-        $folderBrowser.Description = "Select a directory to check for OneDrive sync"
-        $folderBrowser.RootFolder = [System.Environment+SpecialFolder]::Desktop
+    while ($true) {
+        Clear-Host
+        Write-Host "Current Directory: $currentPath" -ForegroundColor Cyan
+        Write-Host "----------------------------------------" -ForegroundColor Cyan
 
-        if ($folderBrowser.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-            $dirToCheck = $folderBrowser.SelectedPath
-        } else {
-            Write-Host "No directory selected. Exiting script." -ForegroundColor Yellow
-            exit
+        # Get the list of directories in the current path
+        $directories = Get-ChildItem -Path $currentPath -Directory
+
+        # Display the directories with numbers for selection
+        for ($i = 0; $i -lt $directories.Count; $i++) {
+            Write-Host "$($i + 1). $($directories[$i].Name)"
         }
-    } else {
-        Write-Host "Invalid choice. Exiting script." -ForegroundColor Red
-        exit
-    }
 
-    return $dirToCheck
+        # Add options for going back or selecting the current directory
+        Write-Host "----------------------------------------" -ForegroundColor Cyan
+        Write-Host "0. Select this directory"
+        if ($currentPath -ne (Split-Path -Path $currentPath -Parent)) {
+            Write-Host "B. Go back to the parent directory"
+        }
+        Write-Host "Q. Quit"
+
+        # Prompt the user for their choice
+        $choice = Read-Host "Enter your choice (number, B, or Q)"
+
+        if ($choice -eq "0") {
+            # User selected the current directory
+            return $currentPath
+        } elseif ($choice -eq "B" -and $currentPath -ne (Split-Path -Path $currentPath -Parent)) {
+            # Go back to the parent directory
+            $currentPath = Split-Path -Path $currentPath -Parent
+        } elseif ($choice -eq "Q") {
+            # Quit the script
+            Write-Host "Exiting script." -ForegroundColor Yellow
+            exit
+        } elseif ($choice -match "^\d+$" -and [int]$choice -le $directories.Count -and [int]$choice -gt 0) {
+            # Navigate into the selected subdirectory
+            $currentPath = $directories[[int]$choice - 1].FullName
+        } else {
+            Write-Host "Invalid choice. Please try again." -ForegroundColor Red
+            Start-Sleep -Seconds 2
+        }
+    }
 }
 
 # Get the directory path from the user
-$dirToCheck = Get-DirectoryPath
+$dirToCheck = Get-BrowsableDirectory
 
 # Get the OneDrive root path
 $onedrivePath = (Get-ItemProperty -Path "HKCU:\Environment" -Name "OneDrive").OneDrive
