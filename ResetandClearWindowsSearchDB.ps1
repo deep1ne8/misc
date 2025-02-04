@@ -18,7 +18,7 @@ if (-not (Test-Admin)) {
 try {
     $WSearch = Get-Service -Name "WSearch" -ErrorAction Stop
 } catch {
-    Write-Host "Windows Search service not found. Exiting...$WSearch" -ForegroundColor Red
+    Write-Host "Windows Search service not found. Exiting..." -ForegroundColor Red
     exit 1
 }
 
@@ -46,13 +46,21 @@ if (Test-Path $SearchDBPath) {
 # Start Windows Search service
 Write-Host "Restarting Windows Search service..." -ForegroundColor Yellow
 Start-Service -Name "WSearch"
-Start-Sleep -Seconds 5
 
-# Wait for Windows Search service to be fully running
-Write-Host "Ensuring Windows Search service is running..." -ForegroundColor Yellow
+# Wait for Windows Search service to be fully running (Max 60 seconds)
+$Timeout = 60
+$Elapsed = 0
 while ((Get-Service -Name "WSearch").Status -ne "Running") {
+    if ($Elapsed -ge $Timeout) {
+        Write-Host "ERROR: Windows Search service failed to start within 60 seconds!" -ForegroundColor Red
+        exit 1
+    }
     Start-Sleep -Seconds 5
+    $Elapsed += 5
+    Write-Host "Waiting for Windows Search service to reach 'Running' state... ($Elapsed seconds elapsed)" -ForegroundColor Yellow
 }
+
+Write-Host "Windows Search service is now running." -ForegroundColor Green
 
 # Trigger rebuild of search index
 Write-Host "Triggering full search index rebuild..." -ForegroundColor Yellow
@@ -64,6 +72,7 @@ try {
     Write-Host "Windows Search Index has been cleared and will be rebuilt automatically." -ForegroundColor Green
 } catch {
     Write-Host "Failed to trigger Windows Search rebuild. The service might be disabled." -ForegroundColor Red
+    exit 1
 }
 
 return
