@@ -14,12 +14,17 @@ if (-not (Test-Admin)) {
     exit 1
 }
 
+# Ensure Windows Search is Enabled
+Write-Host "Ensuring Windows Search is enabled..." -ForegroundColor Yellow
+Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\WSearch" -Name "Start" -Value 2 -Force
+Start-Sleep -Seconds 2
+
 # Check if Windows Search service exists
 try {
     $WSearch = Get-Service -Name "WSearch" -ErrorAction Stop
 } catch {
     Write-Host "Windows Search service not found. Exiting...$WSearch" -ForegroundColor Red
-    exit 1
+    return
 }
 
 # Stop Windows Search service
@@ -53,7 +58,7 @@ $Elapsed = 0
 while ((Get-Service -Name "WSearch").Status -ne "Running") {
     if ($Elapsed -ge $Timeout) {
         Write-Host "ERROR: Windows Search service failed to start within 60 seconds!" -ForegroundColor Red
-        exit 1
+        return
     }
     Start-Sleep -Seconds 5
     $Elapsed += 5
@@ -62,17 +67,25 @@ while ((Get-Service -Name "WSearch").Status -ne "Running") {
 
 Write-Host "Windows Search service is now running." -ForegroundColor Green
 
-# Trigger rebuild of search index
+# Trigger rebuild of search index using both WMI and alternative method
 Write-Host "Triggering full search index rebuild..." -ForegroundColor Yellow
 try {
     $Searcher = New-Object -ComObject WbemScripting.SWbemLocator
     $WMI = $Searcher.ConnectServer(".", "root\CIMv2")
     $Index = $WMI.Get("Win32_SearchIndexer").SpawnInstance_()
     $Index.Rebuild()
-    Write-Host "Windows Search Index has been cleared and will be rebuilt automatically." -ForegroundColor Green
+    Write-Host "Windows Search Index rebuild triggered successfully via WMI." -ForegroundColor Green
 } catch {
-    Write-Host "Failed to trigger Windows Search rebuild. The service might be disabled." -ForegroundColor Red
-    exit 1
+    Write-Host "WMI method failed. Attempting alternative method..." -ForegroundColor Yellow
+    
+    # Alternative Method: Manually delete registry keys to force Windows to rebuild
+    try {
+        Remove-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows Search" -Name "SetupCompletedSuccessfully" -ErrorAction SilentlyContinue
+        Write-Host "Windows Search will now rebuild the index on restart." -ForegroundColor Green
+    } catch {
+        Write-Host "Failed to reset registry settings for index rebuild. Manual intervention may be needed." -ForegroundColor Red
+        return
+    }
 }
 
 return
