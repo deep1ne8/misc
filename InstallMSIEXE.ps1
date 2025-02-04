@@ -53,7 +53,7 @@ if ($Path -like "*.msi") {
     Start-Process -FilePath $Path -ArgumentList "/quiet /norestart" -Wait -NoNewWindow
 } else {
     Write-Error "Unsupported file type. Only .msi and .exe files are supported."
-    exit 1
+    return
 }
 
 # Clean up the job
