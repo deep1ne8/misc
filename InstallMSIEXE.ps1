@@ -15,6 +15,8 @@
     .\Deploy-App.ps1 -Url "https://example.com/app.msi" -Path "C:\Temp\app.msi" -Continue $true
 #>
 
+function downloadApp {
+    
 param (
     [Parameter(Mandatory=$true)]
     [string]
@@ -54,7 +56,22 @@ if ($Path -like "*.msi") {
 } else {
     Write-Error "Unsupported file type. Only .msi and .exe files are supported."
     return
-}
+    }
 
+# Check if the installation was successful
+if ($?) {
+    Write-Host "Installation completed successfully."
+} else {
+    Write-Error "Installation failed."
+    return
+    }
 # Clean up the job
 Remove-BitsTransfer -Job $jobName -Confirm:$false
+}
+
+# Call the function to download and install the app
+downloadApp
+
+
+
+
