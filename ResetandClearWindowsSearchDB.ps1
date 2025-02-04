@@ -1,51 +1,51 @@
-function Reset-WindowsSearch {
-    param(
-        [string]$ServiceName = "WSearch",
-        [string]$SearchDbPath = "$env:ProgramData\Microsoft\Search\Data\Applications\Windows\Windows.edb"
-    )
+# Define the Windows Search database path
+$SearchDBPath = "$env:ProgramData\Microsoft\Search\Data"
 
-    # Define the path that may be causing issues
-    $pathToCheck = "$env:windir\System32\config\systemprofile"
-
-    # Ensure running with elevated permissions (Administrator)
-    try {
-        # Check if access to the path is denied and fix permissions using icacls
-        if (-not (Test-Path $pathToCheck)) {
-            Write-Host "Path not found, skipping access check" -ForegroundColor Yellow
-        } else {
-            Write-Host "Checking permissions for $pathToCheck..." -ForegroundColor Cyan
-            # Use icacls to reset permissions if access is denied
-            icacls $pathToCheck /reset /T /Q
-            Write-Host "Permissions reset for $pathToCheck" -ForegroundColor Green
-        }
-
-        # Suppress all output except errors
-        $ErrorActionPreference = "Stop"
-
-        # Check if the service exists and get its status
-        $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-        if ($null -eq $service) { return }
-
-        # Stop the service if it's running
-        if ($service.Status -eq 'Running') {
-            Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
-        }
-
-        # Remove the corrupted search database
-        if (Test-Path -Path $SearchDbPath) {
-            Remove-Item -Path $SearchDbPath -Force -ErrorAction SilentlyContinue
-        }
-
-        # Start the service
-        Start-Service -Name $ServiceName -ErrorAction SilentlyContinue
-
-        # Trigger a rebuild of the search index quietly (no UI)
-        Start-Process "control.exe" -ArgumentList "/name Microsoft.IndexingOptions" -WindowStyle Hidden
-    } catch {
-        # Error handling if needed (optional)
-        Write-Host "Error: $_" -ForegroundColor Red
-    }
+# Function to check if running as Administrator
+function Test-Admin {
+    $user = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($user)
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-# Call the function
-Reset-WindowsSearch
+# Ensure script is run as Administrator
+if (-not (Test-Admin)) {
+    Write-Host "This script must be run as an administrator!" -ForegroundColor Red
+    return
+}
+
+# Stop Windows Search service
+Write-Host "Stopping Windows Search service..." -ForegroundColor Yellow
+Stop-Service -Name "WSearch" -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 5
+
+# Grant full permissions to the search index folder
+Write-Host "Granting full permissions to Windows Search directory..." -ForegroundColor Yellow
+$acl = Get-Acl $SearchDBPath
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule("Everyone", "FullControl", "ContainerInherit,ObjectInherit", "None", "Allow")
+$acl.SetAccessRule($rule)
+Set-Acl -Path $SearchDBPath -AclObject $acl
+Write-Host "Permissions updated successfully." -ForegroundColor Green
+
+# Delete Windows Search database and index files
+if (Test-Path $SearchDBPath) {
+    Write-Host "Deleting Windows Search database and index files..." -ForegroundColor Yellow
+    Remove-Item -Path "$SearchDBPath\*" -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Database files deleted." -ForegroundColor Green
+} else {
+    Write-Host "Windows Search database folder not found. It may have been deleted already." -ForegroundColor Cyan
+}
+
+# Start Windows Search service
+Write-Host "Restarting Windows Search service..." -ForegroundColor Yellow
+Start-Service -Name "WSearch"
+
+# Trigger rebuild of search index
+Write-Host "Triggering full search index rebuild..." -ForegroundColor Yellow
+$Searcher = New-Object -ComObject WbemScripting.SWbemLocator
+$WMI = $Searcher.ConnectServer(".", "root\CIMv2")
+$Index = $WMI.Get("Win32_SearchIndexer").SpawnInstance_()
+$Index.Rebuild()
+
+Write-Host "Windows Search Index has been cleared and will be rebuilt automatically." -ForegroundColor Green
+return
