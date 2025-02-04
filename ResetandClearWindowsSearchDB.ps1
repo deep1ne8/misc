@@ -18,7 +18,7 @@ if (-not (Test-Admin)) {
 try {
     $WSearch = Get-Service -Name "WSearch" -ErrorAction Stop
 } catch {
-    Write-Host "Windows Search service not found. Exiting..." -ForegroundColor Red
+    Write-Host "Windows Search service not found. Exiting...$WSearch" -ForegroundColor Red
     exit 1
 }
 
