@@ -99,8 +99,9 @@
         }
 
         async function fetchRepoContents() {
-            const repo = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/";
+            const repo = "deep1ne8/misc";
             const url = `https://api.github.com/repos/${repo}/contents/`;
+            const url2 = `https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/`
             try {
                 const response = await fetch(url);
                 const data = await response.json();
@@ -109,8 +110,8 @@
                     if (item.name.endsWith(".ps1")) {
                         const li = document.createElement("li");
                         const a = document.createElement("a");
-                        a.href = `${repo}/${item.name}`;
-                        a.textContent = `mygithubpage/${item.name}`;
+                        a.href = `${window.location.origin}/${repo}/${item.name}`;
+                        a.textContent = `${url2}/${item.name}`;
                         a.target = "_blank";
                         li.appendChild(a);
                         list.appendChild(li);
