@@ -4,7 +4,7 @@ param (
     [Parameter(Mandatory=$true)]
     [string]$DestinationPath,
     [Parameter(Mandatory=$false)]
-    [bool]$Continue = $True
+    [bool]$Continue = $false
 )
 
 # Check if the destination path exists
@@ -17,7 +17,7 @@ if (!(Test-Path $DestinationPath)) {
 $currentPrincipal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
 if (!$currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "Please run this script as an administrator."
-    exit
+    return
 }
 
 # Install BITS if it is not installed
