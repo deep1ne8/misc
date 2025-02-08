@@ -32,12 +32,12 @@ Write-Host "`n"
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host "`n"   
 Write-Host  "   ______           __           ____             __"               -ForegroundColor cyan
-Write-Host  "  /\  _  \         /\ \__       /\  _`\          /\ \__"            -ForegroundColor White
-Write-Host  "  \ \ \L\ \  __  __\ \ ,_\   ___\ \ \L\ \  __  __\ \  _\   __"      -ForegroundColor red
-Write-Host  "   \ \  __ \/\ \/\ \\ \ \/  / __`\ \  _ < /\ \/\ \\ \ \/  / __ \"   -ForegroundColor red
+Write-Host  "  /\  _  \         /\ \__       /\  _ \          /\ \__"            -ForegroundColor White
+Write-Host  "  \ \ \L\ \  __  __\ \  _\   __ \ \ \_\ \      __\ \  _\   __"      -ForegroundColor red
+Write-Host  "   \ \  __ \/\ \/\ \\ \ \/  / __ \ \  _ < /\ \/\ \\ \ \/  / __ \"   -ForegroundColor red
 Write-Host  "    \ \ \/\ \ \ \_\ \\ \ \_/\ \L\ \ \ \L\ \ \ \_\ \\ \ \_/\  __/"   -ForegroundColor White
-Write-Host  "     \ \_\ \_\ \____/ \ \__\ \____/\ \____/\/`____ \\ \__\ \____\"  -ForegroundColor cyan
-Write-Host  "      \/_/\/_/\/___/   \/__/\/___/  \/___/  `/___/> \\/__/\/____/"  -ForegroundColor cyan
+Write-Host  "     \ \_\ \_\ \____/ \ \__\ \____/\ \____/\/ ____ \\ \__\ \____\"  -ForegroundColor cyan
+Write-Host  "      \/_/\/_/\/___/   \/__/\/___/  \/___/   /___/> \\/__/\/____/"  -ForegroundColor cyan
 Write-Host  "                                               /\___/"              -ForegroundColor White
 Write-Host  "                                               \/__/"               -ForegroundColor red
 Write-Host "`n"
