@@ -32,8 +32,13 @@ if (!(Test-Path $DestinationPath)) {
 # Install BITS if it is not installed
 if (-not (Where.exe BITS)) {
     try {
+        # Install BITS
+        Write-Host "Installing BITS." -ForegroundColor Black -CommandColor Green
+        Write-Host "Please wait..." -ForegroundColor Black -CommandColor Green
         dism /online /Get-Features | findstr /i "BITS"
-        dism /online /Enable-Feature /FeatureName:"BITS"
+        Start-Sleep -Seconds 3
+        dism /online /Install-Feature /FeatureName:"BITS" /NoRestart
+        Write-Host "BITS installed successfully." -ForegroundColor Green
     } catch {
         Write-Host "Failed to install BITS: $_" -ForegroundColor Red
         return
@@ -115,14 +120,9 @@ if ($downloadMethod -eq "BITS") {
 
 } elseif ($downloadMethod -eq "WGET") {
     $wgetCommand = "wget `"$Url`" -O `"$DestinationPath`""
-    if ($Url -notmatch '^(https?|ftp)://[^\s/$.?#].[^\s]*$') {
-        Write-Host "Invalid URL format." -ForegroundColor Red
-        return
-    }
-    if ($null -eq $DestinationPath -or $DestinationPath -notmatch '^.+$') {
-        Write-Host "Invalid characters in destination path." -ForegroundColor Red
-        return
-    }
+    Write-Host "Downloading $Url to $DestinationPath..." -ForegroundColor Black -CommandColor Green
+
+    # Execute the WGET command
     try {
         Invoke-Expression $wgetCommand
     } catch {
