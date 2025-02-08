@@ -7,7 +7,8 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/DeployPrinter.ps1"; Description = "DeployPrinter" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/CheckIfOneDriveSyncFolder.ps1"; Description = "CheckIfOneDriveSyncFolder" }
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/CheckIfOneDriveSyncFolder.ps1"; Description = "CheckIfOneDriveSyncFolder" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" }
 )
 
 function InitiateScriptFromUrl {
@@ -49,11 +50,11 @@ function Show-ScriptStarZMenu {
         Write-Host "$index. $($script.Description)" -ForegroundColor Green
         $index++
     }
-    Write-Host "10. Exit" -ForegroundColor Red
+    Write-Host "11. Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Cyan
 
-    $choice = Read-Host "Enter your choice (1-10)"  
+    $choice = Read-Host "Enter your choice (1-11)"  
     switch ($choice) {
         "1" { InitiateScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
         "2" { InitiateScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
@@ -64,7 +65,8 @@ function Show-ScriptStarZMenu {
         "7" { InitiateScriptFromUrl $GitHubScripts[6].ScriptUrl; Show-ReturnMenu }
         "8" { InitiateScriptFromUrl $GitHubScripts[7].ScriptUrl; Show-ReturnMenu }
         "9" { InitiateScriptFromUrl $GitHubScripts[8].ScriptUrl; Show-ReturnMenu }
-        "10" {
+        "10" { InitiateScriptFromUrl $GitHubScripts[9].ScriptUrl; Show-ReturnMenu }
+        "11" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
         }
@@ -76,10 +78,10 @@ function Show-ScriptStarZMenu {
 }
 
 function Show-ReturnMenu {
-    $returnChoice = Read-Host "`nWould you like to return to the menu or exit? (Enter 'Yes' or 'exit')"
+    $returnChoice = Read-Host "`nWould you like to return to the menu or exit? (Enter 1 for 'Yes' or 2 for 'exit')"
     switch ($returnChoice.ToLower()) {
-        "Yes" { Show-ScriptStarZMenu }
-        "exit" {
+        "1" { Show-ScriptStarZMenu }
+        "2" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
         }
