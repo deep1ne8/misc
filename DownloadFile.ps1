@@ -9,29 +9,29 @@ param (
 
 # Check if the destination path exists
 if (!(Test-Path $DestinationPath)) {
-    Write-Host "Destination path does not exist. Creating it."
+    Write-Host "Destination path does not exist. Creating it." -ForegroundColor Red
     New-Item -ItemType Directory -Path $DestinationPath | Out-Null
 }
 
 # Check if the script is running as administrator
 $currentPrincipal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
 if (!$currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "Please run this script as an administrator."
-    return
+    Write-Host "Please run this script as an administrator." -ForegroundColor Red
+
 }
 
 # Install BITS if it is not installed
 if (-not (Get-WindowsFeature -Name BITS -ErrorAction SilentlyContinue).Installed) {
-    Write-Host "BITS is not installed. Installing BITS."
+    Write-Host "BITS is not installed. Installing BITS." -ForegroundColor Green
     Install-WindowsFeature -Name BITS
 }
 
 # Install WGET if it is not installed
 if (-not (Get-Command wget -ErrorAction SilentlyContinue)) {
-    Write-Host "WGET is not installed. Installing WGET."
+    Write-Host "WGET is not installed. Installing WGET." -ForegroundColor Green
     # Install WGET using Chocolatey
     if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-        Write-Host "Chocolatey is not installed. Installing Chocolatey."
+        Write-Host "Chocolatey is not installed. Installing Chocolatey." -ForegroundColor Black -CommandColor Green
         Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
     }
     Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
@@ -50,7 +50,7 @@ if ($downloadMethod -eq "BITS") {
     try {
         $job = Start-BitsTransfer -Source $Url -Destination $DestinationPath -DisplayName $jobName -Asynchronous
     } catch {
-        Write-Host "Error starting BITS transfer: $_"
+        Write-Host "Error starting BITS transfer: $_" -ForegroundColor Red
         if ($job.JobState -eq "Suspended") {
             $job | Resume-BitsTransfer
         }
@@ -78,20 +78,20 @@ if ($downloadMethod -eq "BITS") {
 } elseif ($downloadMethod -eq "WGET") {
     $wgetCommand = "wget `"$Url`" -O `"$DestinationPath`""
     if ($Url -notmatch '^(https?|ftp)://[^\s/$.?#].[^\s]*$') {
-        Write-Host "Invalid URL format."
+        Write-Host "Invalid URL format." -ForegroundColor Red
         return
     }
     if ($null -eq $DestinationPath -or $DestinationPath -notmatch '^.+$') {
-        Write-Host "Invalid characters in destination path."
+        Write-Host "Invalid characters in destination path." -ForegroundColor Red
         return
     }
     try {
         Invoke-Expression $wgetCommand
     } catch {
-        Write-Host "Error during WGET download: $_"
+        Write-Host "Error during WGET download: $_" -ForegroundColor Red
     }
 
 } else {
-    Write-Host "Invalid download method selected. Please choose either BITS or WGET."
+    Write-Host "Invalid download method selected. Please choose either BITS or WGET." -ForegroundColor Red
 }
 
