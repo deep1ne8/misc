@@ -31,7 +31,7 @@ MessageLogger "Starting Dell SupportAssist removal process..."
 foreach ($appName in $appNames) {
     MessageLogger "Checking for application: $appName"
     $apps = Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" |
-    Where-Object { $_.DisplayName -match $appName }
+    Where-Object { $_.DisplayName -match "$appName" }
 
     if ($null -eq $apps) {
         MessageLogger "No applications found matching the name '$appName'."
@@ -40,7 +40,7 @@ foreach ($appName in $appNames) {
 
     foreach ($app in $apps) {
         if ($null -eq $app) {
-            MessageLogger "Null application reference encountered. Skipping."
+            MessageLogger "No application reference encountered. Skipping."
             continue
         }
 
@@ -70,7 +70,7 @@ $regKeys = @(
 )
 foreach ($key in $regKeys) {
     if ($null -eq $key) {
-        MessageLogger "Null registry key encountered. Skipping."
+        MessageLogger "No registry key encountered. Skipping."
         continue
     }
 
@@ -95,3 +95,11 @@ Write-Output $LogContents
 # End of script execution
 return
 
+
+<#
+
+$LogPath = "$env:ProgramData\DellSupportAssist_Uninstall.log"; (Get-ItemProperty "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | Where-Object { $_.DisplayName -match "Dell SupportAssist" }).UninstallString | ForEach-Object { Start-Process -FilePath "cmd.exe" -ArgumentList "/c $_ /quiet /norestart > `"$LogPath`" 2>&1" -NoNewWindow -Wait; Get-Content -Path $LogPath -Wait }
+
+
+
+#>
