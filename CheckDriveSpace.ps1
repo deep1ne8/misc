@@ -2,7 +2,7 @@
 $drive = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
 if ($drive) {
     $freeSpace = [math]::Round($drive.FreeSpace / 1GB, 2)
-    $percentageFree = [math]::Round(($freeSpace / $drive.Size) * 100, 2)
+    $percentageFree = [math]::Round(($drive.FreeSpace / $drive.Size) * 100, 2)
 
     Write-Host "`nChecking drive space..."
     Write-Host "Drive: $($drive.DeviceID)"
