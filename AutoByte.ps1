@@ -26,24 +26,27 @@ function InitiateScriptFromUrl {
 
 function Show-AutoByteMenu {
 Clear-Host
+Clear-Host
+$separator = "================================================================"
+
 Write-Host "`n"
-    Write-Host "================================================================" -ForegroundColor Cyan
-    Write-Host "                        AutoByte Menu                           " -BackgroundColor Blue -ForegroundColor White
-    Write-Host "================================================================" -ForegroundColor Cyan
-    Write-Host "`n"   
-Write-Host  "   ______           __           ____             __"               -ForegroundColor cyan
-Write-Host  "  /\  _  \         /\ \__       /\  _ \          /\ \__"            -ForegroundColor White
-Write-Host  "  \ \ \L\ \  __  __\ \  _\   __ \ \ \_\ \      __\ \  _\   __"      -ForegroundColor red
-Write-Host  "   \ \  __ \/\ \/\ \\ \ \/  / __ \ \  _ < /\ \/\ \\ \ \/  / __ \"   -ForegroundColor red
-Write-Host  "    \ \ \/\ \ \ \_\ \\ \ \_/\ \L\ \ \ \L\ \ \ \_\ \\ \ \_/\  __/"   -ForegroundColor White
-Write-Host  "     \ \_\ \_\ \____/ \ \__\ \____/\ \____/\/ ____ \\ \__\ \____\"  -ForegroundColor cyan
-Write-Host  "      \/_/\/_/\/___/   \/__/\/___/  \/___/   /___/> \\/__/\/____/"  -ForegroundColor cyan
-Write-Host  "                                               /\___/"              -ForegroundColor White
-Write-Host  "                                               \/__/"               -ForegroundColor red
+Write-Host $separator -ForegroundColor Cyan
+Write-Host "                        AutoByte Menu                           " -BackgroundColor Blue -ForegroundColor White
+Write-Host $separator -ForegroundColor Cyan
 Write-Host "`n"
-    Write-Host "Choose a script to run from the following options:"               -BackgroundColor Blue -ForegroundColor White
-    Write-Host "================================================================" -ForegroundColor Cyan
-    Write-Host ""
+Write-Host "   ______           __           ____             __" -ForegroundColor Cyan
+Write-Host "  /\  _  \         /\ \__       /\  _ \          /\ \__" -ForegroundColor White
+Write-Host "  \ \ \L\ \  __  __\ \  _\   __ \ \ \_\ \      __\ \  _\   __" -ForegroundColor Red
+Write-Host "   \ \  __ \/\ \/\ \\ \ \/  / __ \ \  _ < /\ \/\ \\ \ \/  / __ \" -ForegroundColor Red
+Write-Host "    \ \ \/\ \ \ \_\ \\ \ \_/\ \L\ \ \ \L\ \ \ \_\ \\ \ \_/\  __/" -ForegroundColor White
+Write-Host "     \ \_\ \_\ \____/ \ \__\ \____/\ \____/\/ ____ \\ \__\ \____\" -ForegroundColor Cyan
+Write-Host "      \/_/\/_/\/___/   \/__/\/___/  \/___/   /___/> \\/__/\/____/" -ForegroundColor Cyan
+Write-Host "                                               /\___/" -ForegroundColor White
+Write-Host "                                               \/__/" -ForegroundColor Red
+Write-Host "`n"
+Write-Host "Choose a script to run from the following options:" -BackgroundColor Blue -ForegroundColor White
+Write-Host $separator -ForegroundColor Cyan
+Write-Host ""
 
 
     $index = 1
