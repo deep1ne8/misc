@@ -20,9 +20,10 @@ if (!(Test-Path $DestinationPath)) {
 }
 
 # Install BITS if it is not installed
-if (-not (Get-WindowsFeature -Name BITS -ErrorAction SilentlyContinue).Installed) {
+if (-not (Where.exe BITS)) {
     try {
-        Install-WindowsFeature -Name BITS
+        dism /online /Get-Features | findstr /i "BITS"
+        dism /online /Enable-Feature /FeatureName:"BITS"
     } catch {
         Write-Host "Failed to install BITS: $_" -ForegroundColor Red
         return
@@ -30,10 +31,10 @@ if (-not (Get-WindowsFeature -Name BITS -ErrorAction SilentlyContinue).Installed
 }
 
 # Install WGET if it is not installed
-if (-not (Get-Command wget -ErrorAction SilentlyContinue)) {
+if (-not (Where.exe wget)) {
     try {
         # Install WGET using Chocolatey
-        if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+        if (-not (Where.exe choco -ErrorAction SilentlyContinue)) {
             Write-Host "Chocolatey is not installed. Installing Chocolatey." -ForegroundColor Black -CommandColor Green
             Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
         }
