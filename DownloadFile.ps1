@@ -1,7 +1,9 @@
 param (
     [Parameter(Mandatory=$true)]
+    [ValidateNotNullOrEmpty()]
     [string]$Url,
     [Parameter(Mandatory=$true)]
+    [ValidateNotNullOrEmpty()]
     [string]$DestinationPath,
     [Parameter(Mandatory=$false)]
     [bool]$Continue = $false
@@ -9,35 +11,47 @@ param (
 
 # Check if the destination path exists
 if (!(Test-Path $DestinationPath)) {
-    Write-Host "Destination path does not exist. Creating it." -ForegroundColor Red
-    New-Item -ItemType Directory -Path $DestinationPath | Out-Null
+    try {
+        New-Item -ItemType Directory -Path $DestinationPath | Out-Null
+    } catch {
+        Write-Host "Failed to create destination path: $_" -ForegroundColor Red
+        return
+    }
 }
 
 # Check if the script is running as administrator
 $currentPrincipal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
 if (!$currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "Please run this script as an administrator." -ForegroundColor Red
-
+    return
 }
 
 # Install BITS if it is not installed
 if (-not (Get-WindowsFeature -Name BITS -ErrorAction SilentlyContinue).Installed) {
-    Write-Host "BITS is not installed. Installing BITS." -ForegroundColor Green
-    Install-WindowsFeature -Name BITS
+    try {
+        Install-WindowsFeature -Name BITS
+    } catch {
+        Write-Host "Failed to install BITS: $_" -ForegroundColor Red
+        return
+    }
 }
 
 # Install WGET if it is not installed
 if (-not (Get-Command wget -ErrorAction SilentlyContinue)) {
-    Write-Host "WGET is not installed. Installing WGET." -ForegroundColor Green
-    # Install WGET using Chocolatey
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-        Write-Host "Chocolatey is not installed. Installing Chocolatey." -ForegroundColor Black -CommandColor Green
-        Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+    try {
+        # Install WGET using Chocolatey
+        if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+            Write-Host "Chocolatey is not installed. Installing Chocolatey." -ForegroundColor Black -CommandColor Green
+            Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+        }
+        Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
+        refreshenv
+        Start-Sleep -Seconds 3
+        choco install wget -y -force
+    } catch {
+        Write-Host "Failed to install WGET: $_" -ForegroundColor Red
+        return
     }
-    Import-Module $env:ChocolateyInstall\helpers\chocolateyProfile.psm1
-    refreshenv
-    Start-Sleep -Seconds 3
-    choco install wget -y -force
 }
 
 $jobName = "InteractiveDownload"
@@ -52,18 +66,33 @@ if ($downloadMethod -eq "BITS") {
     } catch {
         Write-Host "Error starting BITS transfer: $_" -ForegroundColor Red
         if ($job.JobState -eq "Suspended") {
-            $job | Resume-BitsTransfer
+            try {
+                $job | Resume-BitsTransfer
+            } catch {
+                Write-Host "Failed to resume BITS transfer: $_" -ForegroundColor Red
+                return
+            }
         }
     }
 
     # If continue is set to $true, resume the download from the last downloaded byte
     if ($Continue) {
-        $job | Resume-BitsTransfer
+        try {
+            $job | Resume-BitsTransfer
+        } catch {
+            Write-Host "Failed to resume BITS transfer: $_" -ForegroundColor Red
+            return
+        }
     }
 
     # Monitor the download progress
     do {
-        $progress = $job | Get-BitsTransfer
+        try {
+            $progress = $job | Get-BitsTransfer
+        } catch {
+            Write-Host "Failed to get BITS job progress: $_" -ForegroundColor Red
+            return
+        }
         if ($progress.BytesTotal -ne 0) {
             Write-Progress -Activity "Downloading $Url" -Status "$($progress.BytesTransferred / 1MB) MB of $($progress.BytesTotal / 1MB) MB" -PercentComplete (($progress.BytesTransferred / $progress.BytesTotal) * 100)
         } else {
@@ -73,7 +102,12 @@ if ($downloadMethod -eq "BITS") {
     } while ($job.JobState -ne "Transferred" -and $job.JobState -ne "Suspended")
 
     # Complete the BITS job
-    Complete-BitsTransfer -BitsJob $job
+    try {
+        Complete-BitsTransfer -BitsJob $job
+    } catch {
+        Write-Host "Failed to complete BITS job: $_" -ForegroundColor Red
+        return
+    }
 
 } elseif ($downloadMethod -eq "WGET") {
     $wgetCommand = "wget `"$Url`" -O `"$DestinationPath`""
@@ -89,9 +123,11 @@ if ($downloadMethod -eq "BITS") {
         Invoke-Expression $wgetCommand
     } catch {
         Write-Host "Error during WGET download: $_" -ForegroundColor Red
+        return
     }
 
 } else {
     Write-Host "Invalid download method selected. Please choose either BITS or WGET." -ForegroundColor Red
+    return
 }
 
