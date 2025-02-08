@@ -28,7 +28,7 @@ function Show-AutoByteMenu {
 Clear-Host
 Write-Host "`n"
     Write-Host "================================================================" -ForegroundColor Cyan
-    Write-Host "                        AutoByte Menu                           " -BackgroundColor DarkGreen -ForegroundColor White
+    Write-Host "                        AutoByte Menu                           " -BackgroundColor Blue -ForegroundColor White
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host "`n"   
 Write-Host  "   ______           __           ____             __"               -ForegroundColor cyan
@@ -41,7 +41,7 @@ Write-Host  "      \/_/\/_/\/___/   \/__/\/___/  \/___/  `/___/> \\/__/\/____/" 
 Write-Host  "                                               /\___/"              -ForegroundColor White
 Write-Host  "                                               \/__/"               -ForegroundColor red
 Write-Host "`n"
-    Write-Host "Choose a script to run from the following options:"               -BackgroundColor DarkGreen -ForegroundColor White
+    Write-Host "Choose a script to run from the following options:"               -BackgroundColor Blue -ForegroundColor White
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host ""
 
