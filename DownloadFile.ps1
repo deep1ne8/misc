@@ -1,3 +1,4 @@
+<#
 param (
     [Parameter(Mandatory=$true)]
     [ValidateNotNullOrEmpty()]
@@ -8,8 +9,17 @@ param (
     [Parameter(Mandatory=$false)]
     [bool]$Continue = $false
 )
+#>
 
 # Check if the destination path exists
+$DestinationPath = Read-Host "Choose destination path..."
+Start-Sleep -Seconds 2
+Write-Host "\n"
+$Url = Read-Host "Choose URL..."
+Start-Sleep -Seconds 2
+Write-Host "\n"
+Start-Sleep -Seconds 2
+
 if (!(Test-Path $DestinationPath)) {
     try {
         New-Item -ItemType Directory -Path $DestinationPath | Out-Null
@@ -34,7 +44,7 @@ if (-not (Where.exe BITS)) {
 if (-not (Where.exe wget)) {
     try {
         # Install WGET using Chocolatey
-        if (-not (Where.exe choco -ErrorAction SilentlyContinue)) {
+        if (-not (Where.exe choco)) {
             Write-Host "Chocolatey is not installed. Installing Chocolatey." -ForegroundColor Black -CommandColor Green
             Set-ExecutionPolicy Bypass -Scope Process -Force; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
         }
