@@ -31,15 +31,15 @@ Write-Host "`n"
     Write-Host "                        AutoByte Menu                           " -BackgroundColor DarkGreen -ForegroundColor White
     Write-Host "================================================================" -ForegroundColor Cyan
     Write-Host "`n"   
-Write-Host "   ______           __           ____             __"             
-Write-Host "  /\  _  \         /\ \__       /\  _`\          /\ \__"          
-Write-Host "  \ \ \L\ \  __  __\ \ ,_\   ___\ \ \L\ \  __  __\ \ ,_\"   __   
-Write-Host "   \ \  __ \/\ \/\ \\ \ \/  / __`\ \  _ < /\ \/\ \\ \ \/  / __ \"
-Write-Host "    \ \ \/\ \ \ \_\ \\ \ \_/\ \L\ \ \ \L\ \ \ \_\ \\ \ \_/\  __/"
-Write-Host "     \ \_\ \_\ \____/ \ \__\ \____/\ \____/\/`____ \\ \__\ \____\"
-Write-Host "      \/_/\/_/\/___/   \/__/\/___/  \/___/  `/___/> \\/__/\/____/"
-Write-Host "                                               /\___/"             
-Write-Host "                                               \/__/"             
+Write-Host  "   ______           __           ____             __"               -BackgroundColor DarkGreen -ForegroundColor cyan
+Write-Host  "  /\  _  \         /\ \__       /\  _`\          /\ \__"            -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host  "  \ \ \L\ \  __  __\ \ ,_\   ___\ \ \L\ \  __  __\ \  _\   __"      -BackgroundColor DarkGreen -ForegroundColor red
+Write-Host  "   \ \  __ \/\ \/\ \\ \ \/  / __`\ \  _ < /\ \/\ \\ \ \/  / __ \"   -BackgroundColor DarkGreen -ForegroundColor red
+Write-Host  "    \ \ \/\ \ \ \_\ \\ \ \_/\ \L\ \ \ \L\ \ \ \_\ \\ \ \_/\  __/"   -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host  "     \ \_\ \_\ \____/ \ \__\ \____/\ \____/\/`____ \\ \__\ \____\"  -BackgroundColor DarkGreen -ForegroundColor cyan
+Write-Host  "      \/_/\/_/\/___/   \/__/\/___/  \/___/  `/___/> \\/__/\/____/"  -BackgroundColor DarkGreen -ForegroundColor cyan
+Write-Host  "                                               /\___/"              -BackgroundColor DarkGreen -ForegroundColor White
+Write-Host  "                                               \/__/"               -BackgroundColor DarkGreen -ForegroundColor red
 Write-Host "`n"
     Write-Host "Choose a script to run from the following options:"               -BackgroundColor DarkGreen -ForegroundColor White
     Write-Host "================================================================" -ForegroundColor Cyan
