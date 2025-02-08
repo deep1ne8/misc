@@ -19,13 +19,6 @@ if (!(Test-Path $DestinationPath)) {
     }
 }
 
-# Check if the script is running as administrator
-$currentPrincipal = New-Object System.Security.Principal.WindowsPrincipal([System.Security.Principal.WindowsIdentity]::GetCurrent())
-if (!$currentPrincipal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Host "Please run this script as an administrator." -ForegroundColor Red
-    return
-}
-
 # Install BITS if it is not installed
 if (-not (Get-WindowsFeature -Name BITS -ErrorAction SilentlyContinue).Installed) {
     try {
