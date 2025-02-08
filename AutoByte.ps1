@@ -82,7 +82,7 @@ Write-Host ""
 }
 
 function Show-ReturnMenu {
-    $returnChoice = Read-Host "`nWould you like to return to the menu or exit? (Enter 1 for 'Yes' or 2 for 'exit')"
+    $returnChoice = Read-Host "`nReturn to the menu or exit? (Enter [1] for 'Yes' or [2] for 'exit')"
     switch ($returnChoice.ToLower()) {
         "1" { Show-AutoByteMenu }
         "2" {
