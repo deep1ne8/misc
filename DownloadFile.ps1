@@ -33,14 +33,21 @@ if ($Url -match '([^/]+)$') {
     Write-Host "Full file path: $FullPath"
 }
 
-$ProgressPreference = 'SilentlyContinue'
+$ProgressPreference = 'Continue'
 
-# Download file with progress bar
 try {
-    Invoke-RestMethod -Uri $Url -OutFile $FullPath -Method Get -Headers @{"Range"="bytes=0-"} -Verbose | ForEach-Object {
-        $PercentComplete = $_.ProgressPercentage
-        Write-Progress -PercentComplete $PercentComplete -Activity "Downloading" -Status "$PercentComplete% completed"
-    }
+    $webResponse = Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -UseBasicParsing -Verbose
+    $totalLength = [System.Convert]::ToInt64($webResponse.Headers["Content-Length"])
+    $stream = [System.IO.File]::OpenRead($FullPath)
+    $buffer = New-Object byte[] 8192
+    $bytesRead = 0
+    do {
+        $read = $stream.Read($buffer, 0, $buffer.Length)
+        $bytesRead += $read
+        $percentComplete = ($bytesRead / $totalLength) * 100
+        Write-Progress -PercentComplete $percentComplete -Activity "Downloading" -Status "$([math]::Round($percentComplete, 2))% completed"
+    } while ($read -gt 0)
+    $stream.Close()
     Write-Host "Download completed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "Error: $_" -ForegroundColor Red
