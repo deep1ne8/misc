@@ -44,12 +44,12 @@ if (Get-Service -Name "BITS") {
 
             # Create a new BITS job
             try {
-                $job = Start-BitsTransfer -Source $Url -Destination $DestinationPath -DisplayName $jobName -Asynchronous
+                $job = powershell.exe -Command "Start-BitsTransfer -Source $Url -Destination $DestinationPath -DisplayName $jobName -Asynchronous"
             } catch {
                 Write-Host "Error starting BITS transfer: $_" -ForegroundColor Red
                 if ($job.JobState -eq "Suspended") {
                     try {
-                        $job | Resume-BitsTransfer
+                        $job | powershell.exe -Command "Resume-BitsTransfer"
                     } catch {
                         Write-Host "Failed to resume BITS transfer: $_" -ForegroundColor Red
                         return
@@ -60,7 +60,7 @@ if (Get-Service -Name "BITS") {
                 # Monitor the download progress
                 do {
                     try {
-                        $progress = $job | Get-BitsTransfer
+                        $progress = $job | powershell.exe -Command "Get-BitsTransfer"
                     } catch {
                         Write-Host "Failed to get BITS job progress: $_" -ForegroundColor Red
                         return
@@ -75,7 +75,7 @@ if (Get-Service -Name "BITS") {
             
                 # Complete the BITS job
                 try {
-                    Complete-BitsTransfer -BitsJob $job
+                    powershell.exe -Command "Complete-BitsTransfer -BitsJob $job"
                 } catch {
                     Write-Host "Failed to complete BITS job: $_" -ForegroundColor Red
                     return
