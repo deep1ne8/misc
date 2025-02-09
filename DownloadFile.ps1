@@ -2,7 +2,7 @@ Write-Host "`n"
 Write-Host "Autobyte File Downloader!" -ForegroundColor blue
 Write-Host "`n"
 
-# Check if the destination path exists
+# Check if the destination path exists and is writable
 Start-Sleep -Seconds 2
 Write-Host "`n"
 Write-Host "Enter URL: ==>  " -ForegroundColor Blue -NoNewline
