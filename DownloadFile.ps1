@@ -12,10 +12,12 @@ param (
 #>
 
 # Check if the destination path exists
-$DestinationPath = Read-Host "Choose destination path...:`n" -ForegroundColor Yellow
+Write-Host "Choose destination path...:" -ForegroundColor Yellow -NoNewline
+$DestinationPath = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
-$Url = Read-Host "Enter URL...:`n" -ForegroundColor Yellow
+Write-Host "Enter URL...:" -ForegroundColor Yellow -NoNewline
+$Url = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
 Write-Host "Starting BITS download..." -ForegroundColor White -BackgroundColor Green
