@@ -1,16 +1,4 @@
-<#
-param (
-    [Parameter(Mandatory=$true)]
-    [ValidateNotNullOrEmpty()]
-    [string]$Url,
-    [Parameter(Mandatory=$true)]
-    [ValidateNotNullOrEmpty()]
-    [string]$DestinationPath,
-    [Parameter(Mandatory=$false)]
-    [bool]$Continue = $false
-)
-#>
-
+# Download file with BITS
 Write-Host "`n"
 # Check if the destination path exists
 Write-Host "Enter destination path: ==>  " -ForegroundColor Blue -NoNewline
@@ -36,59 +24,36 @@ if (!(Test-Path $DestinationPath)) {
     }
 }
 
-# Downloading with BITS
-if (Get-Service -Name "BITS") {
-    try {
-            # Define the BITS job name
-            $jobName = "InteractiveDownload"
+# Ensure running in Windows PowerShell (NOT PowerShell 7)
+if ($PSVersionTable.PSEdition -eq "Core") {
+    Write-Host "BITS only works in Windows PowerShell 5.1. Switching..." -ForegroundColor Yellow
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& { Start-BitsTransfer -Source '$Url' -Destination '$DestinationPath' -DisplayName '$jobName' -Asynchronous }"
+    exit
+}
 
-            # Create a new BITS job
-            try {
-                $job = powershell.exe -Command "Start-BitsTransfer -Source $Url -Destination $DestinationPath -DisplayName $jobName -Asynchronous"
-            } catch {
-                Write-Host "Error starting BITS transfer: $_" -ForegroundColor Red
-                if ($job.JobState -eq "Suspended") {
-                    try {
-                        $job | powershell.exe -Command "Resume-BitsTransfer"
-                    } catch {
-                        Write-Host "Failed to resume BITS transfer: $_" -ForegroundColor Red
-                        return
-                    }
-                }
-            }
-            
-                # Monitor the download progress
-                do {
-                    try {
-                        $progress = $job | powershell.exe -Command "Get-BitsTransfer"
-                    } catch {
-                        Write-Host "Failed to get BITS job progress: $_" -ForegroundColor Red
-                        return
-                    }
-                    if ($progress.BytesTotal -ne 0) {
-                        Write-Progress -Activity "Downloading $Url" -Status "$($progress.BytesTransferred / 1MB) MB of $($progress.BytesTotal / 1MB) MB" -PercentComplete (($progress.BytesTransferred / $progress.BytesTotal) * 100)
-                    } else {
-                        Start-Sleep -Seconds 10
-                    }
-                    Start-Sleep -Seconds 2
-                } while ($job.JobState -ne "Transferred" -and $job.JobState -ne "Suspended")
-            
-                # Complete the BITS job
-                try {
-                    powershell.exe -Command "Complete-BitsTransfer -BitsJob $job"
-                } catch {
-                    Write-Host "Failed to complete BITS job: $_" -ForegroundColor Red
-                    return
-                }
-         Write-Host "Download completed successfully!" -ForegroundColor Green
-            return
-
-        } catch {
-        Write-Host "Error during BITS download: $_" -ForegroundColor Red
-            return
-    }
-    Start-Sleep -Seconds 1
+try {
+    $job = Start-BitsTransfer -Source $Url -Destination $DestinationPath -DisplayName $jobName -Asynchronous
+} catch {
+    Write-Host "Error starting BITS transfer: $_" -ForegroundColor Red
     return
+}
+
+# Monitor the BITS job and resume if suspended
+Start-Sleep -Seconds 5  # Allow time for BITS to start processing
+
+try {
+    $job = Get-BitsTransfer | Where-Object { $_.DisplayName -eq $jobName }
+    
+    if ($job.JobState -eq "Suspended") {
+        Write-Host "BITS job is suspended, attempting to resume..." -ForegroundColor Yellow
+        Resume-BitsTransfer -BitsJob $job
+    }
+
+    # Display progress bar
+    $progress = $job | Get-BitsTransfer
+    Write-Progress -Activity "Downloading $Url to $DestinationPath" -Status "$($progress.BytesTransferred / 1MB) MB of $($progress.BytesTotal / 1MB) MB" -PercentComplete ($progress.BytesTransferred / $progress.BytesTotal) * 100
+} catch {
+    Write-Host "Failed to resume BITS transfer: $_" -ForegroundColor Red
 }
 
 
