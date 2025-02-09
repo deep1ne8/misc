@@ -31,7 +31,8 @@ try {
     $FileName = [System.IO.Path]::GetFileName($Url)
     $FullPath = [System.IO.Path]::Combine($BasePath, $FileName)
     Write-Host "Downloading to: $FullPath" -ForegroundColor White -BackgroundColor Green
-
+    Start-Sleep -Seconds 2
+    Write-Host "`n"
     # Download the file
     $webResponse = Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -UseBasicParsing -Verbose -Progress {$PSCmdlet.WriteProgress($PSCmdlet.MyInvocation.MyCommand.Name,$_.StatusMessage, [int]($_.PercentComplete))}
         $webResponse
