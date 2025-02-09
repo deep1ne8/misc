@@ -1,4 +1,4 @@
-# Download file with BITS
+# DownloadFile
 Write-Host "`n"
 # Check if the destination path exists
 Write-Host "Enter destination path: ==>  " -ForegroundColor Blue -NoNewline
@@ -9,7 +9,7 @@ Write-Host "Enter URL: ==>  " -ForegroundColor Blue -NoNewline
 $Url = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
-Write-Host "Starting BITS download..." -ForegroundColor White -BackgroundColor Green
+Write-Host "Download in progress..." -ForegroundColor White -BackgroundColor Green
 Write-Host "Please wait..." -ForegroundColor White -BackgroundColor Green
 Start-Sleep -Seconds 2
 Write-Host "`n"
@@ -24,36 +24,23 @@ if (!(Test-Path $DestinationPath)) {
     }
 }
 
-# Ensure running in Windows PowerShell (NOT PowerShell 7)
-if ($PSVersionTable.PSEdition -eq "Core") {
-    Write-Host "BITS only works in Windows PowerShell 5.1. Switching..." -ForegroundColor Yellow
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& { Start-BitsTransfer -Source '$Url' -Destination '$DestinationPath' -DisplayName '$jobName' -Asynchronous }"
+$WebClient = New-Object System.Net.WebClient
 
+# Event handler for progress updates
+$WebClient.DownloadProgressChanged += {
+    param ($sender, $e)
+    Write-Host "Downloading: $($e.ProgressPercentage)% completed" -ForegroundColor Yellow
 }
 
-try {
-    $job = Start-BitsTransfer -Source $Url -Destination $DestinationPath -DisplayName $jobName -Asynchronous
-} catch {
-    Write-Host "Error starting BITS transfer: $_" -ForegroundColor Red
-    return
+# Event handler for download completion
+$WebClient.DownloadFileCompleted += {
+    Write-Host "Download completed successfully!" -ForegroundColor Green
 }
 
-# Monitor the BITS job and resume if suspended
-Start-Sleep -Seconds 5  # Allow time for BITS to start processing
+# Start asynchronous download
+$WebClient.DownloadFileAsync($Url, $DestinationPath)
 
-try {
-    $job = Get-BitsTransfer | Where-Object { $_.DisplayName -eq $jobName }
-    
-    if ($job.JobState -eq "Suspended") {
-        Write-Host "BITS job is suspended, attempting to resume..." -ForegroundColor Yellow
-        Resume-BitsTransfer -BitsJob $job
-    }
-
-    # Display progress bar
-    $progress = $job | Get-BitsTransfer
-    Write-Progress -Activity "Downloading $Url to $DestinationPath" -Status "$($progress.BytesTransferred / 1MB) MB of $($progress.BytesTotal / 1MB) MB" -PercentComplete ($progress.BytesTransferred / $progress.BytesTotal) * 100
-} catch {
-    Write-Host "Failed to resume BITS transfer: $_" -ForegroundColor Red
-}
+# Keep script running until download completes
+while ($WebClient.IsBusy) { Start-Sleep -Milliseconds 500 }
 
 
