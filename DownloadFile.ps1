@@ -1,5 +1,5 @@
 Write-Host "`n"
-Write-Host "Autobyte File Downloader!"
+Write-Host "Autobyte File Downloader!" -ForegroundColor blue -BackgroundColor white
 Write-Host "`n"
 # Check if the destination path exists
 #Write-Host "Enter destination path: ==>  " -ForegroundColor Blue -NoNewline
