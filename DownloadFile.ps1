@@ -28,8 +28,13 @@ if (!(Test-Path $BasePath)) {
 }
 
 try {
-    $FileName = [System.IO.Path]::GetFileName($Url)
-    $FullPath = [System.IO.Path]::Combine($BasePath, $FileName)
+    # Use regex to get the file name from the URL
+    if ($Url -match '([^/]+)$') {
+    $FileName = $matches[0]
+    $FullPath = Join-Path -Path $BasePath -ChildPath $FileName
+    Write-Host "Full file path: $FullPath"
+    }
+    Write-host "`n"
     Write-Host "Downloading to: $FullPath" -ForegroundColor White -BackgroundColor Green
     Start-Sleep -Seconds 2
     Write-Host "`n"
