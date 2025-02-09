@@ -28,7 +28,7 @@ if (!(Test-Path $DestinationPath)) {
 if ($PSVersionTable.PSEdition -eq "Core") {
     Write-Host "BITS only works in Windows PowerShell 5.1. Switching..." -ForegroundColor Yellow
     powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "& { Start-BitsTransfer -Source '$Url' -Destination '$DestinationPath' -DisplayName '$jobName' -Asynchronous }"
-    exit
+
 }
 
 try {
