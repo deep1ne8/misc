@@ -34,8 +34,6 @@ if ($Url -match '([^/]+)$') {
     Write-Host "Full file path: $FullPath"
 }
 
-$ProgressPreference = 'Continue'
-
 try {
     $webResponse = Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -UseBasicParsing -Verbose
     $totalLength = [System.Convert]::ToInt64($webResponse.Headers["Content-Length"])
