@@ -24,46 +24,14 @@ if (!(Test-Path $DestinationPath)) {
     }
 }
 
-$WebClient = New-Object System.Net.WebClient
+$ProgressPreference = 'SilentlyContinue'
 
-# Check for null pointer references
-if ($null -eq $WebClient) {
-    Write-Host "Failed to create WebClient object" -ForegroundColor Red
-    return
-}
-
-# Event handler for progress updates
-$WebClient.DownloadProgressChanged += {
-    param ($s, $e)
-    if ($null -ne $e) {
-        Write-Host "Downloading: $($e.ProgressPercentage)% completed" -ForegroundColor Yellow
-    } else {
-        Write-Host "Error: null reference in DownloadProgressChanged event" -ForegroundColor Red
-    }
-}
-
-# Event handler for download completion
-$WebClient.DownloadFileCompleted += {
-    param ($s, $e)
-    if ($null -ne $e) {
-        if ($e.Error -eq $null -and $e.Cancelled -eq $false) {
-            Write-Host "Download completed successfully!" -ForegroundColor Green
-        } else {
-            Write-Host "Error: $($e.Error.Message)" -ForegroundColor Red
-        }
-    } else {
-        Write-Host "Error: null reference in DownloadFileCompleted event" -ForegroundColor Red
-    }
-}
-
-# Start asynchronous download
+# Download file with progress bar
 try {
-    $WebClient.DownloadFileAsync($Url, $DestinationPath)
+    Invoke-RestMethod -Uri $Url -OutFile $DestinationPath -Method Get -Progress {$PercentComplete = $_.ProgressPercentage; Write-Host "Downloading: $PercentComplete% completed" -ForegroundColor Yellow}
+    Write-Host "Download completed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "Error: $_" -ForegroundColor Red
 }
-
-# Keep script running until download completes
-while ($WebClient.IsBusy) { Start-Sleep -Milliseconds 500 }
 
 
