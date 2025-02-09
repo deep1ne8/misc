@@ -40,10 +40,8 @@ try {
     Write-Host "`n"
 
     # Download the file
-    Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -Verbose -Progress {
-        $PSCmdlet.WriteProgress($PSCmdlet.MyInvocation.MyCommand.Name, $_.StatusMessage, [int]($_.PercentComplete))
-    }
-    
+    Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -Verbose
+
     Write-Host "Download completed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "Error: $_" -ForegroundColor Red
