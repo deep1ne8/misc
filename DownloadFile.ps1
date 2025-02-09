@@ -1,5 +1,5 @@
 Write-Host "`n"
-Write-Host "Autobyte File Downloader!" -ForegroundColor blue -BackgroundColor white
+Write-Host "Autobyte File Downloader!" -ForegroundColor blue
 Write-Host "`n"
 # Check if the destination path exists
 #Write-Host "Enter destination path: ==>  " -ForegroundColor Blue -NoNewline
@@ -30,6 +30,9 @@ if (!(Test-Path $BasePath)) {
 try {
     $FileName = [System.IO.Path]::GetFileName($Url)
     $FullPath = [System.IO.Path]::Combine($BasePath, $FileName)
+    Write-Host "Downloading to: $FullPath" -ForegroundColor White -BackgroundColor Green
+
+    # Download the file
     $webResponse = Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -UseBasicParsing -Verbose -Progress {$PSCmdlet.WriteProgress($PSCmdlet.MyInvocation.MyCommand.Name,$_.StatusMessage, [int]($_.PercentComplete))}
         $webResponse
     Write-Host "Download completed successfully!" -ForegroundColor Green
