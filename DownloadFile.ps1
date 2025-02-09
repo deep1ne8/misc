@@ -12,12 +12,14 @@ param (
 #>
 
 # Check if the destination path exists
-$DestinationPath = Read-Host "Choose destination path...:\n"
+$DestinationPath = Read-Host "Choose destination path...:`n" -ForegroundColor Yellow
 Start-Sleep -Seconds 2
 Write-Host "`n"
-$Url = Read-Host "Enter URL...:\n"
+$Url = Read-Host "Enter URL...:`n" -ForegroundColor Yellow
 Start-Sleep -Seconds 2
 Write-Host "`n"
+Write-Host "Starting BITS download..." -ForegroundColor White -BackgroundColor Green
+Write-Host "Please wait..." -ForegroundColor White -BackgroundColor Green
 Start-Sleep -Seconds 2
 
 if (!(Test-Path $DestinationPath)) {
@@ -32,10 +34,7 @@ if (!(Test-Path $DestinationPath)) {
 # Downloading with BITS
 if (Get-Service -Name "BITS") {
     try {
-        # Query BITS
-        Write-Host "Starting BITS download..." -ForegroundColor Black -CommandColor Green
-        Write-Host "Please wait..." -ForegroundColor Black -CommandColor Green
-
+            # Define the BITS job name
             $jobName = "InteractiveDownload"
 
             # Create a new BITS job
@@ -52,16 +51,6 @@ if (Get-Service -Name "BITS") {
                     }
                 }
             }
-                
-                # If continue is set to $true, resume the download from the last downloaded byte
-                if ($Continue) {
-                    try {
-                        $job | Resume-BitsTransfer
-                    } catch {
-                        Write-Host "Failed to resume BITS transfer: $_" -ForegroundColor Red
-                        return
-                    }
-                }
             
                 # Monitor the download progress
                 do {
@@ -86,12 +75,12 @@ if (Get-Service -Name "BITS") {
                     Write-Host "Failed to complete BITS job: $_" -ForegroundColor Red
                     return
                 }
-        Write-Host "Download completed successfully!" -ForegroundColor Green
-        return
+         Write-Host "Download completed successfully!" -ForegroundColor Green
+            return
 
         } catch {
         Write-Host "Error during BITS download: $_" -ForegroundColor Red
-        return
+            return
     }
     Start-Sleep -Seconds 1
     return
