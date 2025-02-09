@@ -11,19 +11,22 @@ param (
 )
 #>
 
+Write-Host "`n"
 # Check if the destination path exists
-Write-Host "Choose destination path...:" -ForegroundColor Yellow -NoNewline
+Write-Host "Choose destination path...: " -ForegroundColor Yellow -NoNewline
 $DestinationPath = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
-Write-Host "Enter URL...:" -ForegroundColor Yellow -NoNewline
+Write-Host "Enter URL...: " -ForegroundColor Yellow -NoNewline
 $Url = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
 Write-Host "Starting BITS download..." -ForegroundColor White -BackgroundColor Green
 Write-Host "Please wait..." -ForegroundColor White -BackgroundColor Green
 Start-Sleep -Seconds 2
+Write-Host "`n"
 
+# Check if the destination path exists and is writable
 if (!(Test-Path $DestinationPath)) {
     try {
         New-Item -ItemType Directory -Path $DestinationPath | Out-Null
