@@ -33,20 +33,9 @@ if ($Url -match '([^/]+)$') {
     $FullPath = Join-Path -Path $BasePath -ChildPath $FileName
     Write-Host "Full file path: $FullPath"
 }
-
 try {
-    $webResponse = Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -UseBasicParsing -Verbose
-    $totalLength = [System.Convert]::ToInt64($webResponse.Headers["Content-Length"])
-    $stream = [System.IO.File]::OpenRead($FullPath)
-    $buffer = New-Object byte[] 8192
-    $bytesRead = 0
-    do {
-        $read = $stream.Read($buffer, 0, $buffer.Length)
-        $bytesRead += $read
-        $percentComplete = ($bytesRead / $totalLength) * 100
-        Write-Progress -PercentComplete $percentComplete -Activity "Downloading" -Status "$([math]::Round($percentComplete, 2))% completed"
-    } while ($read -gt 0)
-    $stream.Close()
+    $webResponse = Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -UseBasicParsing -Verbose -Progress {$PSCmdlet.WriteProgress($PSCmdlet.MyInvocation.MyCommand.Name,$_.StatusMessage, [int]($_.PercentComplete))}
+        $webResponse
     Write-Host "Download completed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "Error: $_" -ForegroundColor Red
