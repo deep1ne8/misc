@@ -1,8 +1,8 @@
 Write-Host "File Downloader!"
 Write-Host "`n"
 # Check if the destination path exists
-Write-Host "Enter destination path: ==>  " -ForegroundColor Blue -NoNewline
-$DestinationPath = Read-Host
+#Write-Host "Enter destination path: ==>  " -ForegroundColor Blue -NoNewline
+#$DestinationPath = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
 Write-Host "Enter URL: ==>  " -ForegroundColor Blue -NoNewline
@@ -14,21 +14,33 @@ Write-Host "Please wait..." -ForegroundColor White -BackgroundColor Green
 Start-Sleep -Seconds 2
 Write-Host "`n"
 
+$BasePath = C:\temp
+
 # Check if the destination path exists and is writable
-if (!(Test-Path $DestinationPath)) {
+if (!(Test-Path $BasePath)) {
     try {
-        New-Item -ItemType Directory -Path $DestinationPath | Out-Null
+        New-Item -ItemType Directory -Path $BasePath | Out-Null
     } catch {
         Write-Host "Failed to create destination path: $_" -ForegroundColor Red
         return
     }
 }
 
+# Use regex to get the file name from the URL
+if ($Url -match '([^/]+)$') {
+    $FileName = $matches[0]
+    $FullPath = Join-Path -Path $BasePath -ChildPath $FileName
+    Write-Host "Full file path: $FullPath"
+}
+
 $ProgressPreference = 'SilentlyContinue'
 
 # Download file with progress bar
 try {
-    Invoke-RestMethod -Uri $Url -OutFile $DestinationPath -Method Get -Progress {$PercentComplete = $_.ProgressPercentage; Write-Host "Downloading: $PercentComplete% completed" -ForegroundColor Yellow}
+    Invoke-RestMethod -Uri $Url -OutFile $FullPath -Method Get -Headers @{"Range"="bytes=0-"} -Verbose | ForEach-Object {
+        $PercentComplete = $_.ProgressPercentage
+        Write-Progress -PercentComplete $PercentComplete -Activity "Downloading" -Status "$PercentComplete% completed"
+    }
     Write-Host "Download completed successfully!" -ForegroundColor Green
 } catch {
     Write-Host "Error: $_" -ForegroundColor Red
