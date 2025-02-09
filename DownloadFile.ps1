@@ -27,13 +27,9 @@ if (!(Test-Path $BasePath)) {
     }
 }
 
-# Use regex to get the file name from the URL
-if ($Url -match '([^/]+)$') {
-    $FileName = $matches[0]
-    $FullPath = Join-Path -Path $BasePath -ChildPath $FileName
-    Write-Host "Full file path: $FullPath"
-}
 try {
+    $FileName = [System.IO.Path]::GetFileName($Url)
+    $FullPath = [System.IO.Path]::Combine($BasePath, $FileName)
     $webResponse = Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -UseBasicParsing -Verbose -Progress {$PSCmdlet.WriteProgress($PSCmdlet.MyInvocation.MyCommand.Name,$_.StatusMessage, [int]($_.PercentComplete))}
         $webResponse
     Write-Host "Download completed successfully!" -ForegroundColor Green
@@ -42,3 +38,12 @@ try {
 }
 
 
+<#
+# Use regex to get the file name from the URL
+if ($Url -match '([^/]+)$') {
+    $FileName = $matches[0]
+    $FullPath = Join-Path -Path $BasePath -ChildPath $FileName
+    Write-Host "Full file path: $FullPath"
+}
+
+#>
