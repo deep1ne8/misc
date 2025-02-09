@@ -13,11 +13,11 @@ param (
 
 Write-Host "`n"
 # Check if the destination path exists
-Write-Host "Choose destination path: ==>" -ForegroundColor Blue -NoNewline
+Write-Host "Enter destination path: ==>  " -ForegroundColor Blue -NoNewline
 $DestinationPath = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
-Write-Host "Enter URL: ==>" -ForegroundColor Blue -NoNewline
+Write-Host "Enter URL: ==>  " -ForegroundColor Blue -NoNewline
 $Url = Read-Host
 Start-Sleep -Seconds 2
 Write-Host "`n"
