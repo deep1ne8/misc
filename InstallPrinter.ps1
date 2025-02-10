@@ -29,7 +29,7 @@ $PrinterIP = Read-Host "Enter the printer IP address (e.g., '10.0.1.254')"
 
 # Define working directories
 $TempDirectory = "C:\TEMP\PrinterDriver"
-$ExecutingScriptDirectory = Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
+Split-Path -Path $MyInvocation.MyCommand.Definition -Parent
 
 # Prepare the working directory
 if (!(Test-Path -Path $TempDirectory)) {
