@@ -16,3 +16,4 @@ function Uninstall-DellBloatware {
         }
     }
 }
+Uninstall-DellBloatware
