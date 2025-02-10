@@ -32,7 +32,7 @@ if ($LoggedInUser -match '\\') {
 Write-Host "Getting OneDrive folder path for: $UserName" -ForegroundColor Yellow
 Write-Host ""
 try {
-    $OneDrivePath = (Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction Stop | Where-Object { $_.Name -like "OneDrive - *" }).FullName
+    $OneDrivePath = (Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OneDrive - *" }).FullName
 } catch {
     throw "OneDrive folder path not found for user $LoggedInUser."
 }
