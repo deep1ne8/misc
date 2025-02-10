@@ -66,7 +66,24 @@ function Uninstall-OfficeLanguagePacks {
     }
 }
 
-Uninstall-DellBloatware
 Write-Host "`n"
+# Prompt user for confirmation before uninstalling Dell bloatware
+Write-Host "Are you sure you want to uninstall Dell bloatware? (Y/N)" -ForegroundColor Yellow
+$confirmation = Read-Host
+if ($confirmation -eq "Y" -or $confirmation -eq "y") {
+    Uninstall-DellBloatware
+}
 Start-Sleep -Seconds 3
-Uninstall-OfficeLanguagePacks
+Write-Host "`n"
+
+# Prompt user for confirmation before uninstalling Office language packs
+Write-Host "Are you sure you want to uninstall Microsoft Office language packs and OneNote? (Y/N)" -ForegroundColor Yellow
+$confirmation = Read-Host
+if ($confirmation -eq "Y" -or $confirmation -eq "y") {
+    Uninstall-OfficeLanguagePacks -Force
+}
+Start-Sleep -Seconds 1
+
+Write-Host "`n"
+Write-Host "Dell bloatware and Office language packs uninstallation completed." -ForegroundColor Green
+return
