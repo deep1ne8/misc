@@ -23,10 +23,6 @@ function Uninstall-DellBloatware {
     }
 }
 function Uninstall-OfficeLanguagePacks {
-    param (
-        [switch]$Force
-    )
-
     Write-Host "`nStarting uninstallation of Microsoft Office Language Packs and OneNote..." -ForegroundColor Yellow
 
     # Retrieve installed applications from the registry
@@ -35,55 +31,62 @@ function Uninstall-OfficeLanguagePacks {
     if (!$installed) {
         Write-Host "No Microsoft Office or OneNote applications found." -ForegroundColor Cyan
         return
-    } else {
-        Write-Host "Looking for Microsoft Office/OneNote applications to uninstall..." -ForegroundColor Cyan
+    }
 
-        # Filter applications based on DisplayName
-        $toUninstall = $installed | Where-Object { 
-            ($_."DisplayName" -like "Microsoft 365*" -and $_."DisplayName" -notlike "Microsoft 365 - en-us") -or
-            ($_."DisplayName" -like "Microsoft OneNote*" -and $_."DisplayName" -notlike "Microsoft OneNote - en-us")
-        }
+    Write-Host "Looking for Microsoft Office/OneNote applications to uninstall..." -ForegroundColor Cyan
 
-        if ($toUninstall) {
-            Write-Host "`nThe following Microsoft Office/OneNote applications will be uninstalled:" -ForegroundColor Cyan
-            $toUninstall | ForEach-Object { Write-Host " - $($_.DisplayName)" -ForegroundColor Magenta }
+    # Filter applications based on DisplayName
+    $toUninstall = $installed | Where-Object { 
+        ($_."DisplayName" -like "Microsoft 365*" -and $_."DisplayName" -notlike "Microsoft 365 - en-us") -or
+        ($_."DisplayName" -like "Microsoft OneNote*" -and $_."DisplayName" -notlike "Microsoft OneNote - en-us")
+    }
 
-            # Uninstall applications
-            foreach ($app in $toUninstall) {
-                Write-Host "`nUninstalling: $($app.DisplayName)..." -ForegroundColor Red
-                try {
-                    Start-Process -FilePath "msiexec.exe" -ArgumentList "/x $($app.PSChildName) /qn /norestart" -NoNewWindow -Wait -ErrorAction Stop
-                    Write-Host "Successfully uninstalled: $($app.DisplayName)" -ForegroundColor Green
-                } catch {
-                    Write-Host "Failed to uninstall: $($app.DisplayName). Error: $_" -ForegroundColor DarkRed
+    if ($toUninstall) {
+        Write-Host "`nThe following Microsoft Office/OneNote applications will be uninstalled:" -ForegroundColor Cyan
+        $toUninstall | ForEach-Object { Write-Host " - $($_.DisplayName)" -ForegroundColor Magenta }
+
+        # Uninstall applications
+        foreach ($app in $toUninstall) {
+            Write-Host "`nUninstalling: $($app.DisplayName)..." -ForegroundColor Red
+
+            # Use UninstallString if available (Click-to-Run or MSI)
+            if ($app.UninstallString) {
+                $uninstallCommand = $app.UninstallString
+
+                # Check if the UninstallString needs to be executed with cmd.exe
+                if ($uninstallCommand -match "MsiExec") {
+                    $arguments = $uninstallCommand -replace "MsiExec.exe ", ""  # Strip "MsiExec.exe"
+                    Start-Process -FilePath "MsiExec.exe" -ArgumentList $arguments -NoNewWindow -Wait
+                } else {
+                    Start-Process -FilePath "cmd.exe" -ArgumentList "/c $uninstallCommand" -NoNewWindow -Wait
                 }
+            } elseif ($app.PSChildName) {
+                # Fallback: Use MSI-based uninstallation with GUID
+                Start-Process -FilePath "msiexec.exe" -ArgumentList "/x $($app.PSChildName) /qn /norestart" -NoNewWindow -Wait
+            } else {
+                Write-Host "No uninstall method found for: $($app.DisplayName)" -ForegroundColor DarkRed
+                continue
             }
 
-            Write-Host "`nUninstallation process completed." -ForegroundColor Green
-        } else {
-            Write-Host "No matching applications found for uninstallation." -ForegroundColor Cyan
+            # Confirm uninstallation
+            Start-Sleep -Seconds 2  # Give time for the uninstall process
+            $checkAgain = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
+                          Where-Object { $_.DisplayName -eq $app.DisplayName }
+
+            if ($checkAgain) {
+                Write-Host "❌ Failed to uninstall: $($app.DisplayName)" -ForegroundColor DarkRed
+            } else {
+                Write-Host "✅ Successfully uninstalled: $($app.DisplayName)" -ForegroundColor Green
+            }
         }
+        Write-Host "`nUninstallation process completed." -ForegroundColor Green
+    } else {
+        Write-Host "No matching applications found for uninstallation." -ForegroundColor Cyan
     }
 }
 
+Uninstall-DellBloatware
 Write-Host "`n"
-# Prompt user for confirmation before uninstalling Dell bloatware
-Write-Host "Are you sure you want to uninstall Dell bloatware? (Y/N)" -ForegroundColor Yellow
-$confirmation = Read-Host
-if ($confirmation -eq "Y" -or $confirmation -eq "y") {
-    Uninstall-DellBloatware
-}
 Start-Sleep -Seconds 3
-Write-Host "`n"
-
-# Prompt user for confirmation before uninstalling Office language packs
-Write-Host "Are you sure you want to uninstall Microsoft Office language packs and OneNote? (Y/N)" -ForegroundColor Yellow
-$confirmation = Read-Host
-if ($confirmation -eq "Y" -or $confirmation -eq "y") {
-    Uninstall-OfficeLanguagePacks -Force
-}
-Start-Sleep -Seconds 1
-
-Write-Host "`n"
-Write-Host "Dell bloatware and Office language packs uninstallation completed." -ForegroundColor Green
+Uninstall-OfficeLanguagePacks
 return
