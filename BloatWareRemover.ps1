@@ -2,7 +2,13 @@ function Uninstall-DellBloatware {
     $appNames = @(
         "Dell SupportAssist",
         "Dell SupportAssist OS Recovery Plugin for Dell Update",
-        "Dell SupportAssist Remediation"
+        "Dell SupportAssist Remediation",
+        "Dell Optimizer",
+        "Dell Display Manager",
+        "Dell Peripheral Manager",
+        "Dell Pair",
+        "Dell Core Services",
+        "Dell Trusted Device"
     )
 
     Write-Host "Uninstalling Dell bloatware..." -ForegroundColor Yellow
