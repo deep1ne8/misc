@@ -28,7 +28,7 @@ if ($LoggedInUser -match '\\') {
 }
 
 # Resolve OneDrive path dynamically
-
+Write-Host "`n"
 Write-Host "Getting OneDrive folder path for: $UserName" -ForegroundColor Yellow
 Write-Host ""
 try {
