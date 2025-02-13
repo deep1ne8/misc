@@ -62,7 +62,7 @@ function Uninstall-OfficeLanguagePacks {
             # Use UninstallString if available (Click-to-Run or MSI)
             if ($app.UninstallString) {
                 $uninstallCommand = $app.UninstallString
-
+            }
                 # Check if the UninstallString needs to be executed with cmd.exe
                 if ($uninstallCommand -match "MsiExec") {
                     $arguments = $uninstallCommand -replace "MsiExec.exe ", ""  # Strip "MsiExec.exe"
@@ -87,13 +87,12 @@ function Uninstall-OfficeLanguagePacks {
                 Write-Host "❌ Failed to uninstall: $($app.DisplayName)" -ForegroundColor DarkRed
             } else {
                 Write-Host "✅ Successfully uninstalled: $($app.DisplayName)" -ForegroundColor Green
-            }
-        }
-        Write-Host "`nUninstallation process completed." -ForegroundColor Green
+            }elseif{ 
+            Write-Host "`nUninstallation process completed." -ForegroundColor Green
     } else {
         Write-Host "No matching applications found for uninstallation." -ForegroundColor Cyan
+    }
 }
-
 
 # Run the function
 Uninstall-DellBloatware
