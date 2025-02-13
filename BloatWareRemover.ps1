@@ -92,6 +92,8 @@ function Uninstall-OfficeLanguagePacks {
         Write-Host "No matching applications found for uninstallation." -ForegroundColor Cyan
     }
 }
+
+
 # Run the function
 Uninstall-DellBloatware
 Write-Host "`n"
