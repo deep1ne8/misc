@@ -37,17 +37,27 @@ function Uninstall-OfficeLanguagePacks {
 
     # Filter applications based on DisplayName
     $toUninstall = $installed | Where-Object { 
-        ($_."DisplayName" -like "Microsoft 365*" -and $_."DisplayName" -notlike "Microsoft 365 - en-us" -and $_."DisplayName" -notlike "Microsoft 365 - Apps for Business - en-us" -and $_."DisplayName" -notlike "Microsoft 365 - Apps for Enterprise - en-us") -or
-        ($_."DisplayName" -like "Microsoft OneNote*" -and $_."DisplayName" -notlike "Microsoft OneNote - en-us")
-    }
+        ($_."DisplayName" -like "Microsoft 365*") -and ($_."DisplayName" -notlike "Microsoft 365 - en-us") -and ($_."DisplayName" -notlike "Microsoft 365 - Apps for Business - en-us") -and ($_."DisplayName" -notlike "Microsoft 365 - Apps for Enterprise - en-us") -or
+        ($_."DisplayName" -like "Microsoft OneNote*") -and ($_."DisplayName" -notlike "Microsoft OneNote - en-us")
+    } | Write-Host "Listing all Microsoft Office/OneNote applications to be uninstalled:" | Select-Object DisplayName
 
-    if ($toUninstall) {
-        Write-Host "`nThe following Microsoft Office/OneNote applications will be uninstalled:" -ForegroundColor Cyan
-        $toUninstall | ForEach-Object { Write-Host " - $($_.DisplayName)" -ForegroundColor Magenta }
+    Write-Host "`n"
+    start-sleep -Seconds 3
 
-        # Uninstall applications
+    Read-host "Do you want to proceed with the uninstallation? (Y/N)"
+    if ($result -eq "Y") {
         foreach ($app in $toUninstall) {
             Write-Host "`nUninstalling: $($app.DisplayName)..." -ForegroundColor Red
+        }
+    } else {
+        Write-Host "Uninstallation cancelled." -ForegroundColor Yellow
+        return
+    }
+
+    # Uninstall applications
+    foreach ($app in $toUninstall) {
+        # Use UninstallString if available (Click-to-Run or MSI)
+        $toUninstall | ForEach-Object { Write-Host " - $($_.DisplayName)" -ForegroundColor Magenta }
 
             # Use UninstallString if available (Click-to-Run or MSI)
             if ($app.UninstallString) {
@@ -82,8 +92,13 @@ function Uninstall-OfficeLanguagePacks {
         Write-Host "`nUninstallation process completed." -ForegroundColor Green
     } else {
         Write-Host "No matching applications found for uninstallation." -ForegroundColor Cyan
-    }
 }
+
+
+# Run the function
+Uninstall-DellBloatware
+Write-Host "`n"
+Start-Sleep -Seconds 3
 
 Uninstall-DellBloatware
 Write-Host "`n"
