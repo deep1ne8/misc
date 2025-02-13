@@ -37,9 +37,9 @@ function Uninstall-OfficeLanguagePacks {
 
     # Filter applications based on DisplayName
     $toUninstall = $installed | Where-Object { 
-        ($_."DisplayName" -like "Microsoft 365*" -and $_."DisplayName" -notlike "Microsoft 365 - en-us" -and $_."DisplayName" -notlike "Microsoft 365 - Apps for Business - en-us" -and $_."DisplayName" -notlike "Microsoft 365 - Apps for Enterprise - en-us") -or
-        ($_."DisplayName" -like "Microsoft OneNote*" -and $_."DisplayName" -notlike "Microsoft OneNote - en-us")
-    }
+        ($_."DisplayName" -like "Microsoft 365*" -and $_."DisplayName" -notlike "*en-us*") -or
+        ($_."DisplayName" -like "Microsoft OneNote*" -and $_."DisplayName" -notlike "*en-us*")
+    } |  Select-Object DisplayName
 
     if ($toUninstall) {
         Write-Host "Listing all Microsoft Office/OneNote applications to be uninstalled:"
