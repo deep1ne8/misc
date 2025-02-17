@@ -70,6 +70,7 @@ $unwantedLanguages = @(
 $xmlContent = @"
 <Configuration>
     <Remove>
+        <Display Level="None" AcceptEULA="TRUE"/>
         <Product ID="O365ProPlusRetail">
             $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" } -join "`n")
         </Product>
