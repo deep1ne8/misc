@@ -32,6 +32,7 @@ $xmlPath = "$odtFolder\RemoveLanguages.xml"
 $downloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/ODTTool/setup.exe"
 
 Write-Host "Starting Office Language Remover..." -ForegroundColor Yellow
+Start-Sleep -Seconds 2
 Write-Host "`n"
 # Create ODT directory if it doesn't exist
 if (!(Test-Path $odtFolder)) {
@@ -55,18 +56,38 @@ if (!(Test-Path $setupPath)) {
 
 Write-Host "✅ ODT setup.exe is ready at $setupPath" -ForegroundColor Green
 
-# Retrieve installed Office languages from the registry
-$officeLanguages = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" -ErrorAction SilentlyContinue |
-                    Select-Object -ExpandProperty "InstallationLanguage" | Out-Null
+# Try to retrieve installed Office languages
+$officeLanguages = @()
+$registryPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration",
+    "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Scenario"
+)
 
-$installedLanguages = $officeLanguages -split ";"  # Split in case multiple languages are found
+foreach ($regPath in $registryPaths) {
+    if (Test-Path $regPath) {
+        $regData = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
+        if ($regData.InstallationLanguages) {
+            $officeLanguages += $regData.InstallationLanguages -split ";"
+        } elseif ($regData.InstallationLanguage) {
+            $officeLanguages += $regData.InstallationLanguage
+        }
+    }
+}
+
+# Remove duplicates and keep only unique values
+$installedLanguages = $officeLanguages | Select-Object -Unique
+
+if ($installedLanguages.Count -eq 0) {
+    Write-Host "No additional Office languages found. No action needed." -ForegroundColor Cyan
+    exit
+}
 
 # Exclude en-us and keep only the unwanted languages
 $unwantedLanguages = $installedLanguages | Where-Object { $_ -ne "en-us" }
 
 if ($unwantedLanguages.Count -eq 0) {
-    Write-Host "No additional Office languages found. No action needed." -ForegroundColor Cyan
-    return
+    Write-Host "Only en-us is installed. No need to remove languages." -ForegroundColor Cyan
+    exit
 }
 
 # Create XML Configuration
@@ -74,7 +95,7 @@ $xmlContent = @"
 <Configuration>
     <Remove>
         <Product ID="O365ProPlusRetail">
-            $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" })
+            $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" } -join "`n")
         </Product>
     </Remove>
 </Configuration>
