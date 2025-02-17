@@ -70,12 +70,12 @@ $unwantedLanguages = @(
 $xmlContent = @"
 <Configuration>
     <Remove>
-        <Display Level="False" AcceptEULA="TRUE"/>
-        <Property Name="FORCEAPPSHUTDOWN" Value="TRUE"/>
         <Product ID="O365ProPlusRetail">
             $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" } -join "`n")
         </Product>
     </Remove>
+    <Display Level="None" AcceptEULA="TRUE"/>
+    <Property Name="FORCEAPPSHUTDOWN" Value="TRUE"/>
 </Configuration>
 "@
 
@@ -100,7 +100,7 @@ if ($confirmation -ne "Y" -and $confirmation -ne "y") {
 }else {
 # Run Office Deployment Tool to remove the languages
 Write-Host "`nStarting Office Deployment Tool to remove unwanted languages..." -ForegroundColor Green
-Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath  /quiet /forceappshutdown AcceptEULA=True" -NoNewWindow -Wait
+Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
 Write-Host "Office language removal process completed." -ForegroundColor Green
 
 Write-Host "`n"
@@ -110,8 +110,18 @@ Write-Host "Please restart your computer for the changes to take effect." -Foreg
 
 
 # Run the function
-Uninstall-DellBloatware
-Write-Host "`n"
-Start-Sleep -Seconds 3
-Remove-OfficeLanguages
-return
+$manufacturer = (Get-WmiObject -Class Win32_ComputerSystem).Manufacturer
+if ($manufacturer -like "*Dell*") {
+    Write-Host "This device is a $manufacturer. Proceeding with removal of Dell Bloatware."
+    Uninstall-DellBloatware
+    Write-Host "`n"
+    Start-Sleep -Seconds 3
+    Remove-OfficeLanguages
+    return
+}else {
+    Write-Host "This device is not a Dell. Skipping removal of Dell bloatware. Starting Office Language Remover..." -ForegroundColor Yellow
+    Write-Host "`n"
+    Start-Sleep -Seconds 3
+    Remove-OfficeLanguages
+    return
+}
