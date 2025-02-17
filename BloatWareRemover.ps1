@@ -22,75 +22,70 @@ function Uninstall-DellBloatware {
         }
     }
 }
-function Uninstall-OfficeLanguagePacks {
-    Write-Host "`nStarting uninstallation of Microsoft Office Language Packs and OneNote..." -ForegroundColor Yellow
+function Remove-OfficeLanguages {
+# Define ODT folder and setup path
+$odtFolder = "C:\ODT"
+$setupPath = "$odtFolder\setup.exe"
+$xmlPath = "$odtFolder\RemoveLanguages.xml"
+$downloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/ODTTool/setup.exe"
 
-    # Retrieve installed applications from the registry
-    $installed = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue
+# Create ODT directory if it doesn't exist
+if (!(Test-Path $odtFolder)) {
+    Write-Host "Creating ODT directory at $odtFolder..." -ForegroundColor Yellow
+    New-Item -Path $odtFolder -ItemType Directory -Force | Out-Null
+}
 
-    if (!$installed) {
-        Write-Host "No Microsoft Office or OneNote applications found." -ForegroundColor Cyan
-        return
-    }
+# Download setup.exe if not found
+if (!(Test-Path $setupPath)) {
+    Write-Host "Downloading Office Deployment Tool (ODT)..." -ForegroundColor Cyan
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $setupPath
+} else {
+    Write-Host "setup.exe already exists in C:\ODT. Skipping download." -ForegroundColor Green
+}
 
-    Write-Host "Looking for Microsoft Office/OneNote applications to uninstall..." -ForegroundColor Cyan
+# Verify download
+if (!(Test-Path $setupPath)) {
+    Write-Host "❌ Download failed. Check the URL or try again." -ForegroundColor Red
+    exit
+}
 
-    # Filter applications based on DisplayName
-    $toUninstall = $installed | Where-Object { 
-        ($_."DisplayName" -like "Microsoft 365*" -and $_."DisplayName" -notlike "*en-us*") -or
-        ($_."DisplayName" -like "Microsoft OneNote*" -and $_."DisplayName" -notlike "*en-us*")
-    } |  Select-Object DisplayName
+Write-Host "✅ ODT setup.exe is ready at $setupPath" -ForegroundColor Green
 
-    if ($toUninstall) {
-        Write-Host "Listing all Microsoft Office/OneNote applications to be uninstalled:"
-        $toUninstall | ForEach-Object { Write-Host " - $($_.DisplayName)" -ForegroundColor Magenta }
+# Retrieve installed Office languages from the registry
+$officeLanguages = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" -ErrorAction SilentlyContinue |
+                    Select-Object -ExpandProperty "InstallationLanguage"
 
-        Write-Host "`n"
-        Start-Sleep -Seconds 3
+$installedLanguages = $officeLanguages -split ";"  # Split in case multiple languages are found
 
-        $result = Read-Host "Do you want to proceed with the uninstallation? (Y/N)"
-        if ($result -eq "Y") {
-            foreach ($app in $toUninstall) {
-                Write-Host "`nUninstalling: $($app.DisplayName)..." -ForegroundColor Red
+# Exclude en-us and keep only the unwanted languages
+$unwantedLanguages = $installedLanguages | Where-Object { $_ -ne "en-us" }
 
-                # Use UninstallString if available (Click-to-Run or MSI)
-                if ($app.UninstallString) {
-                    $uninstallCommand = $app.UninstallString
+if ($unwantedLanguages.Count -eq 0) {
+    Write-Host "No additional Office languages found. No action needed." -ForegroundColor Cyan
+    exit
+}
 
-                    # Check if the UninstallString needs to be executed with cmd.exe
-                    if ($uninstallCommand -match "MsiExec") {
-                        $arguments = $uninstallCommand -replace "MsiExec.exe ", ""  # Strip "MsiExec.exe"
-                        Start-Process -FilePath "MsiExec.exe" -ArgumentList $arguments -NoNewWindow -Wait
-                    } else {
-                        Start-Process -FilePath "cmd.exe" -ArgumentList "/c $uninstallCommand" -NoNewWindow -Wait
-                    }
-                } elseif ($app.PSChildName) {
-                    # Fallback: Use MSI-based uninstallation with GUID
-                    Start-Process -FilePath "msiexec.exe" -ArgumentList "/x $($app.PSChildName) /qn /norestart" -NoNewWindow -Wait
-                } else {
-                    Write-Host "No uninstall method found for: $($app.DisplayName)" -ForegroundColor DarkRed
-                    continue
-                }
+# Create XML Configuration
+$xmlContent = @"
+<Configuration>
+    <Remove>
+        <Product ID="O365ProPlusRetail">
+            $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" } | Out-String)
+        </Product>
+    </Remove>
+</Configuration>
+"@
 
-                # Confirm uninstallation
-                Start-Sleep -Seconds 2  # Give time for the uninstall process
-                $checkAgain = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" -ErrorAction SilentlyContinue |
-                              Where-Object { $_.DisplayName -eq $app.DisplayName }
+# Save the XML File
+$xmlContent | Set-Content -Path $xmlPath -Encoding UTF8
 
-                if ($checkAgain) {
-                    Write-Host "❌ Failed to uninstall: $($app.DisplayName)" -ForegroundColor DarkRed
-                } else {
-                    Write-Host "✅ Successfully uninstalled: $($app.DisplayName)" -ForegroundColor Green
-                }
-            }
-            Write-Host "`nUninstallation process completed." -ForegroundColor Green
-        } else {
-            Write-Host "Uninstallation cancelled." -ForegroundColor Yellow
-            return
-        }
-    } else {
-        Write-Host "No matching applications found for uninstallation." -ForegroundColor Cyan
-    }
+Write-Host "Generated RemoveLanguages.xml with the following languages:" -ForegroundColor Yellow
+$unwantedLanguages | ForEach-Object { Write-Host " - $_" -ForegroundColor Magenta }
+
+# Run Office Deployment Tool to remove the languages
+Write-Host "`nStarting Office Deployment Tool to remove unwanted languages..." -ForegroundColor Green
+Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
+Write-Host "Office language removal process completed." -ForegroundColor Green
 }
 
 
@@ -98,5 +93,5 @@ function Uninstall-OfficeLanguagePacks {
 Uninstall-DellBloatware
 Write-Host "`n"
 Start-Sleep -Seconds 3
-Uninstall-OfficeLanguagePacks
+Remove-OfficeLanguages
 return
