@@ -50,7 +50,7 @@ if (!(Test-Path $setupPath)) {
 # Verify download
 if (!(Test-Path $setupPath)) {
     Write-Host "❌ Download failed. Check the URL or try again." -ForegroundColor Red
-    exit
+    return
 }
 
 Write-Host "✅ ODT setup.exe is ready at $setupPath" -ForegroundColor Green
