@@ -81,13 +81,30 @@ $xmlContent = @"
 # Save the XML content to file
 $xmlContent | Set-Content -Path $xmlPath -Encoding UTF8
 
+Write-Host "`n"
 Write-Host "Generated RemoveLanguages.xml with the following languages:" -ForegroundColor Yellow
+
+# List the unwanted languages
+Write-Host "Unwanted languages to be removed:" -ForegroundColor Yellow
+Write-Host "`n"
 $unwantedLanguages | ForEach-Object { Write-Host " - $_" -ForegroundColor Magenta }
 
+Write-Host "`n"
+Start-Sleep -Seconds 2
+Write-Host "Are you sure you want to remove these languages? (Y/N) " -ForegroundColor Yellow -NoNewline
+$confirmation = Read-Host
+if ($confirmation -ne "Y" -and $confirmation -ne "y") {
+    Write-Host "Operation canceled." -ForegroundColor Red
+    return
+}else {
 # Run Office Deployment Tool to remove the languages
 Write-Host "`nStarting Office Deployment Tool to remove unwanted languages..." -ForegroundColor Green
 Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
 Write-Host "Office language removal process completed." -ForegroundColor Green
+
+Write-Host "`n"
+Write-Host "Please restart your computer for the changes to take effect." -ForegroundColor Yellow
+    }
 }
 
 
