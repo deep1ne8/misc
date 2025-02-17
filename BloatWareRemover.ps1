@@ -22,6 +22,8 @@ function Uninstall-DellBloatware {
         }
     }
 }
+
+
 function Remove-OfficeLanguages {
 # Define ODT folder and setup path
 $odtFolder = "C:\ODT"
@@ -29,6 +31,8 @@ $setupPath = "$odtFolder\setup.exe"
 $xmlPath = "$odtFolder\RemoveLanguages.xml"
 $downloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/ODTTool/setup.exe"
 
+Write-Host "Starting Office Language Remover..." -ForegroundColor Yellow
+Write-Host "`n"
 # Create ODT directory if it doesn't exist
 if (!(Test-Path $odtFolder)) {
     Write-Host "Creating ODT directory at $odtFolder..." -ForegroundColor Yellow
@@ -53,7 +57,7 @@ Write-Host "✅ ODT setup.exe is ready at $setupPath" -ForegroundColor Green
 
 # Retrieve installed Office languages from the registry
 $officeLanguages = Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration" -ErrorAction SilentlyContinue |
-                    Select-Object -ExpandProperty "InstallationLanguage"
+                    Select-Object -ExpandProperty "InstallationLanguage" | Out-Null
 
 $installedLanguages = $officeLanguages -split ";"  # Split in case multiple languages are found
 
@@ -62,7 +66,7 @@ $unwantedLanguages = $installedLanguages | Where-Object { $_ -ne "en-us" }
 
 if ($unwantedLanguages.Count -eq 0) {
     Write-Host "No additional Office languages found. No action needed." -ForegroundColor Cyan
-    exit
+    return
 }
 
 # Create XML Configuration
