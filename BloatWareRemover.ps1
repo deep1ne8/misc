@@ -70,7 +70,7 @@ $xmlContent = @"
 <Configuration>
     <Remove>
         <Product ID="O365ProPlusRetail">
-            $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" } | Out-String)
+            $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" })
         </Product>
     </Remove>
 </Configuration>
