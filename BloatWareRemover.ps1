@@ -79,7 +79,7 @@ $installedLanguages = $officeLanguages | Select-Object -Unique
 
 if ($installedLanguages.Count -eq 0) {
     Write-Host "No additional Office languages found. No action needed." -ForegroundColor Cyan
-    exit
+    return
 }
 
 # Exclude en-us and keep only the unwanted languages
@@ -87,7 +87,7 @@ $unwantedLanguages = $installedLanguages | Where-Object { $_ -ne "en-us" }
 
 if ($unwantedLanguages.Count -eq 0) {
     Write-Host "Only en-us is installed. No need to remove languages." -ForegroundColor Cyan
-    exit
+    return
 }
 
 # Create XML Configuration
