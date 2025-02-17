@@ -100,7 +100,7 @@ if ($confirmation -ne "Y" -and $confirmation -ne "y") {
 }else {
 # Run Office Deployment Tool to remove the languages
 Write-Host "`nStarting Office Deployment Tool to remove unwanted languages..." -ForegroundColor Green
-Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
+Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath DisplayLevel=False AcceptEULA=True FORCEAPPSHUTDOWN=True" -NoNewWindow -Wait
 Write-Host "Office language removal process completed." -ForegroundColor Green
 
 Write-Host "`n"
