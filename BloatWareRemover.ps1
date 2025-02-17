@@ -56,41 +56,17 @@ if (!(Test-Path $setupPath)) {
 
 Write-Host "✅ ODT setup.exe is ready at $setupPath" -ForegroundColor Green
 
-# Try to retrieve installed Office languages
-$officeLanguages = @()
-$registryPaths = @(
-    "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Configuration",
-    "HKLM:\SOFTWARE\Microsoft\Office\ClickToRun\Scenario"
+# Define the languages you want to uninstall
+$unwantedLanguages = @(
+    "af-za", "sq-al", "ar-sa", "hy-am", "bn-in", "bg-bg", "ca-es", "hr-hr", "cs-cz", 
+    "da-dk", "nl-nl", "et-ee", "fi-fi", "fr-fr", "de-de", "el-gr", "gu-in", 
+    "he-il", "hi-in", "hu-hu", "is-is", "id-id", "it-it", "ja-jp", "kn-in", "ko-kr", 
+    "la-lt", "lv-lv", "lt-lt", "mk-mk", "ml-in", "mr-in", "nb-no", "pl-pl", "pt-br", 
+    "pt-pt", "pa-in", "ro-ro", "ru-ru", "sr-latn-rs", "sk-sk", "sl-si", "es-es", "sv-se", 
+    "ta-in", "tr-tr", "uk-ua", "vi-vn", "cy-gb", "xh-za", "zu-za"
 )
 
-foreach ($regPath in $registryPaths) {
-    if (Test-Path $regPath) {
-        $regData = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
-        if ($regData.InstallationLanguages) {
-            $officeLanguages += $regData.InstallationLanguages -split ";"
-        } elseif ($regData.InstallationLanguage) {
-            $officeLanguages += $regData.InstallationLanguage
-        }
-    }
-}
-
-# Remove duplicates and keep only unique values
-$installedLanguages = $officeLanguages | Select-Object -Unique
-
-if ($installedLanguages.Count -eq 0) {
-    Write-Host "No additional Office languages found. No action needed." -ForegroundColor Cyan
-    return
-}
-
-# Exclude en-us and keep only the unwanted languages
-$unwantedLanguages = $installedLanguages | Where-Object { $_ -ne "en-us" }
-
-if ($unwantedLanguages.Count -eq 0) {
-    Write-Host "Only en-us is installed. No need to remove languages." -ForegroundColor Cyan
-    return
-}
-
-# Create XML Configuration
+# Generate XML content to remove unwanted languages
 $xmlContent = @"
 <Configuration>
     <Remove>
@@ -101,7 +77,7 @@ $xmlContent = @"
 </Configuration>
 "@
 
-# Save the XML File
+# Save the XML content to file
 $xmlContent | Set-Content -Path $xmlPath -Encoding UTF8
 
 Write-Host "Generated RemoveLanguages.xml with the following languages:" -ForegroundColor Yellow
