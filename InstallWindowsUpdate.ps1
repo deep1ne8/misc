@@ -34,7 +34,7 @@ try {
     Import-Module -Name PSWindowsUpdate -Force -Verbose
 } catch {
     Write-Host "Failed to install PSWindowsUpdate"  -ForeGroundColor Red
-    exit 1
+    return
 }
 
 # Initialize Windows Update
@@ -49,7 +49,7 @@ try {
     
 } catch {
     Write-Host "Failed to initialize Windows Update"  -ForeGroundColor Red
-    exit 1
+    return
 }
 
 # Enable automatic updates
@@ -58,6 +58,7 @@ try {
     Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\wuauserv\Parameters" -Name AutoUpdate -Value 1 -Force
 } catch {
     Write-Host "Failed to enable automatic updates"  -ForeGroundColor Red
-    exit 1
+    return
 }
 
+Write-Host "Installation complete"  -ForeGroundColor Green
