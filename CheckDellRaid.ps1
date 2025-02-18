@@ -21,7 +21,7 @@ if ($omreport) {
     # Get RAID Controller Information
     $controllers = omreport storage controller | Select-String "ID:"
     foreach ($controller in $controllers) {
-        $controllerID = $controller -match "ID:\s+(\d+)" ? $matches[1] : "Unknown"
+        $controllerID = if ($controller -match "ID:\s+(\d+)") { $matches[1] } else { "Unknown" }
         Log-Output "RAID Controller ID: $controllerID"
         
         # Check Virtual Disks (RAID arrays)
