@@ -14,7 +14,7 @@ foreach ($path in $paths) {
 }
 
 # Install PSWindowsUpdate
-Set-ExecutionPolicy Unrestricted -Scope LocalMachine -Force -Confirm:$false
+Set-ExecutionPolicy Unrestricted -Scope LocalMachine -Force
 try {
     Install-Module -Name PSWindowsUpdate  -Force -Verbose
     Import-Module -Name PSWindowsUpdate -Force -Verbose
