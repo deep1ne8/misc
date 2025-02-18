@@ -1,17 +1,3 @@
-<#
-.SYNOPSIS
-Removes Windows Update Get-PnPSitePolicy and installs PSWindowsUpdate. Then updates Windows and suspends Bitlocker. Finally, enables automatic updates.
-
-.DESCRIPTION
-This script removes the Windows Update Get-PnPSitePolicy if present, installs the PSWindowsUpdate module, updates Windows, suspends Bitlocker and enables automatic updates.
-
-.EXAMPLE
-.\InstallWindowsUpdate.ps1
-
-.NOTES
-Make sure to run this script in an elevated PowerShell console.
-#>
-
 # Remove Windows Update Get-PnPSitePolicy 
 $paths = @("HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "HKCU:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate")
 foreach ($path in $paths) {
