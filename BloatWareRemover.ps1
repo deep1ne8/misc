@@ -19,7 +19,7 @@ function Uninstall-DellBloatware {
                 Write-Host "$appName not installed." -ForegroundColor Magenta
                 Write-Host "Skipping..." -ForegroundColor Magenta
                 Write-Host "Verbose: Moving on to office language remover..." -ForegroundColor Magenta
-                Offiice-LanguageRemover -Verbose
+                Remove-OfficeLanguages -Verbose
             }
             elseif ($app) {
                 Write-Host "Uninstalling $appName..." -ForegroundColor Cyan
