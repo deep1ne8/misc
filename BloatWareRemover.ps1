@@ -1,3 +1,21 @@
+<#
+Dell Bloatware and Office Language Remover
+
+Author: EDaniels
+Date: 12/2024
+
+Description:
+This script removes Dell Bloatware and unwanted Office languages.
+
+Usage:
+Run the script and follow the prompts to uninstall Dell bloatware and remove unwanted Office languages.
+
+Requirements:
+- PowerShell 5.1 or later
+
+
+#>
+
 function Uninstall-DellBloatware {
     $appNames = @(
         "Dell SupportAssist",
