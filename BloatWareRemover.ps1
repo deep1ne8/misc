@@ -38,10 +38,14 @@ Write-Host "Starting Office Language Remover..." -ForegroundColor Yellow
 Start-Sleep -Seconds 2
 Write-Host "`n"
 # Create ODT directory if it doesn't exist
-if (!(Test-Path $odtFolder -and Test-Path $ODTlog)) {
+if (!(Test-Path $odtFolder -PathType Container) -or !(Test-Path $ODTlog -PathType Container)) {
     Write-Host "Creating ODT directory at $odtFolder and log folder $ODTlog..." -ForegroundColor Yellow
-    New-Item -Path $odtFolder -ItemType Directory -Force | Out-Null
-    New-Item -Path $ODTlog -ItemType Directory -Force | Out-Null
+    try {
+        $null = New-Item -Path $odtFolder -ItemType Directory -Force -ErrorAction Stop
+        $null = New-Item -Path $ODTlog -ItemType Directory -Force -ErrorAction Stop
+    } catch {
+        Write-Warning "Failed to create ODT directory at $odtFolder or log folder $ODTlog. Error: $_"
+    }
 }
 
 # Download setup.exe if not found
