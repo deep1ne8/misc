@@ -40,7 +40,7 @@ if (-not (Test-Path $ODTlog -PathType Container)) {
 
 if ($null -eq $ListInstalledLanguages) {
     Write-Host "`n"
-    Write-Host "VERBOSE: No installed languages found. Please check the registry key HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" -foregroundColor Yellow
+    Write-Host "VERBOSE: No installed languages found." -foregroundColor Yellow
     Write-Host "VERBOSE: Skipping Office Language Remover..." -ForegroundColor Red
     Write-Host "Verbose: Script completed..." -ForegroundColor Green
     return
