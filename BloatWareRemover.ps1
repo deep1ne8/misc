@@ -31,18 +31,16 @@ $setupPath = "$odtFolder\setup.exe"
 $xmlPath = "$odtFolder\RemoveLanguages.xml"
 $downloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/ODTTool/setup.exe"
 $ListInstalledLanguages = Get-Item "HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" -ErrorAction SilentlyContinue | Where-Object {$_.Property -ne "en-us" -and $_.Property -ne "en-gb"} | Select-Object Property
-$ODTlog = Join-Path -Path $odtFolder -ChildPath "ODTlog" -Resolve -ErrorAction SilentlyContinue
-
-if ($null -eq $ODTlog) {
-    Write-Warning "ODT log folder path not resolved. Please check the path and permissions."
-}
+$ODTlog = Join-Path -Path $odtFolder -ChildPath "ODTlog" -ErrorAction SilentlyContinue
 
 if (-not (Test-Path $ODTlog -PathType Container)) {
-    Write-Warning "ODT log folder $ODTlog not found. Please check the path and permissions."
+    Write-Host "ODT log folder $ODTlog not found. Creating log folder." -foregroundColor Red
+    New-Item -Path $ODTlog -ItemType Directory
 }
 
 if ($null -eq $ListInstalledLanguages) {
-    Write-Warning "No installed languages found. Please check the registry key HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages"
+    Write-Host "No installed languages found. Please check the registry key HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" -foregroundColor Red
+    return
 }
 
 Write-Host "Starting Office Language Remover..." -ForegroundColor Yellow
@@ -52,10 +50,11 @@ Write-Host "`n"
 if (!(Test-Path $odtFolder -PathType Container) -or !(Test-Path $ODTlog -PathType Container)) {
     Write-Host "Creating ODT directory at $odtFolder and log folder $ODTlog..." -ForegroundColor Yellow
     try {
-        $null = New-Item -Path $odtFolder -ItemType Directory -Force -ErrorAction Stop
-        $null = New-Item -Path $ODTlog -ItemType Directory -Force -ErrorAction Stop
+        New-Item -Path $odtFolder -ItemType Directory -Force -ErrorAction SilentlyContinue
+        New-Item -Path $ODTlog -ItemType Directory -Force -ErrorAction SilentlyContinue
     } catch {
-        Write-Warning "Failed to create ODT directory at $odtFolder or log folder $ODTlog. Error: $_"
+        Write-Host "Failed to create ODT directory at $odtFolder or log folder $ODTlog. Error: $_" -foregroundColor Red
+        return
     }
 }
 
@@ -123,7 +122,7 @@ if ($confirmation -ne "Y" -and $confirmation -ne "y") {
 Write-Host "`nStarting Office Deployment Tool to remove unwanted languages..." -ForegroundColor Green
 Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
 Write-Host "`n"
-Get-Output -Path $ODTlog -Tail 100
+Get-Output -Path "$ODTlog\*.log" -Tail 100
 Write-Host "`n"
 Write-Host "Office language removal process completed." -ForegroundColor Green
 
