@@ -33,7 +33,8 @@ function Uninstall-DellBloatware {
     foreach ($appName in $appNames) {
         $app = Get-Package -Name $appName -ErrorAction SilentlyContinue
         if ($null -eq $app) {
-            Write-Host "$appName not installed." -ForegroundColor Magenta
+            Write-Host "${appName} not installed." -ForegroundColor Yellow
+            Write-Host ""
             Write-Host "Stopping uninstallation process and moving on to office language remover..." -ForegroundColor Magenta
             Remove-OfficeLanguages
             return
