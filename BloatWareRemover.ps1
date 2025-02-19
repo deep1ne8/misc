@@ -30,9 +30,16 @@ $odtFolder = "C:\ODT"
 $setupPath = "$odtFolder\setup.exe"
 $xmlPath = "$odtFolder\RemoveLanguages.xml"
 $downloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/ODTTool/setup.exe"
-$ListInstalledLanguages = (Get-Item "HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" | Where-Object {$_.Property -ne "en-us" -and $_.Prope
-rty -ne "en-gb"} | Select-Object Property)
-$ODTlog = "$odtFolder\ODTlog"
+$ListInstalledLanguages = (Get-Item "HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" -ErrorAction SilentlyContinue | Where-Object {$_.Property -ne "en-us" -and $_.Property -ne "en-gb"} | Select-Object Property)
+$ODTlog = Join-Path -Path $odtFolder -ChildPath "ODTlog" -Resolve -ErrorAction SilentlyContinue
+
+if (-not (Test-Path $ODTlog -PathType Container)) {
+    Write-Warning "ODT log folder $ODTlog not found. Please check the path and permissions."
+}
+
+if (-not $ListInstalledLanguages) {
+    Write-Warning "No installed languages found. Please check the registry key HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages"
+}
 
 Write-Host "Starting Office Language Remover..." -ForegroundColor Yellow
 Start-Sleep -Seconds 2
