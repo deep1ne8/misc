@@ -34,36 +34,39 @@ $ListInstalledLanguages = Get-Item "HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\
 $ODTlog = Join-Path -Path $odtFolder -ChildPath "ODTlog" -ErrorAction SilentlyContinue
 
 if (-not (Test-Path $ODTlog -PathType Container)) {
-    Write-Host "ODT log folder $ODTlog not found. Creating log folder." -foregroundColor Red
+    Write-Host "Verbose: ODT log folder $ODTlog not found. Creating log folder." -foregroundColor Red
     New-Item -Path $ODTlog -ItemType Directory
 }
 
 if ($null -eq $ListInstalledLanguages) {
-    Write-Host "No installed languages found. Please check the registry key HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" -foregroundColor Red
+    Write-Host "`n"
+    Write-Host "VERBOSE: No installed languages found. Please check the registry key HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" -foregroundColor Yellow
+    Write-Host "VERBOSE: Skipping Office Language Remover..." -ForegroundColor Red
+    Write-Host "Verbose: Script completed..." -ForegroundColor Green
     return
 }
 
-Write-Host "Starting Office Language Remover..." -ForegroundColor Yellow
+Write-Host "Verbose: Starting Office Language Remover..." -ForegroundColor Yellow
 Start-Sleep -Seconds 2
 Write-Host "`n"
 # Create ODT directory if it doesn't exist
 if (!(Test-Path $odtFolder -PathType Container) -or !(Test-Path $ODTlog -PathType Container)) {
-    Write-Host "Creating ODT directory at $odtFolder and log folder $ODTlog..." -ForegroundColor Yellow
+    Write-Host "Verbose: Creating ODT directory at $odtFolder and log folder $ODTlog..." -ForegroundColor Yellow
     try {
         New-Item -Path $odtFolder -ItemType Directory -Force -ErrorAction SilentlyContinue
         New-Item -Path $ODTlog -ItemType Directory -Force -ErrorAction SilentlyContinue
     } catch {
-        Write-Host "Failed to create ODT directory at $odtFolder or log folder $ODTlog. Error: $_" -foregroundColor Red
+        Write-Host "Verbose: Failed to create ODT directory at $odtFolder or log folder $ODTlog. Error: $_" -foregroundColor Red
         return
     }
 }
 
 # Download setup.exe if not found
 if (!(Test-Path $setupPath)) {
-    Write-Host "Downloading Office Deployment Tool (ODT)..." -ForegroundColor Cyan
+    Write-Host "Verbose: Downloading Office Deployment Tool (ODT)..." -ForegroundColor Cyan
     Invoke-WebRequest -Uri $downloadUrl -OutFile $setupPath
 } else {
-    Write-Host "setup.exe already exists in C:\ODT. Skipping download." -ForegroundColor Green
+    Write-Host "Verbose: setup.exe already exists in C:\ODT. Skipping download." -ForegroundColor Green
 }
 
 # Verify download
@@ -102,10 +105,10 @@ $xmlContent = @"
 $xmlContent | Set-Content -Path $xmlPath -Encoding UTF8
 
 Write-Host "`n"
-Write-Host "Generated RemoveLanguages.xml with the following languages:" -ForegroundColor Yellow
+Write-Host "Verbose: Generated RemoveLanguages.xml with the following languages:" -ForegroundColor Yellow
 
 # List the unwanted languages
-Write-Host "Unwanted languages to be removed:" -ForegroundColor Yellow
+Write-Host "Verbose: Unwanted languages to be removed:" -ForegroundColor Yellow
 Write-Host "`n"
 
 $ListInstalledLanguages | ForEach-Object { Write-Host " - $_" -ForegroundColor Magenta }
@@ -124,7 +127,7 @@ Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWin
 Write-Host "`n"
 Get-Output -Path "$ODTlog\*.log" -Tail 100
 Write-Host "`n"
-Write-Host "Office language removal process completed." -ForegroundColor Green
+Write-Host "Verbose: Office language removal process completed." -ForegroundColor Green
 
 Write-Host "`n"
 Write-Host "Please restart your computer for the changes to take effect." -ForegroundColor Yellow
@@ -135,14 +138,14 @@ Write-Host "Please restart your computer for the changes to take effect." -Foreg
 # Run the function
 $manufacturer = (Get-WmiObject -Class Win32_ComputerSystem).Manufacturer
 if ($manufacturer -like "*Dell*") {
-    Write-Host "This device is a $manufacturer. Proceeding with removal of Dell Bloatware."
+    Write-Host "Verbose: This device is a $manufacturer. Proceeding with removal of Dell Bloatware."
     Uninstall-DellBloatware
     Write-Host "`n"
     Start-Sleep -Seconds 3
     Remove-OfficeLanguages
     return
 }else {
-    Write-Host "This device is not a Dell. Skipping removal of Dell bloatware. Starting Office Language Remover..." -ForegroundColor Yellow
+    Write-Host "Verbose: This device is not a Dell. Skipping removal of Dell bloatware. Starting Office Language Remover..." -ForegroundColor Yellow
     Write-Host "`n"
     Start-Sleep -Seconds 3
     Remove-OfficeLanguages
