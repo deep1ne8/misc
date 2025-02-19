@@ -16,7 +16,7 @@ function Uninstall-DellBloatware {
         $app = Get-Package -Name $appName -ErrorAction SilentlyContinue
         if ($app) {
             Write-Host "Uninstalling $appName..." -ForegroundColor Cyan
-            $app | Uninstall-Package -Confirm:$false
+            $app | Uninstall-Package
         } else {
             Write-Host "$appName not found." -ForegroundColor Magenta
         }
@@ -30,14 +30,18 @@ $odtFolder = "C:\ODT"
 $setupPath = "$odtFolder\setup.exe"
 $xmlPath = "$odtFolder\RemoveLanguages.xml"
 $downloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/ODTTool/setup.exe"
+$ListInstalledLanguages = Get-Item "HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" | Where-Object {$_.Property -ne "en-us" -and $_.Prope
+rty -ne "en-gb"} | Select-Object Property
+$ODTlog = "$odtFolder\ODTlog"
 
 Write-Host "Starting Office Language Remover..." -ForegroundColor Yellow
 Start-Sleep -Seconds 2
 Write-Host "`n"
 # Create ODT directory if it doesn't exist
-if (!(Test-Path $odtFolder)) {
-    Write-Host "Creating ODT directory at $odtFolder..." -ForegroundColor Yellow
+if (!(Test-Path $odtFolder -and Test-Path $ODTlog)) {
+    Write-Host "Creating ODT directory at $odtFolder and log folder $ODTlog..." -ForegroundColor Yellow
     New-Item -Path $odtFolder -ItemType Directory -Force | Out-Null
+    New-Item -Path $ODTlog -ItemType Directory -Force | Out-Null
 }
 
 # Download setup.exe if not found
@@ -70,12 +74,13 @@ $unwantedLanguages = @(
 $xmlContent = @"
 <Configuration>
     <Remove>
-        <Product ID="O365ProPlusRetail">
+        <Product ID="LanguagePack">
             $(foreach ($lang in $unwantedLanguages) { "<Language ID=`"$lang`" />" } -join "`n")
         </Product>
     </Remove>
     <Display Level="None" AcceptEULA="TRUE"/>
     <Property Name="FORCEAPPSHUTDOWN" Value="TRUE"/>
+    <Logging Level="Standard" Path="$ODTlog" />
 </Configuration>
 "@
 
@@ -88,7 +93,8 @@ Write-Host "Generated RemoveLanguages.xml with the following languages:" -Foregr
 # List the unwanted languages
 Write-Host "Unwanted languages to be removed:" -ForegroundColor Yellow
 Write-Host "`n"
-$unwantedLanguages | ForEach-Object { Write-Host " - $_" -ForegroundColor Magenta }
+
+$ListInstalledLanguages | ForEach-Object { Write-Host " - $_" -ForegroundColor Magenta }
 
 Write-Host "`n"
 Start-Sleep -Seconds 2
@@ -101,6 +107,9 @@ if ($confirmation -ne "Y" -and $confirmation -ne "y") {
 # Run Office Deployment Tool to remove the languages
 Write-Host "`nStarting Office Deployment Tool to remove unwanted languages..." -ForegroundColor Green
 Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
+Write-Host "`n"
+Get-Output -Path $ODTlog -Tail 100
+Write-Host "`n"
 Write-Host "Office language removal process completed." -ForegroundColor Green
 
 Write-Host "`n"
