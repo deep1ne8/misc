@@ -31,22 +31,17 @@ function Uninstall-DellBloatware {
 
     Write-Host "Uninstalling Dell bloatware..." -ForegroundColor Yellow
     foreach ($appName in $appNames) {
-        try {
-            $app = Get-Package -Name $appName -ErrorAction SilentlyContinue
-            if ($null -eq $app) {
-                Write-Host "$appName not installed." -ForegroundColor Magenta
-                Write-Host "Skipping..." -ForegroundColor Magenta
-                Write-Host "Verbose: Moving on to office language remover..." -ForegroundColor Magenta
-                Remove-OfficeLanguages -Verbose
-            }
-            elseif ($app) {
-                Write-Host "Uninstalling $appName..." -ForegroundColor Cyan
-                $app | Uninstall-Package
-            } else {
-                Write-Host "$appName not found." -ForegroundColor Magenta
-            }
-        } catch {
-            Write-Host "An error occurred while uninstalling ${appName}: $($_.Exception.Message)" -ForegroundColor Red
+        $app = Get-Package -Name $appName -ErrorAction SilentlyContinue
+        if ($null -eq $app) {
+            Write-Host "$appName not installed." -ForegroundColor Magenta
+            Write-Host "Stopping uninstallation process and moving on to office language remover..." -ForegroundColor Magenta
+            Remove-OfficeLanguages
+            return
+        } elseif ($app) {
+            Write-Host "Uninstalling $appName..." -ForegroundColor Cyan
+            $app | Uninstall-Package
+        } else {
+            Write-Host "$appName not found." -ForegroundColor Magenta
         }
     }
 }
