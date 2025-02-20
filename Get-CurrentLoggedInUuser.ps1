@@ -6,7 +6,7 @@ function Get-LoggedOnUser {
 
     try {
         # Query Win32_ComputerSystem to get the logged-in user
-        $User = Get-CimInstance -ClassName Win32_ComputerSystem -ComputerName $ComputerName -ErrorAction SilentlyContinue | Select-Object UserName  
+        $User = Get-CimInstance -ClassName Win32_ComputerSystem  | Select-Object UserName  
         
         if ($User) {
             Write-Host "$ComputerName : Logged in user - $User" -ForegroundColor Green
