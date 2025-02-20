@@ -1,10 +1,18 @@
 function Start-AdvancedSystemCleanup {
+    param (
+        [switch]$DryRun
+    )
+
     $DaysOld = 30
     $LargeFileSizeGB = 1
     Write-Host "Starting Advanced System Cleanup..." -ForegroundColor Cyan
 
     # Get initial disk space
     $drive = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='C:'"
+    if (!$drive) {
+        Write-Host "Failed to retrieve drive information." -ForegroundColor Red
+        return
+    }
     $initialFreeSpace = [math]::Round($drive.FreeSpace / 1GB, 2)
     Write-Host "Initial free space: $initialFreeSpace GB" -ForegroundColor Green
 
@@ -66,7 +74,6 @@ function Start-AdvancedSystemCleanup {
 }
 
 function LargeFiles {
-
     $SourcePath = "C:\"
     $DestinationPath = "D:\Temp"
     $SizeThresholdBytes = 1073741824
@@ -111,8 +118,8 @@ function LargeFiles {
 }
 
 function ListUserProfiles {
-
     $DaysOld = 90
+    $usersPath = "C:\Users"
     # Exclude specific directories
     $excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User", "DefaultAppPool", "HvmService")
 
@@ -179,7 +186,7 @@ function CheckAndUninstallDellApps {
         Write-Host "This is not a Dell system. No action required." -ForegroundColor Yellow
     }
 }
-Clear-Host
+
 function Show-CleanupMenu {
     Clear-Host
     Write-Host "==============================" -ForegroundColor Cyan
@@ -187,42 +194,63 @@ function Show-CleanupMenu {
     Write-Host "==============================" -ForegroundColor Cyan
     Write-Host "1. Run Advanced System Cleanup" -ForegroundColor Green
     Write-Host "2. Run Cleanup Dry Run" -ForegroundColor Green
-    Write-Host "2. Run Cleanup Normally" -ForegroundColor Green
-    Write-Host "2. List User Profiles" -ForegroundColor Green
-    Write-Host "3. List Large Files" -ForegroundColor Green
-    Write-Host "4. Exit" -ForegroundColor Green
+    Write-Host "3. Run Cleanup Normally" -ForegroundColor Green
+    Write-Host "4. List User Profiles" -ForegroundColor Green
+    Write-Host "5. List Large Files" -ForegroundColor Green
+    Write-Host "6. Exit" -ForegroundColor Green
     Write-Host "==============================" -ForegroundColor Cyan
 
-    $choice = Read-Host "Enter your choice (1-6)"
+    try {
+        [int]$choice = Read-Host "Enter your choice (1-6)"
+        if ($choice -eq 0) {
+            throw "Choice cannot be empty."
+        }
 
-    switch ($choice) {
-        "1" { Start-AdvancedSystemCleanup }
-        "2" { Run-Cleanup -DryRun }
-        "3" { Run-Cleanup }
-        "4" { ListUserProfiles }
-        "5" { LargeFiles }
-        "6" {
-            Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
-            return
+        switch ($choice) {
+            1 { Start-AdvancedSystemCleanup }
+            2 { Start-AdvancedSystemCleanup -DryRun }
+            3 { Start-AdvancedSystemCleanup }
+            4 { ListUserProfiles }
+            5 { LargeFiles }
+            6 {
+                Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
+                return
+            }
+            default {
+                Write-Host "Invalid choice, please try again." -ForegroundColor Red
+                Show-CleanupMenu
+            }
         }
-        default {
-            Write-Host "Invalid choice, please try again." -ForegroundColor Red
-            Show-CleanupMenu
-        }
+    } catch {
+        Write-Host "An error occurred: $_" -ForegroundColor Red
+        Show-CleanupMenu
     }
 }
 
 function Show-ReturnMenu {
-    $returnChoice = Read-Host "`nReturn to the menu or exit? (Enter [1] for 'Yes' or [2] for 'exit')"
-    switch ($returnChoice.ToLower()) {
-        "1" { Show-CleanupMenu }
-        "2" {
-            Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
-            return
+    try {
+        [int]$returnChoice = Read-Host "`nReturn to the menu or exit? (Enter [1] for 'Yes' or [2] for 'exit')"
+        if ($returnChoice -eq 0) {
+            throw "Choice cannot be empty."
         }
-        default {
-            Write-Host "Invalid choice, please try again." -ForegroundColor Red
-            Show-ReturnMenu
+
+        switch ($returnChoice) {
+            1 { Show-CleanupMenu }
+            2 {
+                Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
+                return
+            }
+            default {
+                Write-Host "Invalid choice, please try again." -ForegroundColor Red
+                Show-ReturnMenu
+            }
         }
+    } catch {
+        Write-Host "An error occurred: $_" -ForegroundColor Red
+        Show-ReturnMenu
     }
 }
+
+# Display the cleanup menu
+Show-CleanupMenu
+
