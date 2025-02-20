@@ -9,7 +9,8 @@ function Get-LoggedOnUser {
         $User = Get-CimInstance -ClassName Win32_ComputerSystem  | Select-Object UserName  
         
         if ($User) {
-            Write-Host "$ComputerName : Logged in user - $User" -ForegroundColor Green
+            Write-Host "Current logged-in user`n" -ForegroundColor Green
+            Write-Host "Computername : $ComputerName`nLogged in user: $($User.UserName)" -ForegroundColor Green
         } else {
             Write-Host "$ComputerName : No user currently logged in" -ForegroundColor Green
         }
