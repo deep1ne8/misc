@@ -1,14 +1,6 @@
 function Start-AdvancedSystemCleanup {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $false)]
-        [int]$DaysOld = 30,
-        [Parameter(Mandatory = $false)]
-        [int]$LargeFileSizeGB = 1,
-        [Parameter(Mandatory = $false)]
-        [switch]$DryRun
-    )
-
+    $DaysOld = 30
+    $LargeFileSizeGB = 1
     Write-Host "Starting Advanced System Cleanup..." -ForegroundColor Cyan
 
     # Get initial disk space
@@ -74,15 +66,10 @@ function Start-AdvancedSystemCleanup {
 }
 
 function LargeFiles {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $false)]
-        [string]$SourcePath = "C:\",
-        [Parameter(Mandatory = $false)]
-        [string]$DestinationPath = "D:\Temp",
-        [Parameter(Mandatory = $false)]
-        [int64]$SizeThresholdBytes = 1073741824
-    )
+
+    $SourcePath = "C:\"
+    $DestinationPath = "D:\Temp"
+    $SizeThresholdBytes = 1073741824
 
     try {
         Write-Host "Starting scan for files larger than $([math]::Round($SizeThresholdBytes / 1GB, 2)) GB in path: $SourcePath" -ForegroundColor Cyan
@@ -124,12 +111,8 @@ function LargeFiles {
 }
 
 function ListUserProfiles {
-    [CmdletBinding()]
-    param (
-        [Parameter(Mandatory = $false)]
-        [int]$DaysOld = 90
-    )
 
+    $DaysOld = 90
     # Exclude specific directories
     $excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User", "DefaultAppPool", "HvmService")
 
@@ -196,7 +179,7 @@ function CheckAndUninstallDellApps {
         Write-Host "This is not a Dell system. No action required." -ForegroundColor Yellow
     }
 }
-
+Clear-Host
 function Show-CleanupMenu {
     Clear-Host
     Write-Host "==============================" -ForegroundColor Cyan
