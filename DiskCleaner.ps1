@@ -202,19 +202,23 @@ function Show-CleanupMenu {
     Write-Host "==============================" -ForegroundColor Cyan
     Write-Host "  Advanced System Cleanup Menu" -ForegroundColor Yellow
     Write-Host "==============================" -ForegroundColor Cyan
-    Write-Host "1. Run Cleanup in Dry-Run Mode" -ForegroundColor Green
+    Write-Host "1. Run Advanced System Cleanup" -ForegroundColor Green
+    Write-Host "2. Run Cleanup Dry Run" -ForegroundColor Green
     Write-Host "2. Run Cleanup Normally" -ForegroundColor Green
-    Write-Host "3. List User Profiles" -ForegroundColor Green
+    Write-Host "2. List User Profiles" -ForegroundColor Green
+    Write-Host "3. List Large Files" -ForegroundColor Green
     Write-Host "4. Exit" -ForegroundColor Green
     Write-Host "==============================" -ForegroundColor Cyan
 
-    $choice = Read-Host "Enter your choice (1-4)"
+    $choice = Read-Host "Enter your choice (1-6)"
 
     switch ($choice) {
-        "1" { Run-Cleanup -DryRun }
-        "2" { Run-Cleanup }
-        "3" { ListUserProfiles }
-        "4" {
+        "1" { Start-AdvancedSystemCleanup }
+        "2" { Run-Cleanup -DryRun }
+        "3" { Run-Cleanup }
+        "4" { ListUserProfiles }
+        "5" { LargeFiles }
+        "6" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
         }
