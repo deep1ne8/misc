@@ -6,17 +6,17 @@ function Get-LoggedOnUser {
 
     try {
         # Query Win32_ComputerSystem to get the logged-in user
-        $User = Get-WmiObject -Class Win32_ComputerSystem -ComputerName $ComputerName -ErrorAction Stop | 
+        $User = Get-CimInstance -Class Win32_ComputerSystem -ComputerName $ComputerName -ErrorAction SilentlyContinue | 
                 Select-Object -ExpandProperty UserName
         
         if ($User) {
-            Write-Output "$ComputerName : Logged in user - $User"
+            Write-Host "$ComputerName : Logged in user - $User" -ForegroundColor Green
         } else {
-            Write-Output "$ComputerName : No user currently logged in"
+            Write-Host "$ComputerName : No user currently logged in" -ForegroundColor Green
         }
     }
     catch {
-        Write-Output "$ComputerName : Error - $_"
+        Write-Host "$ComputerName : Error - $_" -ForegroundColor Red
     }
 }
 
