@@ -7,10 +7,10 @@ function Write-Log {
     Add-Content -Path $logPath -Value "[$timestamp] VERBOSE: $Message"
     Write-Host "[$timestamp] VERBOSE: $Message" -ForegroundColor Green
 }
-Write-Host "`n============ Windows Update Removal ================="
-Write-Host "`n====================================================="
+Write-Host "`n======================================================"
+Write-Log -Message "Disabling Windows Update"
+Write-Host "`n"
 # Remove Windows Update policies
-Write-Log -Message "Removing Windows Update policies"
 Start-Sleep 3
 Write-Host "`n"
 $paths = @("HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate", "HKCU:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate")
@@ -54,6 +54,9 @@ try {
     Import-Module -Name PSWindowsUpdate -Force
     Reset-WUComponents
     Start-Sleep 3
+    Write-Log -Message "Windows Update components cleaned up"
+    Start-Sleep 3
+    Write-Log -Message "Suspending Bitlocker on C:\"
     try {
         $bitLockerStatus = Get-BitLockerVolume -MountPoint C: | Select-Object -ExpandProperty VolumeStatus
         if ($bitLockerStatus -eq 'FullyEncrypted') {
@@ -63,8 +66,11 @@ try {
         }
     } catch {
         Write-Log -Message "Failed to disable BitLocker"
-        return
     }
+    Start-Sleep 3
+    Write-Host "`n======================================================"
+    # Get and install Windows updates
+    Write-Log -Message "Getting and installing Windows updates"
     Start-Sleep 3
     try {
         Get-WindowsUpdate -Verbose -Install -AcceptAll
@@ -92,6 +98,5 @@ try {
     Write-Log -Message "Failed to enable automatic updates"
     return
 }
-
 Write-Log -Message "Installation complete"
 return
