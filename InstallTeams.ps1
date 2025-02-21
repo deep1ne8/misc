@@ -8,7 +8,9 @@ $teamsConfigPath = "$odtExtractPath\teams.xml"
 Write-Host "Downloading the Office Deployment Tool..." -ForegroundColor Cyan
 Invoke-WebRequest -Uri $odtDownloadUrl -OutFile $odtInstallerPath
 
-mkdir $odtExtractPath
+if (-not(Test-Path $odtExtractPath)) {
+    mkdir $odtExtractPath
+}
 
 # Step 2: Extract the ODT
 Write-Host "Extracting the Office Deployment Tool..." -ForegroundColor Cyan
