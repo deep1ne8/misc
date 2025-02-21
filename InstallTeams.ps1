@@ -29,7 +29,6 @@ $teamsConfig = @"
   <Property Name="SCLCacheOverride" Value="0" />
   <Property Name="AUTOACTIVATE" Value="1" />
   <Property Name="PinIconsToTaskbar" Value="TRUE" />
-  <Display Level="None" AcceptEULA="TRUE" />
 </Configuration>
 "@
 Set-Content -Path $teamsConfigPath -Value $teamsConfig
