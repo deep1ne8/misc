@@ -18,17 +18,25 @@ Start-Process -FilePath $odtInstallerPath -ArgumentList "/extract:$odtExtractPat
 Write-Host "Creating Teams installation configuration..." -ForegroundColor Cyan
 $teamsConfig = @"
 <Configuration>
-  <Add OfficeClientEdition="64" Channel="Current">
-    <Product ID="Teams">
-      <Language ID="en-us" />
-    </Product>
-  </Add>
-  <Display Level="None" AcceptEULA="TRUE" />
-  <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
-  <Property Name="SharedComputerLicensing" Value="0" />
-  <Property Name="SCLCacheOverride" Value="0" />
-  <Property Name="AUTOACTIVATE" Value="1" />
-  <Property Name="PinIconsToTaskbar" Value="TRUE" />
+    <Add OfficeClientEdition="64" Channel="Current">
+        <Product ID="O365ProPlusRetail">
+            <Language ID="en-us" />
+            <ExcludeApp ID="Access" />
+            <ExcludeApp ID="Excel" />
+            <ExcludeApp ID="OneDrive" />
+            <ExcludeApp ID="OneNote" />
+            <ExcludeApp ID="Outlook" />
+            <ExcludeApp ID="PowerPoint" />
+            <ExcludeApp ID="Publisher" />
+            <ExcludeApp ID="Word" />
+        </Product>
+    </Add>
+    <Display Level="None" AcceptEULA="TRUE" />
+    <Property Name="AUTOACTIVATE" Value="1" />
+    <Property Name="SharedComputerLicensing" Value="1" />
+    <Property Name="DeviceBasedLicensing" Value="1" />
+    <Property Name="SCLCacheOverride" Value="0" />
+    <Property Name="PinIconsToTaskbar" Value="TRUE" />
 </Configuration>
 "@
 Set-Content -Path $teamsConfigPath -Value $teamsConfig
