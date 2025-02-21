@@ -7,7 +7,8 @@ function Write-Log {
     Add-Content -Path $logPath -Value "[$timestamp] VERBOSE: $Message"
     Write-Host "[$timestamp] VERBOSE: $Message" -ForegroundColor Green
 }
-
+Write-Host "`n============ Windows Update Removal ================="
+Write-Host "`n====================================================="
 # Remove Windows Update policies
 Write-Log -Message "Removing Windows Update policies"
 Start-Sleep 3
@@ -17,36 +18,36 @@ foreach ($path in $paths) {
     if (Test-Path $path) {
         try {
             Remove-Item -Path $path -Recurse -Force
-            Write-Host "Removed: $path" -ForegroundColor Green
+            Write-Log -Message "Removed: $path"
         } catch {
-            Write-Host "Failed to remove $path" -ForegroundColor Red
+            Write-Log -Message "Failed to remove $path"
         }
     } else {
-        Write-Host "Not found: $path"  -ForegroundColor Yellow
+        Write-Log -Message "Not found: $path"
     }
 }
 Start-Sleep 3
-Write-Host "`n"
+Write-Host "`n======================================================"
 # Install PSWindowsUpdate
 Set-ExecutionPolicy Unrestricted -Scope CurrentUser -Force
+Write-Log -Message "Installing PSWindowsUpdate"
 try {
     if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
         Install-PackageProvider -Name NuGet -Force
     }
     Start-Sleep 1
-    Write-Host "`n"
     if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
         Install-Module -Name PSWindowsUpdate -Force
     }
     Start-Sleep 1
-    Write-Host "`n"
     Import-Module -Name PSWindowsUpdate -Force
 } catch {
     Write-Log -Message "Failed to install PSWindowsUpdate"
     return
 }
 Start-Sleep 3
-Write-Host "`n"
+Write-Host "`n====================================================="
+
 # Initialize Windows Update
 Write-Log -Message "Cleaning up Windows update components"
 try {
@@ -61,7 +62,7 @@ try {
             Write-Log -Message "BitLocker is not enabled on C:\"
         }
     } catch {
-        Write-Host "Failed to disable BitLocker"
+        Write-Log -Message "Failed to disable BitLocker"
         return
     }
     Start-Sleep 3
@@ -77,10 +78,14 @@ try {
     Write-Log -Message "Failed to initialize Windows Update"
     return
 }
+Write-Host "`n======================================================"
+# Set Windows Update options
+Write-Log -Message "Setting Windows Update options"
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update" -Name AUOptions -Value 4 -Force
 Write-Host "`n"
 # Enable automatic updates
 Write-Log -Message "Enabling Windows Auto Updates"
+Write-Host "`n"
 try {
     Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\wuauserv\Parameters" -Name AutoUpdate -Value 1 -Force
 } catch {
@@ -89,3 +94,4 @@ try {
 }
 
 Write-Log -Message "Installation complete"
+return
