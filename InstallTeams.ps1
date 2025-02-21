@@ -35,7 +35,7 @@ Set-Content -Path $teamsConfigPath -Value $teamsConfig
 
 # Step 4: Install Teams using the ODT
 Write-Host "Installing Microsoft Teams..." -ForegroundColor Cyan
-Start-Process -FilePath "$odtExtractPath\setup.exe" -ArgumentList "/configure $teamsConfigPath" -Wait
+Start-Process -FilePath "$odtExtractPath\setup.exe" -ArgumentList "/configure $teamsConfigPath" -Wait -Verbose
 
 # Step 5: Verify Teams installation
 Write-Host "Verifying Teams installation..." -ForegroundColor Cyan
