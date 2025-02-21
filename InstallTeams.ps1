@@ -1,5 +1,5 @@
 # Define variables
-$odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_17126-20202.exe"
+$odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18324-20194.exe"
 $odtInstallerPath = "$env:TEMP\odt_setup.exe"
 $odtExtractPath = "$env:TEMP\ODT"
 $teamsConfigPath = "$odtExtractPath\teams.xml"
@@ -43,3 +43,4 @@ if (Test-Path $teamsExePath) {
 } else {
     Write-Host "Microsoft Teams installation failed." -ForegroundColor Red
 }
+return
