@@ -1,17 +1,17 @@
 $GitHubScripts = @(
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/DiskCleaner.ps1"; Description = "DiskCleaner" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/EnableFilesOnDemand.ps1"; Description = "EnableFilesOnDemand" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/DownloadFile.ps1"; Description = "DownloadFile" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/NetworkScan.ps1"; Description = "NetworkScan" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/BloatWareRemover.ps1"; Description = "DellBloatWareRemover" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/DeployPrinter.ps1"; Description = "DeployPrinter" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/CheckIfOneDriveSyncFolder.ps1"; Description = "CheckIfOneDriveSyncFolder" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/CheckIfUserIsAdmin.ps1"; Description = "CheckIfUserIsAdmin" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Get-CurrentLoggedInUser.ps1"; Description = "Get-CurrentLoggedInUser" }
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/InstallTeams.ps1"; Description = "InstallTeams" }
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/DiskCleaner.ps1"; Description = "DiskCleaner" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/EnableFilesOnDemand.ps1"; Description = "EnableFilesOnDemand" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/DownloadFile.ps1"; Description = "DownloadFile" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/NetworkScan.ps1"; Description = "NetworkScan" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/BloatWareRemover.ps1"; Description = "DellBloatWareRemover" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
+    #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/DeployPrinter.ps1"; Description = "DeployPrinter" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
+    #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/CheckIfOneDriveSyncFolder.ps1"; Description = "CheckIfOneDriveSyncFolder" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
+    #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/CheckIfUserIsAdmin.ps1"; Description = "CheckIfUserIsAdmin" },
+    #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/Get-CurrentLoggedInUser.ps1"; Description = "Get-CurrentLoggedInUser" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/InstallTeams.ps1"; Description = "InstallTeams" }
 )
 
 function InitiateScriptFromUrl {
@@ -57,11 +57,11 @@ Write-Host ""
         Write-Host "$index. $($script.Description)" -ForegroundColor Green
         $index++
     }
-    Write-Host "14. Exit" -ForegroundColor Red
+    Write-Host "10. Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Cyan
 
-    $choice = Read-Host "Enter your choice (1-14)"  
+    $choice = Read-Host "Enter your choice (1-10)"  
     switch ($choice) {
         "1" { InitiateScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
         "2" { InitiateScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
@@ -72,11 +72,7 @@ Write-Host ""
         "7" { InitiateScriptFromUrl $GitHubScripts[6].ScriptUrl; Show-ReturnMenu }
         "8" { InitiateScriptFromUrl $GitHubScripts[7].ScriptUrl; Show-ReturnMenu }
         "9" { InitiateScriptFromUrl $GitHubScripts[8].ScriptUrl; Show-ReturnMenu }
-        "10" { InitiateScriptFromUrl $GitHubScripts[9].ScriptUrl; Show-ReturnMenu }
-        "11" { InitiateScriptFromUrl $GitHubScripts[10].ScriptUrl; Show-ReturnMenu }
-        "12" { InitiateScriptFromUrl $GitHubScripts[11].ScriptUrl; Show-ReturnMenu }
-        "13" { InitiateScriptFromUrl $GitHubScripts[12].ScriptUrl; Show-ReturnMenu }
-        "14" {
+        "10" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
         }
