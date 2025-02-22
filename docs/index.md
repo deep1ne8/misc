@@ -1,6 +1,6 @@
 # AutoByte - Automate Your Workflow with PowerShell
 
-![AutoByte Logo](https://raw.githubusercontent.com/deep1ne8/misc/main/icon.png)
+![AutoByte Logo](https://raw.githubusercontent.com/deep1ne8/misc/main/Autobyte_MAIN.png)
 
 AutoByte is a **PowerShell automation tool** that simplifies system tasks, making it easier to manage deployments, configurations, and automation workflows.
 
