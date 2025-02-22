@@ -3,18 +3,34 @@ $odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4
 $odtInstallerPath = "$env:TEMP\odt_setup.exe"
 $odtExtractPath = "$env:TEMP\ODT"
 $teamsConfigPath = "$odtExtractPath\teams.xml"
+$teamsExePath = "$env:LOCALAPPDATA\Microsoft\Teams\Update.exe"
 
 # Step 1: Download the Office Deployment Tool (ODT)
 Write-Host "Downloading the Office Deployment Tool..." -ForegroundColor Cyan
-Invoke-WebRequest -Uri $odtDownloadUrl -OutFile $odtInstallerPath
+try {
+    Invoke-WebRequest -Uri $odtDownloadUrl -OutFile $odtInstallerPath
+} catch {
+    Write-Host "Failed to download Office Deployment Tool: $($_.Exception.Message)" -ForegroundColor Red
+    return
+}
 
 if (-not(Test-Path $odtExtractPath)) {
-    mkdir $odtExtractPath
+    try {
+        mkdir $odtExtractPath
+    } catch {
+        Write-Host "Failed to create directory for ODT extraction: $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
 }
 
 # Step 2: Extract the ODT
 Write-Host "Extracting the Office Deployment Tool..." -ForegroundColor Cyan
-Start-Process -FilePath $odtInstallerPath -ArgumentList "/extract:$odtExtractPath /quiet" -Wait
+try {
+    Start-Process -FilePath $odtInstallerPath -ArgumentList "/extract:$odtExtractPath /quiet" -Wait
+} catch {
+    Write-Host "Failed to extract Office Deployment Tool: $($_.Exception.Message)" -ForegroundColor Red
+    return
+}
 
 # Step 3: Create the XML configuration file for Teams
 Write-Host "Creating Teams installation configuration..." -ForegroundColor Cyan
@@ -41,15 +57,24 @@ $teamsConfig = @"
     <Property Name="PinIconsToTaskbar" Value="TRUE" />
 </Configuration>
 "@
-Set-Content -Path $teamsConfigPath -Value $teamsConfig
+try {
+    Set-Content -Path $teamsConfigPath -Value $teamsConfig
+} catch {
+    Write-Host "Failed to create Teams configuration file: $($_.Exception.Message)" -ForegroundColor Red
+    return
+}
 
 # Step 4: Install Teams using the ODT
 Write-Host "Installing Microsoft Teams..." -ForegroundColor Cyan
-Start-Process -FilePath "$odtExtractPath\setup.exe" -ArgumentList "/configure $teamsConfigPath" -Wait -Verbose
+try {
+    Start-Process -FilePath "$odtExtractPath\setup.exe" -ArgumentList "/configure $teamsConfigPath" -Wait -Verbose
+} catch {
+    Write-Host "Failed to install Microsoft Teams: $($_.Exception.Message)" -ForegroundColor Red
+    return
+}
 
 # Step 5: Verify Teams installation
 Write-Host "Verifying Teams installation..." -ForegroundColor Cyan
-$teamsExePath = "$env:LOCALAPPDATA\Microsoft\Teams\Update.exe"
 if (Test-Path $teamsExePath) {
     Write-Host "Microsoft Teams has been installed successfully." -ForegroundColor Green
 } else {

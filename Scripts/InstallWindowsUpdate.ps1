@@ -47,7 +47,6 @@ try {
 }
 Start-Sleep 3
 Write-Host "`n====================================================="
-
 # Initialize Windows Update
 Write-Log -Message "Cleaning up Windows update components"
 try {
