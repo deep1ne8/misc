@@ -1,6 +1,6 @@
 # AutoByte - Easy Automate Your Workflow with PowerShell
 
-![AutoByte](https://raw.githubusercontent.com/deep1ne8/misc/main/AutoByte_MAIN.png)
+![AutoByte](https://github.com/deep1ne8/misc/blob/main/AutoByte_Main.png)
 
 AutoByte is a **PowerShell automation tool** that simplifies system tasks, making it easier to manage deployments, configurations, and automation workflows.
 
@@ -32,4 +32,4 @@ Check out the [Release Notes](https://github.com/deep1ne8/misc/releases) for new
 - Discussions: [Community Discussions](https://github.com/deep1ne8/misc/discussions)
 - Contributions: Open-source contributions are welcome! 🎉
 
-[autoByteImage]: https://raw.githubusercontent.com/deep1ne8/misc/main/AutoByte_MAIN.png
+[autoByteImage]: https://github.com/deep1ne8/misc/blob/main/AutoByte_Main.png
