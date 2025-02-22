@@ -1,4 +1,4 @@
-# AutoByte - Automate Your Workflow with PowerShell
+# AutoByte - Easy Automate Your Workflow with PowerShell
 
 ![AutoByte](https://raw.githubusercontent.com/deep1ne8/misc/main/AutoByte_MAIN.png)
 
