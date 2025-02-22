@@ -19,10 +19,12 @@ function downloadApp {
     
 param (
     [Parameter(Mandatory=$true)]
+    [ValidateNotNullOrEmpty()]
     [string]
     $Url,
 
     [Parameter(Mandatory=$true)]
+    [ValidateNotNullOrEmpty()]
     [string]
     $Path,
 
@@ -33,45 +35,48 @@ param (
 
 $jobName = "Deploy-App"
 
-# Create a new BITS job
-$job = Start-BitsTransfer -Source $Url -Destination $Path -DisplayName $jobName
+try {
+    # Create a new BITS job
+    $job = Start-BitsTransfer -Source $Url -Destination $Path -DisplayName $jobName -ErrorAction Stop
 
-# If continue is set to $true, resume the download from the last downloaded byte
-if ($Continue) {
-    $job | Resume-BitsTransfer
+    # If continue is set to $true, resume the download from the last downloaded byte
+    if ($Continue) {
+        $job | Resume-BitsTransfer -ErrorAction Stop
+    }
+
+    # Wait for the download to complete
+    $job | Wait-BitsTransfer -ErrorAction Stop
+
+    # Display the progress bar
+    $progress = $job | Get-BitsTransfer
+    Write-Progress -Activity "Downloading $Url" -Status "$($progress.BytesTransferred / 1MB) MB of $($progress.BytesTotal / 1MB) MB" -PercentComplete ($progress.BytesTransferred / $progress.BytesTotal) * 100
+
+    # Install the application silently
+    if ($Path -like "*.msi") {
+        Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$Path`" /quiet /norestart" -Wait -NoNewWindow -ErrorAction Stop
+    } elseif ($Path -like "*.exe") {
+        Start-Process -FilePath $Path -ArgumentList "/quiet /norestart" -Wait -NoNewWindow -ErrorAction Stop
+    } else {
+        Write-Error "Unsupported file type. Only .msi and .exe files are supported."
+        return
+    }
+
+    # Check if the installation was successful
+    if ($?) {
+        Write-Host "Installation completed successfully."
+    } else {
+        Write-Error "Installation failed."
+        return
+    }
+} catch {
+    Write-Error "An error occurred: $_"
+    return
 }
 
-# Wait for the download to complete
-$job | Wait-BitsTransfer
-
-# Display the progress bar
-$progress = $job | Get-BitsTransfer
-Write-Progress -Activity "Downloading $Url" -Status "$($progress.BytesTransferred / 1MB) MB of $($progress.BytesTotal / 1MB) MB" -PercentComplete ($progress.BytesTransferred / $progress.BytesTotal) * 100
-
-# Install the application silently
-if ($Path -like "*.msi") {
-    Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$Path`" /quiet /norestart" -Wait -NoNewWindow
-} elseif ($Path -like "*.exe") {
-    Start-Process -FilePath $Path -ArgumentList "/quiet /norestart" -Wait -NoNewWindow
-} else {
-    Write-Error "Unsupported file type. Only .msi and .exe files are supported."
-    return
-    }
-
-# Check if the installation was successful
-if ($?) {
-    Write-Host "Installation completed successfully."
-} else {
-    Write-Error "Installation failed."
-    return
-    }
 # Clean up the job
-Remove-BitsTransfer -Job $jobName -Confirm:$false
+Remove-BitsTransfer -Job $jobName -Confirm:$false -ErrorAction SilentlyContinue
 }
 
 # Call the function to download and install the app
 downloadApp
-
-
-
 
