@@ -1,48 +1,54 @@
-Write-Host "`n"
-Write-Host "Autobyte File Downloader!" -ForegroundColor blue
-Write-Host "`n"
+param (
+    [string] $DestinationPath = "C:\Downloads"
+)
 
-# Check if the destination path exists and is writable
-Start-Sleep -Seconds 2
-Write-Host "`n"
-Write-Host "Enter URL: ==>  " -ForegroundColor Blue -NoNewline
-$Url = Read-Host
-Start-Sleep -Seconds 2
-Write-Host "`n"
-Write-Host "Download in progress..." -ForegroundColor White -BackgroundColor Green
-Write-Host "Please wait..." -ForegroundColor White -BackgroundColor Green
-Start-Sleep -Seconds 2
-Write-Host "`n"
+Write-Host "Autobyte File Downloader!" -ForegroundColor Cyan
+Write-Host ""
 
-$BasePath = "C:\temp"
+$Url = Read-Host "Enter URL:   "
 
-# Check if the destination path exists and is writable
-if (!(Test-Path $BasePath)) {
+if ([string]::IsNullOrWhiteSpace($Url) -or -not ($Url -match '^https?://')) {
+    Write-Host "Invalid or empty URL input." -ForegroundColor Red
+    return
+}
+
+$FileName = [System.IO.Path]::GetFileName($Url)
+if ([string]::IsNullOrWhiteSpace($FileName)) {
+    Write-Host "URL does not contain a valid file name." -ForegroundColor Red
+    return
+}
+$FullPath = Join-Path -Path $DestinationPath -ChildPath $FileName
+
+if (-not (Test-Path $DestinationPath)) {
     try {
-        New-Item -ItemType Directory -Path $BasePath | Out-Null
+        New-Item -ItemType Directory -Path $DestinationPath -ErrorAction Stop | Out-Null
     } catch {
         Write-Host "Failed to create destination path: $_" -ForegroundColor Red
         return
     }
 }
 
-try {
-    # Use regex to get the file name from the URL
-    if ($Url -match '([^/]+)$') {
-        $FileName = $matches[0]
-        $FullPath = Join-Path -Path $BasePath -ChildPath $FileName
-        Write-Host "Full file path: $FullPath"
+Write-Host "`n"
+Write-Host "Downloading to: $FullPath" -ForegroundColor White
+Write-Host "`n"
+
+$maxRetries = 3
+$retryCount = 0
+$success = $false
+
+while (-not $success -and $retryCount -lt $maxRetries) {
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -ErrorAction Stop
+        Write-Host "Download completed successfully!" -ForegroundColor Green
+        $success = $true
+    } catch {
+        $retryCount++
+        Write-Host "Failed to download the file (Attempt $retryCount of $maxRetries): $_" -ForegroundColor Red
+        Start-Sleep -Seconds 2
     }
-
-    Write-Host "`n"
-    Write-Host "Downloading to: $FullPath" -ForegroundColor White -BackgroundColor Green
-    Start-Sleep -Seconds 2
-    Write-Host "`n"
-
-    # Download the file
-    Invoke-WebRequest -Uri $Url -OutFile $FullPath -Method Get -Verbose
-
-    Write-Host "Download completed successfully!" -ForegroundColor Green
-} catch {
-    Write-Host "Error: $_" -ForegroundColor Red
 }
+
+if (-not $success) {
+    Write-Host "Failed to download the file after $maxRetries attempts." -ForegroundColor Red
+}
+
