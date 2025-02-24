@@ -4,7 +4,7 @@
 # Run with administrative privileges
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "This script requires administrative privileges. Please run as Administrator."
-    exit
+    return
 }
 
 # Configuration - Edit these values
