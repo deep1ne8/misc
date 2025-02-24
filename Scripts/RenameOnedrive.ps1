@@ -4,7 +4,6 @@
 # Run with administrative privileges
 if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
     Write-Warning "Please run this script as Administrator!"
-    exit
 }
 
 # Gather information
@@ -19,7 +18,7 @@ $confirmation = Read-Host "Do you want to continue? (Y/N)"
 
 if ($confirmation -ne 'Y') {
     Write-Host "Operation cancelled." -ForegroundColor Red
-    exit
+    return
 }
 
 # Stop OneDrive process
@@ -141,3 +140,4 @@ if ($restartExplorer -eq 'Y') {
     Start-Process "explorer"
     Write-Host "Explorer restarted." -ForegroundColor Green
 }
+return
