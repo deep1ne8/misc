@@ -8,8 +8,8 @@ if (-NOT ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 }
 
 # Configuration - Edit these values
-$folderPath = "C:\Users\jjfnk\JJ - RegeneRx Biopharmaceuticals, Inc - Business" # Full path to the folder you want to add
-$displayName = "JJ - RegeneRx Biopharmaceuticals, Inc - Business"      # The name to display in Explorer
+$folderPath = "C:\Users\jjfnk\JJ - RegeneRx Biopharmaceuticals, Inc" # Full path to the folder you want to add
+$displayName = "JJ - RegeneRx Biopharmaceuticals, Inc"      # The name to display in Explorer
 
 # Get input from user if default values are unchanged
 if ($null -eq $folderPath) {
