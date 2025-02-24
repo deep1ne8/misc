@@ -9,7 +9,7 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
     #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckIfOneDriveSyncFolder.ps1"; Description = "CheckIfOneDriveSyncFolder" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
-    #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckIfUserIsAdmin.ps1"; Description = "CheckIfUserIsAdmin" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/RenameOneDrive.ps1"; Description = "RenameOneDrive" },
     #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/Get-CurrentLoggedInUser.ps1"; Description = "Get-CurrentLoggedInUser" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallTeams.ps1"; Description = "InstallTeams" }
 )
@@ -57,11 +57,11 @@ Write-Host ""
         Write-Host "$index. $($script.Description)" -ForegroundColor Green
         $index++
     }
-    Write-Host "10. Exit" -ForegroundColor Red
+    Write-Host "11. Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Cyan
 
-    $choice = Read-Host "Enter your choice (1-10)"  
+    $choice = Read-Host "Enter your choice (1-11)"  
     switch ($choice) {
         "1" { InitiateScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
         "2" { InitiateScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
@@ -72,7 +72,8 @@ Write-Host ""
         "7" { InitiateScriptFromUrl $GitHubScripts[6].ScriptUrl; Show-ReturnMenu }
         "8" { InitiateScriptFromUrl $GitHubScripts[7].ScriptUrl; Show-ReturnMenu }
         "9" { InitiateScriptFromUrl $GitHubScripts[8].ScriptUrl; Show-ReturnMenu }
-        "10" {
+        "10" { InitiateScriptFromUrl $GitHubScripts[9].ScriptUrl; Show-ReturnMenu }
+        "11" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
         }
