@@ -1,6 +1,69 @@
 # Internet Latency Testing Tool
 # This script tests latency to multiple destinations and provides statistics
 
+<#
+.SYNOPSIS
+    Tests network latency to multiple destinations and provides detailed statistics.
+
+.DESCRIPTION
+    The Test-InternetLatency function performs ping tests to specified destinations
+    and presents detailed latency statistics including average, minimum, and maximum
+    response times as well as packet loss percentage. Results are color-coded for
+    easy interpretation and can be logged to a file.
+
+.PARAMETER Destinations
+    An array of IP addresses or hostnames to test. 
+    Default: 8.8.8.8 (Google DNS), 1.1.1.1 (Cloudflare DNS), www.google.com, www.microsoft.com
+
+.PARAMETER Count
+    The number of ping requests to send to each destination.
+    Default: 10
+
+.PARAMETER Interval
+    The interval in seconds between ping requests.
+    Default: 2
+
+.PARAMETER Continuous
+    Switch to enable continuous monitoring. Press Ctrl+C to stop.
+
+.PARAMETER OutputFile
+    Path to save the log file. A timestamp will be appended to the filename.
+    Example: "LatencyReport" becomes "LatencyReport_20250225_123456.log"
+
+.PARAMETER ShowDetails
+    Switch to display detailed results for each ping.
+
+.EXAMPLE
+    Test-InternetLatency
+    Performs a basic latency test with default settings.
+
+.EXAMPLE
+    Test-InternetLatency -Destinations "8.8.8.8", "1.1.1.1", "www.amazon.com"
+    Tests latency to the specified destinations.
+
+.EXAMPLE
+    Test-InternetLatency -Count 5 -Interval 1
+    Sends 5 ping requests to each default destination with a 1-second interval.
+
+.EXAMPLE
+    Test-InternetLatency -Continuous
+    Continuously monitors latency until manually stopped with Ctrl+C.
+
+.EXAMPLE
+    Test-InternetLatency -ShowDetails -OutputFile "C:\Logs\LatencyReport"
+    Performs a latency test with detailed output and saves results to a log file.
+
+.NOTES
+    Author: Claude
+    Version: 1.0
+    Date: February 25, 2025
+    
+    Color Coding:
+    - Green: Good latency (<50ms)
+    - Yellow: Average latency (50-100ms)
+    - Red: Poor latency (>100ms)
+#>
+
 function Test-InternetLatency {
     [CmdletBinding()]
     param (
