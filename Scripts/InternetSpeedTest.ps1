@@ -1,8 +1,10 @@
 # Internet Speed Test using PowerShell
 # This script uses speedtest.net's CLI
 
+$chocoModule = choco list speedtest
+
 Write-Host "Checking for speedtest module..." -ForegroundColor Green
-if (-not(choco list speedtest)) {
+if ($null -eq $chocoModule) {
     Write-Host "Installing Speedtest..." -ForegroundColor Green
     Set-ExecutionPolicy Bypass -Scope Process -Force; `
     [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; `
@@ -12,11 +14,11 @@ if (-not(choco list speedtest)) {
 }
 
 # Check if Invoke-WebRequest is available (PowerShell 3.0+)
-if (choco list speedtest) {
+if ($null -ne $chocoModule) {
     Write-Host "Starting Internet Speed Test..." -ForegroundColor Cyan
     
     # Method 1: Using Speedtest CLI (if installed)
-    if (choco list speedtest) {
+    if ($null -ne $chocoModule) {
         Write-Host "Using Speedtest CLI..." -ForegroundColor Green
         speedtest
     }
