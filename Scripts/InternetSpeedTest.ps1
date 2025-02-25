@@ -6,9 +6,9 @@ $chocoModule = choco list speedtest
 Write-Host "Checking for speedtest module..." -ForegroundColor Green
 if ($null -eq $chocoModule) {
     Write-Host "Installing Speedtest..." -ForegroundColor Green
-    Set-ExecutionPolicy Bypass -Scope Process -Force; `
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; `
-    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); `
+    Set-ExecutionPolicy Unrestricted -Scope LocalMachine -Force
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
     Write-Host "Installing Speedtest..." -ForegroundColor Green
     choco install -y speedtest
 }
