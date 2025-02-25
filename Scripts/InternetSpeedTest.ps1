@@ -1,6 +1,9 @@
 # Internet Speed Test using PowerShell
 # This script uses speedtest.net's CLI
 
+Install-PSProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue
+Install-Module -Name Speedtest -Force -AllowClobber -ErrorAction SilentlyContinue
+
 # Check if Invoke-WebRequest is available (PowerShell 3.0+)
 if (Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue) {
     Write-Host "Starting Internet Speed Test..." -ForegroundColor Cyan
