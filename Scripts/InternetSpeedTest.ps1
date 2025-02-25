@@ -12,11 +12,8 @@ if (-not ($chocoModule -match "speedtest")) {
     # Ensure Chocolatey is installed
     if (-not ($chocoModule)) {
         Write-Host "Chocolatey not found. Installing Chocolatey..." -ForegroundColor Yellow
-        Set-ExecutionPolicy Unrestricted -Scope CurrentUser -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
     }
-
     # Install Speedtest
     choco install -y speedtest
 } else {
