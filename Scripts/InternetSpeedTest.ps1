@@ -1,16 +1,26 @@
 # Internet Speed Test using PowerShell
 # This script uses speedtest.net's CLI
 
-$chocoModule = choco list speedtest
+Write-Host "Checking for Speedtest module..." -ForegroundColor Green
 
-Write-Host "Checking for speedtest module..." -ForegroundColor Green
-if ($null -eq $chocoModule) {
-    Write-Host "Installing Speedtest..." -ForegroundColor Green
-    Set-ExecutionPolicy Unrestricted -Scope LocalMachine -Force
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-    Write-Host "Installing Speedtest..." -ForegroundColor Green
+# Check if Speedtest is installed
+$chocoModule = choco list --localonly speedtest 2>$null
+
+if (-not ($chocoModule -match "speedtest")) {
+    Write-Host "Speedtest not found. Installing Speedtest..." -ForegroundColor Green
+
+    # Ensure Chocolatey is installed
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+        Write-Host "Chocolatey not found. Installing Chocolatey..." -ForegroundColor Yellow
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    }
+
+    # Install Speedtest
     choco install -y speedtest
+} else {
+    Write-Host "Speedtest is already installed." -ForegroundColor Cyan
 }
 
 # Check if Invoke-WebRequest is available (PowerShell 3.0+)
