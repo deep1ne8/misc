@@ -1,15 +1,21 @@
 # Internet Speed Test using PowerShell
 # This script uses speedtest.net's CLI
 
-Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -ErrorAction SilentlyContinue
-Install-Module -Name Speedtest -Force -AllowClobber -ErrorAction SilentlyContinue
+
+if (-not(choco list speedtest)) {
+    Write-Host "Installing Speedtest..." -ForegroundColor Green
+    Set-ExecutionPolicy Bypass -Scope Process -Force; `
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; `
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1')); `
+    choco install -y speedtest
+}
 
 # Check if Invoke-WebRequest is available (PowerShell 3.0+)
-if (Get-Command Invoke-WebRequest -ErrorAction SilentlyContinue) {
+if (choco list speedtest) {
     Write-Host "Starting Internet Speed Test..." -ForegroundColor Cyan
     
     # Method 1: Using Speedtest CLI (if installed)
-    if (Get-Command speedtest -ErrorAction SilentlyContinue) {
+    if (choco list speedtest) {
         Write-Host "Using Speedtest CLI..." -ForegroundColor Green
         speedtest
     }
