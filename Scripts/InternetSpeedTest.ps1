@@ -62,7 +62,7 @@ function Install-SpeedtestCLI {
     Write-Host "Installing Speedtest CLI..." -ForegroundColor Yellow
     
     try {
-        choco install speedtest --yes
+        choco install speedtest --yes --force
         
         # Refresh environment variables
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
