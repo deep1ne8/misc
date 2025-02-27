@@ -150,13 +150,13 @@ function Invoke-Fallback-SpeedTest {
 
 function Invoke-SpeedTest {
     param(
-        [string]$SpeedtestPath = "speedtest"
+        [string]$SpeedtestPath = "C:\ProgramData\chocolatey\lib\speedtest\tools\speedtest.exe"
     )
     
     Write-Host "Running speed test..." -ForegroundColor Yellow
     
     try {
-        if ($SpeedtestPath -eq "speedtest") {
+        if ($SpeedtestPath) {
             # Run using PATH
             $result = & speedtest --format=json --accept-license --accept-gdpr
         } else {
