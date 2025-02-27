@@ -1,153 +1,252 @@
-# Internet Speed Test using PowerShell
-# This script uses speedtest.net's CLI when available, or falls back to PowerShell implementation
+# Improved Speed Test Script
+# This script checks for and installs Chocolatey if needed, then installs and runs Speedtest CLI
 
-Write-Host "Checking for Speedtest module..." -ForegroundColor Green
-
-# Check if Speedtest is installed
-$speedtestInstalled = $false
-try {
-    $chocoList = choco list --localonly speedtest 2>$null
-    $speedtestInstalled = $chocoList -match "speedtest"
-} catch {
-    Write-Host "Chocolatey not installed or not in PATH" -ForegroundColor Yellow
+function Test-CommandExists {
+    param($Command)
+    
+    $exists = $null -ne (Get-Command -Name $Command -ErrorAction SilentlyContinue)
+    return $exists
 }
 
-if (-not $speedtestInstalled) {
-    Write-Host "Speedtest not found. Installing Speedtest..." -ForegroundColor Green
-
-    # Ensure Chocolatey is installed
-    try {
-        $chocoVersion = choco --version 2>$null
-        if (-not $chocoVersion) {
-            throw "Chocolatey not found"
+function Install-Chocolatey {
+    Write-Host "Chocolatey not found. Installing Chocolatey..." -ForegroundColor Yellow
+    
+    # Check if there's an existing installation folder
+    if (Test-Path "C:\ProgramData\chocolatey") {
+        Write-Host "WARNING: Chocolatey directory exists but command is not available." -ForegroundColor Red
+        Write-Host "This could be due to an incomplete installation or PATH issues." -ForegroundColor Red
+        
+        $response = Read-Host "Do you want to try refreshing your PATH and checking again? (Y/N)"
+        if ($response -eq "Y" -or $response -eq "y") {
+            # Refresh environment variables
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+            
+            if (Test-CommandExists "choco") {
+                Write-Host "Chocolatey is now available!" -ForegroundColor Green
+                return $true
+            }
         }
-    } catch {
-        Write-Host "Chocolatey not found. Installing Chocolatey..." -ForegroundColor Yellow
-        try {
-            Set-ExecutionPolicy Bypass -Scope Process -Force
-            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-        } catch {
-            Write-Error "Failed to install Chocolatey: $_"
-            return
+        
+        $response = Read-Host "Do you want to attempt repair by running the installer? (Y/N)"
+        if ($response -ne "Y" -and $response -ne "y") {
+            Write-Host "Installation aborted." -ForegroundColor Red
+            return $false
         }
     }
     
-    # Install Speedtest
     try {
-        choco install -y speedtest
-        $speedtestInstalled = $true
+        # Use TLS 1.2 for security
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        
+        # Download and run Chocolatey installer
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        
+        # Refresh environment variables
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        
+        if (Test-CommandExists "choco") {
+            Write-Host "Chocolatey installed successfully!" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "Chocolatey installation completed but 'choco' command is not available." -ForegroundColor Red
+            Write-Host "You may need to restart your PowerShell session." -ForegroundColor Yellow
+            return $false
+        }
     } catch {
-        Write-Host "Failed to install Speedtest via Chocolatey: $_" -ForegroundColor Red
+        Write-Host "Failed to install Chocolatey: $_" -ForegroundColor Red
+        return $false
     }
-} else {
-    Write-Host "Speedtest is already installed." -ForegroundColor Cyan
 }
 
-# Check if PowerShell version supports Invoke-WebRequest (PowerShell 3.0+)
-$psVersion = $PSVersionTable.PSVersion.Major
-if ($psVersion -lt 3) {
-    Write-Error "This script requires PowerShell 3.0 or later."
-    return
-}
-
-Write-Host "Starting Internet Speed Test..." -ForegroundColor Cyan
-
-# Method 1: Using Speedtest CLI (if installed)
-if ($speedtestInstalled) {
-    Write-Host "Using Speedtest CLI..." -ForegroundColor Green
+function Install-SpeedtestCLI {
+    Write-Host "Installing Speedtest CLI..." -ForegroundColor Yellow
+    
     try {
-        speedtest
+        choco install speedtest --yes
+        
+        # Refresh environment variables
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+        
+        if (Test-CommandExists "speedtest") {
+            Write-Host "Speedtest CLI installed successfully!" -ForegroundColor Green
+            return $true
+        } else {
+            Write-Host "Speedtest CLI installation completed but 'speedtest' command is not available." -ForegroundColor Red
+            Write-Host "Trying to find the installed executable..." -ForegroundColor Yellow
+            
+            # Try to find the speedtest.exe location
+            $possibleLocations = @(
+                "C:\ProgramData\chocolatey\bin\speedtest.exe",
+                "C:\ProgramData\chocolatey\lib\speedtest\tools\speedtest.exe"
+            )
+            
+            foreach ($location in $possibleLocations) {
+                if (Test-Path $location) {
+                    Write-Host "Found Speedtest CLI at: $location" -ForegroundColor Green
+                    return $location
+                }
+            }
+            
+            Write-Host "Could not find Speedtest CLI executable." -ForegroundColor Red
+            return $false
+        }
+    } catch {
+        Write-Host "Failed to install Speedtest CLI: $_" -ForegroundColor Red
+        return $false
+    }
+}
+
+function Invoke-Fallback-SpeedTest {
+    Write-Host "Running fallback PowerShell speed test..." -ForegroundColor Yellow
+    
+    try {
+        # Using reliable test servers
+        $downloadTestUrl = "https://download.microsoft.com/download/2/0/E/20E90413-712F-438C-988E-FDAA79A8AC3D/dotnetfx35.exe"
+        
+        Write-Host "Testing download speed..." -ForegroundColor Cyan
+        $startTime = Get-Date
+        $webClient = New-Object System.Net.WebClient
+        $webClient.Headers.Add("user-agent", "PowerShell Speed Test")
+        
+        # Stream the file but don't save it
+        $downloadStream = $webClient.OpenRead($downloadTestUrl)
+        $buffer = New-Object byte[] 8192
+        $totalBytesRead = 0
+        $maxBytes = 20 * 1024 * 1024 # Read only first 20 MB to save time
+        
+        while (($bytesRead = $downloadStream.Read($buffer, 0, $buffer.Length)) -gt 0 -and $totalBytesRead -lt $maxBytes) {
+            $totalBytesRead += $bytesRead
+            # Show progress
+            if ($totalBytesRead % (1024 * 1024) -lt $buffer.Length) {
+                Write-Host "." -NoNewline
+            }
+        }
+        
+        $downloadStream.Close()
+        $endTime = Get-Date
+        
+        $duration = ($endTime - $startTime).TotalSeconds
+        $downloadSpeedMbps = [Math]::Round(($totalBytesRead * 8 / 1000000) / $duration, 2)
+        
+        Write-Host "`nDownload Speed: $downloadSpeedMbps Mbps" -ForegroundColor Green
+        
+        # We can't easily test upload in a reliable way with PowerShell only
+        # So we'll skip it and just return download speed
+        
+        return @{
+            "Download" = $downloadSpeedMbps
+            "Upload" = "N/A"
+            "Ping" = "N/A"
+        }
+    } catch {
+        Write-Host "Fallback speed test failed: $_" -ForegroundColor Red
+        return @{
+            "Download" = "Error"
+            "Upload" = "Error"
+            "Ping" = "Error"
+        }
+    }
+}
+
+function Invoke-SpeedTest {
+    param(
+        [string]$SpeedtestPath = "speedtest"
+    )
+    
+    Write-Host "Running speed test..." -ForegroundColor Yellow
+    
+    try {
+        if ($SpeedtestPath -eq "speedtest") {
+            # Run using PATH
+            $result = & speedtest --format=json --accept-license --accept-gdpr
+        } else {
+            # Run using specific path
+            $result = & $SpeedtestPath --format=json --accept-license --accept-gdpr
+        }
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Speedtest CLI returned error code: $LASTEXITCODE"
+        }
+        
+        # Parse JSON result
+        $speedData = $result | ConvertFrom-Json
+        
+        return @{
+            "Download" = [Math]::Round($speedData.download.bandwidth * 8 / 1000000, 2)
+            "Upload" = [Math]::Round($speedData.upload.bandwidth * 8 / 1000000, 2)
+            "Ping" = [Math]::Round($speedData.ping.latency, 0)
+            "ISP" = $speedData.isp
+            "Server" = $speedData.server.name
+            "Location" = $speedData.server.location
+        }
     } catch {
         Write-Host "Error running Speedtest CLI: $_" -ForegroundColor Red
         Write-Host "Falling back to PowerShell implementation..." -ForegroundColor Yellow
-        $fallbackToPowerShell = $true
+        return Invoke-Fallback-SpeedTest
     }
-}
-# Method 2: PowerShell implementation
-else {
-    $fallbackToPowerShell = $true
 }
 
-if ($fallbackToPowerShell -or -not $speedtestInstalled) {
-    Write-Host "Using PowerShell implementation..." -ForegroundColor Yellow
+function Show-Results {
+    param(
+        [hashtable]$Results
+    )
     
-    # Function to measure download speed
-    function Test-DownloadSpeed {
-        $url = "https://download.microsoft.com/download/5/B/C/5BC5DBB3-652D-4DCE-B14A-475AB85EEF6E/WindowsUpdateDiagnostic.diagcab"
-        $outputPath = "$env:TEMP\speedtest.tmp"
-        
-        try {
-            $startTime = Get-Date
-            Invoke-WebRequest -Uri $url -OutFile $outputPath
-            $endTime = Get-Date
-            
-            $fileSize = (Get-Item $outputPath).Length / 1MB
-            $duration = ($endTime - $startTime).TotalSeconds
-            $speedMbps = [Math]::Round(($fileSize * 8) / $duration, 2)
-            
-            Remove-Item $outputPath -Force
-            
-            return $speedMbps
-        } catch {
-            Write-Host "Download test failed: $_" -ForegroundColor Red
+    Write-Host "`n===== SPEED TEST RESULTS =====" -ForegroundColor Cyan
+    Write-Host "Download: $($Results.Download) Mbps" -ForegroundColor Green
+    Write-Host "Upload: $($Results.Upload) Mbps" -ForegroundColor Green
+    Write-Host "Ping: $($Results.Ping) ms" -ForegroundColor Green
+    
+    if ($Results.ContainsKey("ISP")) {
+        Write-Host "ISP: $($Results.ISP)" -ForegroundColor Green
+    }
+    
+    if ($Results.ContainsKey("Server")) {
+        Write-Host "Server: $($Results.Server)" -ForegroundColor Green
+    }
+    
+    if ($Results.ContainsKey("Location")) {
+        Write-Host "Location: $($Results.Location)" -ForegroundColor Green
+    }
+    
+    Write-Host "=============================" -ForegroundColor Cyan
+}
+
+# Main script execution
+Write-Host "Internet Speed Test Script" -ForegroundColor Cyan
+Write-Host "------------------------" -ForegroundColor Cyan
+
+# Check if Speedtest CLI is already installed
+if (Test-CommandExists "speedtest") {
+    Write-Host "Speedtest CLI is already installed." -ForegroundColor Green
+    $speedtestPath = "speedtest"
+} else {
+    Write-Host "Speedtest CLI not found. Checking for Chocolatey..." -ForegroundColor Yellow
+    
+    # Check if Chocolatey is installed
+    if (-not (Test-CommandExists "choco")) {
+        $chocoInstalled = Install-Chocolatey
+        if (-not $chocoInstalled) {
+            Write-Host "Could not install Chocolatey. Falling back to PowerShell implementation." -ForegroundColor Red
+            $results = Invoke-Fallback-SpeedTest
+            Show-Results -Results $results
             return
         }
+    } else {
+        Write-Host "Chocolatey is already installed." -ForegroundColor Green
     }
     
-    # Function to measure upload speed (simplified)
-    function Test-UploadSpeed {
-        $url = "https://www.speedtest.net/api/upload.php"
-        $tempFile = "$env:TEMP\upload_test.tmp"
-        
-        # Create a file of roughly 5MB
-        try {
-            $randomData = New-Object byte[] (5MB)
-            [System.Security.Cryptography.RNGCryptoServiceProvider]::Create().GetBytes($randomData)
-            [System.IO.File]::WriteAllBytes($tempFile, $randomData)
-            
-            try {
-                $startTime = Get-Date
-                Invoke-RestMethod -Uri $url -Method Post -InFile $tempFile -TimeoutSec 60 -ErrorAction SilentlyContinue | Out-Null
-                $endTime = Get-Date
-                
-                $fileSize = (Get-Item $tempFile).Length / 1MB
-                $duration = ($endTime - $startTime).TotalSeconds
-                $speedMbps = [Math]::Round(($fileSize * 8) / $duration, 2)
-            }
-            catch {
-                Write-Host "Unable to complete upload test. Using estimate." -ForegroundColor Red
-                $downloadSpeed = Test-DownloadSpeed
-                $speedMbps = if ($downloadSpeed -gt 0) { [Math]::Round(($downloadSpeed / 3), 2) } else { 0 }
-            }
-            
-            Remove-Item $tempFile -Force -ErrorAction SilentlyContinue
-            return $speedMbps
-        } catch {
-            Write-Host "Failed to create test file: $_" -ForegroundColor Red
-            return 0
-        }
+    # Install Speedtest CLI using Chocolatey
+    $speedtestPath = Install-SpeedtestCLI
+    if (-not $speedtestPath) {
+        Write-Host "Could not install Speedtest CLI. Falling back to PowerShell implementation." -ForegroundColor Red
+        $results = Run-Fallback-SpeedTest
+        Display-Results -Results $results
+        return
     }
-    
-    # Test ping
-    try {
-        $ping = Test-Connection -ComputerName 8.8.8.8 -Count 10 | Measure-Object -Property ResponseTime -Average
-        $pingMs = [Math]::Round($ping.Average, 0)
-    }
-    catch {
-        $pingMs = "Unable to measure"
-    }
-    
-    # Run the tests
-    Write-Host "`nTesting download speed..." -ForegroundColor Cyan
-    $downloadSpeed = Test-DownloadSpeed
-    Write-Host "Testing upload speed..." -ForegroundColor Cyan
-    $uploadSpeed = Test-UploadSpeed
-    
-    # Display results
-    Write-Host "`n===== SPEED TEST RESULTS =====" -ForegroundColor Green
-    Write-Host "Download: $downloadSpeed Mbps" -ForegroundColor White
-    Write-Host "Upload: $uploadSpeed Mbps" -ForegroundColor White
-    Write-Host "Ping: $pingMs ms" -ForegroundColor White
-    Write-Host "=============================" -ForegroundColor Green
 }
+
+# Run the speed test
+$results = Invoke-SpeedTest -SpeedtestPath $speedtestPath
+
+# Display results
+Display-Results -Results $results
