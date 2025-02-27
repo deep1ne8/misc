@@ -312,7 +312,7 @@ function Test-InternetLatency {
 # Test-InternetLatency -Destinations "8.8.8.8", "1.1.1.1", "www.amazon.com"
 
 # Continuous monitoring
-# Test-InternetLatency -Continuous
+ Test-InternetLatency -Continuous
 
 # Detailed report with logging
 # Test-InternetLatency -Count 20 -Interval 1 -ShowDetails -OutputFile "LatencyReport"
