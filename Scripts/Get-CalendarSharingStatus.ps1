@@ -36,12 +36,12 @@
 # Check-SharingStatus.ps1 -Owner Owner@contoso.com -Receiver Receiver@contoso.com
 
 # Define the parameters
-[CmdletBinding()]
+[CmdletBinding()] 
 param(
     [Parameter(Mandatory=$true)]
-    [string]$Owner,
+    [string]$Owner = "jeff@distributedsun.com",
     [Parameter(Mandatory=$true)]
-    [string]$Receiver
+    [string]$Receiver = "kate@trucurrent.com"
 )
 
 $BuildVersion = "24.09.17.1810"
