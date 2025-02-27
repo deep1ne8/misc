@@ -1,6 +1,6 @@
 # Improved Speed Test Script
 # This script checks for and installs Chocolatey if needed, then installs and runs Speedtest CLI
-
+Write-Host "`n"
 function Test-CommandExists {
     param($Command)
     
@@ -165,7 +165,7 @@ function Invoke-SpeedTest {
         }
         
         if ($LASTEXITCODE -ne 0) {
-            throw "Speedtest CLI returned error code: $LASTEXITCODE"
+            Write-Host "Speedtest CLI returned error code: $LASTEXITCODE"
         }
         
         # Parse JSON result
