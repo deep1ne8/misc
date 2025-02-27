@@ -240,7 +240,7 @@ if (Test-CommandExists "speedtest") {
     if (-not $speedtestPath) {
         Write-Host "Could not install Speedtest CLI. Falling back to PowerShell implementation." -ForegroundColor Red
         $results = Run-Fallback-SpeedTest
-        Display-Results -Results $results
+        Show-Results -Results $results
         return
     }
 }
@@ -249,4 +249,4 @@ if (Test-CommandExists "speedtest") {
 $results = Invoke-SpeedTest -SpeedtestPath $speedtestPath
 
 # Display results
-Display-Results -Results $results
+Show-Results -Results $results
