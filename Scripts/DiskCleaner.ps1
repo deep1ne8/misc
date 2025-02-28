@@ -73,17 +73,24 @@ function Start-AdvancedSystemCleanup {
     }
 }
 
-function LargeFiles {
-    $SourcePath = "C:\"
-    $DestinationPath = "D:\Temp"
-    $SizeThresholdBytes = 1073741824
+function Find-LargeFiles {
+    param (
+        [string]$SourcePath = "C:\",
+        [string]$DestinationPath = "D:\Temp",
+        [double]$SizeThresholdGB = 1
+    )
+
+    $SizeThresholdBytes = $SizeThresholdGB * 1GB
 
     try {
-        Write-Host "Starting scan for files larger than $([math]::Round($SizeThresholdBytes / 1GB, 2)) GB in path: $SourcePath" -ForegroundColor Cyan
+        Write-Host "Starting scan for files larger than $SizeThresholdGB GB in path: $SourcePath" -ForegroundColor Cyan
         
         # Run robocopy with /L to list files larger than the threshold
         $robocopyCommand = "robocopy $SourcePath $DestinationPath /L /MIN:$SizeThresholdBytes"
         $robocopyOutput = & cmd.exe /c $robocopyCommand
+
+        # Create an array to store results for table output
+        $largeFiles = @()
 
         # Parse robocopy output to extract file paths and sizes
         $robocopyOutput | ForEach-Object {
@@ -104,9 +111,19 @@ function LargeFiles {
                 if ($fileSizeBytes -gt $SizeThresholdBytes) {
                     # Display the full file path
                     $fullPath = Join-Path -Path $SourcePath -ChildPath $filePath
-                    Write-Host "Large File Found: $fullPath - Size: $([math]::Round($fileSizeBytes / 1GB, 2)) GB" -ForegroundColor Yellow
+                    $largeFiles += [PSCustomObject]@{
+                        Path = $fullPath
+                        SizeGB = [math]::Round($fileSizeBytes / 1GB, 2)
+                    }
                 }
             }
+        }
+        
+        # Display results as a table
+        if ($largeFiles.Count -gt 0) {
+            $largeFiles | Sort-Object -Property SizeGB -Descending | Format-Table -AutoSize
+        } else {
+            Write-Host "No files larger than $SizeThresholdGB GB found." -ForegroundColor Green
         }
         
         Write-Host "Scan completed." -ForegroundColor Cyan
@@ -117,14 +134,17 @@ function LargeFiles {
     }
 }
 
-function ListUserProfiles {
-    $DaysOld = 90
-    $usersPath = "C:\Users"
+function Get-OldUserProfiles {
+    param (
+        [int]$DaysOld = 90,
+        [string]$UsersPath = "C:\Users"
+    )
+    
     # Exclude specific directories
     $excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User", "DefaultAppPool", "HvmService")
 
     # Progress bar setup
-    $userProfiles = Get-ChildItem -Path $usersPath -Directory | Where-Object {
+    $userProfiles = Get-ChildItem -Path $UsersPath -Directory | Where-Object {
         ($_.Attributes -notmatch 'Hidden|System') -and
         $_.Name -notin $excludeProfiles
     }
@@ -143,12 +163,15 @@ function ListUserProfiles {
             $lastWriteTime = (Get-Item $profile.FullName).LastWriteTime
             $profileSize = (Get-ChildItem -Path $profile.FullName -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum
 
-            # Check if profile is older than 90 days
+            # Check if profile is older than specified days
             if ((Get-Date).AddDays(-$DaysOld) -gt $lastWriteTime -and $profileSize -gt 0) {
                 $profileSizeGB = [math]::Round($profileSize / 1GB, 2)
+                $daysSinceLastUse = [math]::Round(((Get-Date) - $lastWriteTime).TotalDays, 0)
+                
                 $results += [PSCustomObject]@{
                     ProfileName = $profile.Name
                     LastUsed    = $lastWriteTime
+                    DaysInactive = $daysSinceLastUse
                     SpaceUsedGB = $profileSizeGB
                 }
             } else {
@@ -162,13 +185,17 @@ function ListUserProfiles {
     # Display results
     if ($results.Count -gt 0) {
         Write-Host "Profiles older than $DaysOld days:" -ForegroundColor Cyan
-        $results | Format-Table -AutoSize
+        $results | Sort-Object -Property SpaceUsedGB -Descending | Format-Table -AutoSize
+        
+        # Calculate and display total space used by old profiles
+        $totalSpaceUsed = ($results | Measure-Object -Property SpaceUsedGB -Sum).Sum
+        Write-Host "Total space used by old profiles: $([math]::Round($totalSpaceUsed, 2)) GB" -ForegroundColor Green
     } else {
         Write-Host "No profiles older than $DaysOld days found." -ForegroundColor Green
     }
 }
 
-function CheckAndUninstallDellApps {
+function Uninstall-DellApps {
     # Check if the computer is a Dell system
     $manufacturer = (Get-CimInstance -ClassName Win32_ComputerSystem).Manufacturer
 
@@ -188,15 +215,18 @@ function CheckAndUninstallDellApps {
 }
 
 function Show-CleanupMenu {
+    # Measure script execution time
+    $functionTimer = [System.Diagnostics.Stopwatch]::StartNew()
+    
     Clear-Host
     Write-Host "==============================" -ForegroundColor Cyan
     Write-Host "  Advanced System Cleanup Menu" -ForegroundColor Yellow
     Write-Host "==============================" -ForegroundColor Cyan
     Write-Host "1. Run Advanced System Cleanup" -ForegroundColor Green
     Write-Host "2. Run Cleanup Dry Run" -ForegroundColor Green
-    Write-Host "3. Run Cleanup Normally" -ForegroundColor Green
-    Write-Host "4. List User Profiles" -ForegroundColor Green
-    Write-Host "5. List Large Files" -ForegroundColor Green
+    Write-Host "3. List User Profiles" -ForegroundColor Green
+    Write-Host "4. List Large Files" -ForegroundColor Green
+    Write-Host "5. Clean Dell Bloatware" -ForegroundColor Green
     Write-Host "6. Exit" -ForegroundColor Green
     Write-Host "==============================" -ForegroundColor Cyan
 
@@ -206,12 +236,15 @@ function Show-CleanupMenu {
             throw "Choice cannot be empty."
         }
 
+        # Reset timer when function is actually called
+        $functionTimer.Restart()
+        
         switch ($choice) {
             1 { Start-AdvancedSystemCleanup }
             2 { Start-AdvancedSystemCleanup -DryRun }
-            3 { Start-AdvancedSystemCleanup }
-            4 { ListUserProfiles }
-            5 { LargeFiles }
+            3 { Get-OldUserProfiles }
+            4 { Find-LargeFiles }
+            5 { Uninstall-DellApps }
             6 {
                 Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
                 return
@@ -219,8 +252,16 @@ function Show-CleanupMenu {
             default {
                 Write-Host "Invalid choice, please try again." -ForegroundColor Red
                 Show-CleanupMenu
+                return
             }
         }
+        
+        # Stop the timer and display execution time
+        $functionTimer.Stop()
+        $executionTime = $functionTimer.Elapsed
+        Write-Host "`nExecution Time: $($executionTime.Hours.ToString('00')):$($executionTime.Minutes.ToString('00')):$($executionTime.Seconds.ToString('00')).$($executionTime.Milliseconds.ToString('000'))" -ForegroundColor Cyan
+        
+        Show-ReturnMenu
     } catch {
         Write-Host "An error occurred: $_" -ForegroundColor Red
         Show-CleanupMenu
@@ -253,4 +294,3 @@ function Show-ReturnMenu {
 
 # Display the cleanup menu
 Show-CleanupMenu
-
