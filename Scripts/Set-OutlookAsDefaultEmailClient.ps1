@@ -9,9 +9,6 @@ try {
     $outlook = New-Object -ComObject Outlook.Application
     Write-Host "Successfully connected to Outlook"
     
-    # Get the MAPI namespace
-    #$namespace = $outlook.GetNamespace("MAPI")
-    
     # Get Outlook accounts
     $accounts = $outlook.Session.Accounts
     Write-Host "Found $($accounts.Count) accounts"
@@ -27,7 +24,7 @@ try {
         }
     }
     
-    if ($null -eq $targetAccount) {
+    if ($targetAccount -eq $null) {
         Write-Host "Error: Account with email address '$targetEmailAddress' not found!" -ForegroundColor Red
         exit 1
     }
