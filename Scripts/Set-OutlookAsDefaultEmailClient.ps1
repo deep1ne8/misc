@@ -10,7 +10,7 @@ try {
     Write-Host "Successfully connected to Outlook"
     
     # Get the MAPI namespace
-    $namespace = $outlook.GetNamespace("MAPI")
+    #$namespace = $outlook.GetNamespace("MAPI")
     
     # Get Outlook accounts
     $accounts = $outlook.Session.Accounts
