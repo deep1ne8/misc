@@ -40,9 +40,43 @@ function Start-AdvancedSystemCleanup {
                 Write-Host "Dry run: Would clean files older than $DaysOld days or larger than $LargeFileSizeGB GB" -ForegroundColor Yellow
             } else {
                 try {
+                    # Original file filtering logic based on age and size
                     Get-ChildItem -Path $path -Recurse -File -ErrorAction SilentlyContinue |
-                        Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$DaysOld) -or $_.Length -gt ($LargeFileSizeGB * 1GB) } |
-                        Remove-Item -Force -ErrorAction SilentlyContinue
+                    Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-$DaysOld) -or $_.Length -gt ($LargeFileSizeGB * 1GB) } |
+                    
+                ForEach-Object {
+                try {
+                    # Try normal removal first
+                    Remove-Item -Path $_.FullName -Force -ErrorAction Stop
+                    }
+                catch [System.IO.PathTooLongException] {
+                    # If path too long, use the long path prefix method
+                    $longPath = "\\?\" + $_.FullName
+                    [System.IO.File]::Delete($longPath)
+                    }   
+                }
+
+# For the specific SoftwareDistribution folder, use the long path handling approach
+if (Test-Path "C:\Windows\SoftwareDistribution") {
+    # Handle folders and files with long paths
+    Get-ChildItem -Path "C:\Windows\SoftwareDistribution" -Recurse -Force -ErrorAction SilentlyContinue | 
+    Sort-Object -Property FullName -Descending |
+    ForEach-Object {
+        try {
+            $longPath = "\\?\" + $_.FullName
+            if ($_.PSIsContainer) {
+                [System.IO.Directory]::Delete($longPath)
+            } else {
+                [System.IO.File]::Delete($longPath)
+            }
+        }
+        catch {
+            Write-Warning "Failed to delete: $($_.FullName). Error: $($_.Exception.Message)"
+        }
+    }
+}
+                    
+
 
                     $afterSize = (Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum / 1GB
                     $spaceCleaned = [math]::Round($beforeSize - $afterSize, 2)
