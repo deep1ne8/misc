@@ -27,7 +27,7 @@ try {
         }
     }
     
-    if ($targetAccount -eq $null) {
+    if ($null -eq $targetAccount) {
         Write-Host "Error: Account with email address '$targetEmailAddress' not found!" -ForegroundColor Red
         exit 1
     }
