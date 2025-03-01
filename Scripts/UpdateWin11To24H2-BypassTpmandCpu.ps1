@@ -203,14 +203,11 @@ exit /b 0
     }
 }
 
-# Function to download Windows 11 24H2 ISO
+# Function to download Windows 11 24H2 ISO using Fido
 function Get-Windows11ISO {
     param([string]$OutputPath)
     
-    Write-ColorOutput "Preparing to download Windows 11 24H2 ISO..." "Info"
-    
-    # For direct downloads we'd need to use the Microsoft Media Creation Tool or similar
-    # Since direct ISO download links aren't officially available, we'll use a more reliable approach
+    Write-ColorOutput "Preparing to download Windows 11 24H2 ISO using Fido..." "Info"
     
     # Check if ISO already exists
     if (Test-Path $OutputPath) {
@@ -222,15 +219,127 @@ function Get-Windows11ISO {
         }
     }
     
+    # Create temporary directory for Fido
+    $tempDir = "$env:TEMP\Win11_24H2_Download"
+    if (Test-Path $tempDir) {
+        Remove-Item -Path $tempDir -Recurse -Force
+    }
+    New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
+    
+    try {
+        # Step 1: Download Fido
+        Write-Step "1" "Downloading Fido tool for Windows 11 ISO acquisition"
+        Write-ColorOutput "Downloading Fido tool..." "Info"
+        
+        $fidoUrl = "https://github.com/pbatard/Fido/archive/refs/heads/master.zip"
+        $fidoZip = "$tempDir\fido.zip"
+        $fidoDir = "$tempDir\Fido"
+        
+        # Download Fido
+        Invoke-WebRequest -Uri $fidoUrl -OutFile $fidoZip
+        
+        # Extract Fido
+        Expand-Archive -Path $fidoZip -DestinationPath $tempDir -Force
+        $fidoMasterDir = Get-ChildItem -Path $tempDir -Directory | Where-Object { $_.Name -like "Fido-*" } | Select-Object -First 1
+        Move-Item -Path $fidoMasterDir.FullName -Destination $fidoDir -Force
+        
+        # Step 2: Run Fido to download Windows 11 24H2
+        Write-ColorOutput "Starting Windows 11 24H2 download with Fido..." "Info"
+        Write-ColorOutput "This process will take some time depending on your internet speed..." "Warning"
+        
+        $fidoScript = "$fidoDir\Fido.ps1"
+        if (-not (Test-Path $fidoScript)) {
+            Exit-WithError "Could not find Fido.ps1 script in the downloaded package"
+        }
+        
+        # Get the directory for the ISO
+        $outputDir = Split-Path -Parent $OutputPath
+        
+        # Execute Fido script with parameters for Windows 11 24H2 (use latest)
+        # Fido parameters: 
+        # -Win 11       : Windows 11
+        # -Ed Pro       : Professional Edition 
+        # -Lang en-US   : English US language
+        # -Arch x64     : 64-bit architecture
+        # -GetLangs     : To see all available languages
+        # -OutDir       : Output directory
+        Write-ColorOutput "Running Fido to download Windows 11 24H2 ISO..." "Info"
+        
+        # First show available languages
+        $process = Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -File `"$fidoScript`" -GetLangs" -Wait -PassThru -NoNewWindow
+        
+        # Ask user for language preference
+        $language = Read-Host "Enter your preferred language (e.g., en-US, de-DE, etc.) or press Enter for en-US"
+        if ([string]::IsNullOrEmpty($language)) {
+            $language = "en-US"
+        }
+        
+        # Now download the actual ISO
+        Write-ColorOutput "Downloading Windows 11 with language: $language..." "Info"
+        $process = Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -File `"$fidoScript`" -Win 11 -Ed Pro -Lang $language -Arch x64 -OutDir `"$outputDir`"" -Wait -PassThru -NoNewWindow
+        
+        if ($process.ExitCode -ne 0) {
+            Exit-WithError "Fido download failed with exit code: $($process.ExitCode)"
+        }
+        
+        # Step 3: Find the downloaded ISO and rename if needed
+        $downloadedISO = Get-ChildItem -Path $outputDir -Filter "*.iso" | Where-Object { $_.Name -like "*windows*11*" } | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($null -eq $downloadedISO) {
+            Exit-WithError "Could not find downloaded Windows 11 ISO in $outputDir"
+        }
+        
+        # Rename the ISO if it's not already at the target path
+        if ($downloadedISO.FullName -ne $OutputPath) {
+            Move-Item -Path $downloadedISO.FullName -Destination $OutputPath -Force
+        }
+        
+        Write-ColorOutput "Windows 11 24H2 ISO successfully downloaded to: $OutputPath" "Success"
+        
+        # Cleanup temp directory
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        
+        return $true
+    }
+    catch {
+        Write-ColorOutput "Fido ISO download failed with error: $_" "Error"
+        
+        # Fallback to manual download
+        Write-ColorOutput "Would you like to:" "Warning"
+        Write-ColorOutput "1. Try alternative download method (UUP dump)" "Info"
+        Write-ColorOutput "2. Download Windows 11 manually and provide the path" "Info"
+        $fallbackChoice = Read-Host "Enter your choice (1 or 2)"
+        
+        if ($fallbackChoice -eq "1") {
+            return Get-Windows11ISOFallback -OutputPath $OutputPath
+        }
+        else {
+            Write-ColorOutput "Please download Windows 11 24H2 ISO manually from Microsoft's website:" "Warning"
+            Write-ColorOutput "https://www.microsoft.com/software-download/windows11" "Info"
+            
+            $manualDownloadPath = Read-Host "Enter the full path to your manually downloaded Windows 11 24H2 ISO"
+            if (Test-Path $manualDownloadPath) {
+                Copy-Item -Path $manualDownloadPath -Destination $OutputPath -Force
+                Write-ColorOutput "Using manually provided ISO: $manualDownloadPath" "Success"
+                return $true
+            }
+            else {
+                Exit-WithError "Could not find ISO at specified path: $manualDownloadPath"
+            }
+        }
+    }
+}
+
+# Fallback function using UUP dump method
+function Get-Windows11ISOFallback {
+    param([string]$OutputPath)
+    
+    Write-ColorOutput "Attempting fallback download method using UUP dump..." "Info"
+    
     # Microsoft's Edge browser user agent to prevent throttling
     $userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
     
-    # Option 1: Use uupdump.net to get the latest Windows 11 24H2 ISO
-    Write-Step "1" "Setting up Windows 11 24H2 ISO download"
-    Write-ColorOutput "We'll use UUP dump to download the latest Windows 11 24H2 build" "Info"
-    
     # Create temporary directory for download scripts
-    $tempDir = "$env:TEMP\Win11_24H2_Download"
+    $tempDir = "$env:TEMP\Win11_24H2_Download_Fallback"
     if (Test-Path $tempDir) {
         Remove-Item -Path $tempDir -Recurse -Force
     }
@@ -280,19 +389,8 @@ function Get-Windows11ISO {
         return $true
     }
     catch {
-        Write-ColorOutput "Automated ISO download failed with error: $_" "Error"
-        Write-ColorOutput "Please download Windows 11 24H2 ISO manually from Microsoft's website:" "Warning"
-        Write-ColorOutput "https://www.microsoft.com/software-download/windows11" "Info"
-        
-        $manualDownloadPath = Read-Host "Enter the full path to your manually downloaded Windows 11 24H2 ISO"
-        if (Test-Path $manualDownloadPath) {
-            Copy-Item -Path $manualDownloadPath -Destination $OutputPath -Force
-            Write-ColorOutput "Using manually provided ISO: $manualDownloadPath" "Success"
-            return $true
-        }
-        else {
-            Exit-WithError "Could not find ISO at specified path: $manualDownloadPath"
-        }
+        Write-ColorOutput "UUP dump fallback method failed with error: $_" "Error"
+        return $false
     }
 }
 
