@@ -60,8 +60,6 @@ function Write-ColorOutput {
     }
 }
 
-# Run the upgrade process
-Start-Win11Upgrade
 
 function Write-Step {
     param([string]$StepNumber, [string]$StepDescription)
@@ -524,9 +522,13 @@ function Get-Windows11ISO {
 
 # Function to mount ISO and run silent setup - Fixed function structure
 function Start-WindowsUpdate {
+    try {
+        # Run the upgrade process
+        Start-Win11Upgrade
+    } catch {
+        Write-Error "An error occurred during the Windows 11 upgrade: $_"
+    }
 
-# Run the upgrade process
-Start-Win11Upgrade
     param([string]$IsoPath)
     
     Write-Step "3" "Starting Windows 11 24H2 Silent Update Process"
