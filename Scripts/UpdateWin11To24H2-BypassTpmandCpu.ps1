@@ -1,4 +1,3 @@
-#requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Complete Windows 11 24H2 Update Script with Automatic ISO Download and TPM/CPU Bypass
@@ -78,7 +77,7 @@ function Exit-WithError {
     
     Write-ColorOutput $ErrorMessage "Error"
     Write-ColorOutput "Script execution stopped due to error. Check log at: $LogFile" "Error"
-    exit 1
+    return
 }
 
 # Function to check if Windows 11 24H2 update is needed
@@ -280,7 +279,7 @@ function Start-Win11Upgrade {
     # Check if update is needed
     if (-not (Test-NeedsUpdate)) {
         Write-ColorOutput "No update needed. Exiting." "Info"
-        exit 0
+        return
     }
     
     # Apply compatibility bypasses first
@@ -525,6 +524,9 @@ function Get-Windows11ISO {
 
 # Function to mount ISO and run silent setup - Fixed function structure
 function Start-WindowsUpdate {
+
+# Run the upgrade process
+Start-Win11Upgrade
     param([string]$IsoPath)
     
     Write-Step "3" "Starting Windows 11 24H2 Silent Update Process"
