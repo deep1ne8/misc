@@ -1,10 +1,12 @@
-@(set '(=)||' <# lean and mean cmd / powershell hybrid #> @'
+# PowerShell wrapper for Windows 11 bypass script
+# Save this content as win11bypass.ps1
 
-::# Get 11 on 'unsupported' PC via Windows Update or mounted ISO (no patching needed)
-::# Works for feature updates (23H2 to 24H2) as well as initial Windows 11 installation
-::# V14: Enhanced reliability for 24H2, additional logging, cleanup improvements, and better compatibility with newer builds
+# Create a temporary batch file
+$batchFile = "$env:TEMP\win11bypass.cmd"
 
-@echo off & title Windows 11 Compatibility Bypass || Enhanced from AveYo's script
+# Define the batch script content
+$batchScript = @'
+@echo off & title Windows 11 Compatibility Bypass || Enhanced for 24H2
 if /i "%~f0" neq "%SystemDrive%\Scripts\win11bypass.cmd" goto setup
 powershell -win 1 -nop -c ";"
 set CLI=%*& set SOURCES=%SystemDrive%\$WINDOWS.~BT\Sources& set MEDIA=.& set MOD=CLI& set PRE=WUA& set /a VER=11
@@ -150,7 +152,7 @@ reg add HKLM\SYSTEM\Setup\LabConfig /f /v BypassStorageCheck /d 1 /t reg_dword >
 reg add HKLM\SYSTEM\Setup\LabConfig /f /v BypassCPUCheck /d 1 /t reg_dword >nul
 
 echo;
-%<%:f0 " Windows 11 TPM/CPU Compatibility Bypass "%>>% & %<%:2f " INSTALLED "%>>% & %<%:f0 " run again to remove "%>%
+echo Windows 11 TPM/CPU Compatibility Bypass INSTALLED - run again to remove
 echo %date% %time% - Bypass installed successfully >> "%SystemDrive%\Scripts\logs\win11bypass.log"
 if /i "%CLI%"=="" timeout /t 7
 exit /b
@@ -161,10 +163,43 @@ del /f /q "%SystemDrive%\Scripts\win11bypass.cmd" >nul 2>nul
 reg delete "%IFEO%\SetupHost.exe" /f >nul 2>nul
 reg delete "HKLM\SYSTEM\Setup\LabConfig" /f >nul 2>nul
 echo;
-%<%:f0 " Windows 11 TPM/CPU Compatibility Bypass "%>>% & %<%:df " REMOVED "%>>% & %<%:f0 " run again to install "%>%
+echo Windows 11 TPM/CPU Compatibility Bypass REMOVED - run again to install
 echo %date% %time% - Bypass removed successfully >> "%SystemDrive%\Scripts\logs\win11bypass.log"
 if /i "%CLI%"=="" timeout /t 7
 exit /b
+'@
 
-'@); $0 = "$env:SystemDrive\Scripts\win11bypass.cmd"; ${(=)||} -split "\r?\n" | out-file $0 -encoding default -force; & $0
-# Press Enter to continue
+# Write the batch script to a temporary file
+Set-Content -Path $batchFile -Value $batchScript
+
+# Check if running as administrator
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
+
+if (-not $isAdmin) {
+    Write-Host "This script requires administrator privileges. Attempting to elevate..." -ForegroundColor Yellow
+    
+    # Create a new process with admin rights
+    $processInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $processInfo.FileName = "cmd.exe"
+    $processInfo.Arguments = "/c $batchFile"
+    $processInfo.Verb = "runas"
+    
+    try {
+        [System.Diagnostics.Process]::Start($processInfo) | Out-Null
+        Write-Host "Elevation successful. The bypass script is now running." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "Failed to run with administrator privileges. Please run this script as an administrator." -ForegroundColor Red
+        Write-Host "Error: $_" -ForegroundColor Red
+    }
+}
+else {
+    # Already running as admin, execute the batch file directly
+    Write-Host "Running with administrator privileges..." -ForegroundColor Green
+    & cmd.exe /c $batchFile
+    Write-Host "Windows 11 compatibility bypass operation completed." -ForegroundColor Green
+}
+
+# Clean up temporary file
+Start-Sleep -Seconds 1
+Remove-Item -Path $batchFile -Force -ErrorAction SilentlyContinue
