@@ -5,7 +5,7 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/NetworkScan.ps1"; Description = "NetworkScan" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/BloatWareRemover.ps1"; Description = "DellBloatWareRemover" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
-    #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DeployPrinter.ps1"; Description = "DeployPrinter" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/UpdateWin11To24H2-BypassTpmandCpu.cmd"; Description = "UpdateWin11To24H2-BypassTpmandCpu" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
     #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckIfOneDriveSyncFolder.ps1"; Description = "CheckIfOneDriveSyncFolder" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
@@ -57,11 +57,11 @@ Write-Host ""
         Write-Host "$index. $($script.Description)" -ForegroundColor Green
         $index++
     }
-    Write-Host "12. Exit" -ForegroundColor Red
+    Write-Host "13. Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Cyan
 
-    $choice = Read-Host "Enter your choice (1-12)"  
+    $choice = Read-Host "Enter your choice (1-13)"  
     switch ($choice) {
         "1" { InitiateScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
         "2" { InitiateScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
@@ -74,7 +74,8 @@ Write-Host ""
         "9" { InitiateScriptFromUrl $GitHubScripts[8].ScriptUrl; Show-ReturnMenu }
         "10" { InitiateScriptFromUrl $GitHubScripts[9].ScriptUrl; Show-ReturnMenu }
         "11" { InitiateScriptFromUrl $GitHubScripts[10].ScriptUrl; Show-ReturnMenu }
-        "12" {
+        "12" { InitiateScriptFromUrl $GitHubScripts[11].ScriptUrl; Show-ReturnMenu }
+        "13" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
         }
