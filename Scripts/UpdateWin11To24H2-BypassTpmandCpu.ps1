@@ -20,7 +20,6 @@ $ProgressPreference = "SilentlyContinue" # Speeds up downloads
 $IsoPath = "$env:USERPROFILE\Downloads\Windows11_24H2.iso"
 $LogPath = "$env:SystemDrive\Scripts\logs"
 $LogFile = "$LogPath\Win11_24H2_Update.log"
-$BypassPath = "$env:SystemDrive\Scripts\win11bypass.cmd"
 
 # Console colors
 $colors = @{
@@ -61,6 +60,9 @@ function Write-ColorOutput {
         Write-Host $Message -ForegroundColor $color
     }
 }
+
+# Run the upgrade process
+Start-Win11Upgrade
 
 function Write-Step {
     param([string]$StepNumber, [string]$StepDescription)
@@ -200,6 +202,135 @@ exit /b 0
     }
     catch {
         Exit-WithError "Failed to execute compatibility bypass script: $_"
+    }
+}
+
+# Fallback function for UUP dump method - previously missing
+function Get-Windows11ISOFallback {
+    param([string]$OutputPath)
+    
+    Write-ColorOutput "Attempting fallback download method using UUP dump..." "Info"
+    
+    # Microsoft's Edge browser user agent to prevent throttling
+    $userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0"
+    
+    # Create temporary directory for download scripts
+    $tempDir = "$env:TEMP\Win11_24H2_Download_Fallback"
+    if (Test-Path $tempDir) {
+        Remove-Item -Path $tempDir -Recurse -Force
+    }
+    New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
+    
+    try {
+        # Step 1: Download UUP dump script package
+        Write-ColorOutput "Downloading UUP dump script package..." "Info"
+        
+        # UUP dump links for Windows 11 24H2 (Latest Retail build)
+        $uupScriptUrl = "https://uupdump.net/get.php?id=d347bc84-5a90-4dfa-8012-cf5a82543c21&pack=en-us&edition=professional&download=1"
+        
+        Invoke-WebRequest -Uri $uupScriptUrl -OutFile "$tempDir\uup_download_windows.zip" -UserAgent $userAgent
+        
+        # Step 2: Extract the UUP dump script package
+        Write-ColorOutput "Extracting UUP dump script package..." "Info"
+        Expand-Archive -Path "$tempDir\uup_download_windows.zip" -DestinationPath $tempDir -Force
+        
+        # Step 3: Run the UUP dump script to download and convert to ISO
+        Write-ColorOutput "Starting Windows 11 24H2 download and ISO creation..." "Info"
+        Write-ColorOutput "This process will take some time depending on your internet speed..." "Warning"
+        
+        $convertScript = Get-ChildItem -Path $tempDir -Filter "*.cmd" | Where-Object { $_.Name -like "*convert*" } | Select-Object -First 1
+        if ($null -eq $convertScript) {
+            Exit-WithError "Could not find UUP conversion script in the downloaded package"
+        }
+        
+        # Execute the UUP dump script
+        $process = Start-Process -FilePath $convertScript.FullName -WorkingDirectory $tempDir -Wait -PassThru -NoNewWindow
+        if ($process.ExitCode -ne 0) {
+            Exit-WithError "UUP dump script failed with exit code: $($process.ExitCode)"
+        }
+        
+        # Step 4: Find and move the created ISO
+        $createdISO = Get-ChildItem -Path $tempDir -Filter "*.iso" | Select-Object -First 1
+        if ($null -eq $createdISO) {
+            Exit-WithError "Could not find created ISO in the download directory"
+        }
+        
+        # Move ISO to final destination
+        Move-Item -Path $createdISO.FullName -Destination $OutputPath -Force
+        Write-ColorOutput "Windows 11 24H2 ISO successfully downloaded to: $OutputPath" "Success"
+        
+        # Cleanup temp directory
+        Remove-Item -Path $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        
+        return $true
+    }
+    catch {
+        Write-ColorOutput "UUP dump fallback method failed with error: $_" "Error"
+        return $false
+    }
+}
+
+# Main flow control function - properly structured
+function Start-Win11Upgrade {
+    Write-ColorOutput "=========================================================" "Info"
+    Write-ColorOutput "      WINDOWS 11 24H2 AUTOMATED UPGRADE UTILITY" "Step"
+    Write-ColorOutput "                  WITH TPM/CPU BYPASS" "Step"
+    Write-ColorOutput "=========================================================" "Info"
+    
+    # Check if update is needed
+    if (-not (Test-NeedsUpdate)) {
+        Write-ColorOutput "No update needed. Exiting." "Info"
+        exit 0
+    }
+    
+    # Apply compatibility bypasses first
+    Write-Step "2" "Installing Windows 11 Compatibility Bypasses"
+    Install-CompatibilityBypass
+    
+    # Define ISO path
+    $IsoPath = "$env:USERPROFILE\Downloads\Windows11_24H2.iso"
+    
+    # Check first if ISO exists without downloading
+    $existingIso = $null
+    $possibleIsoPatterns = @(
+        "$env:USERPROFILE\Downloads\*Win*11*.iso",
+        "$env:USERPROFILE\Downloads\*Windows*11*.iso"
+    )
+    
+    foreach ($pattern in $possibleIsoPatterns) {
+        $matchingFiles = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+        if ($matchingFiles -and $matchingFiles.Count -gt 0) {
+            $existingIso = $matchingFiles[0]
+            $IsoPath = $existingIso.FullName
+            Write-ColorOutput "Found existing Windows 11 ISO: $IsoPath" "Success"
+            break
+        }
+    }
+    
+    # If no ISO exists or user chooses to download a new one
+    if (-not $existingIso) {
+        $downloadISO = $true
+        Write-ColorOutput "No existing Windows 11 ISO found. Proceeding to download..." "Info"
+    } else {
+        $fileSize = $existingIso.Length / 1GB
+        Write-ColorOutput "Found existing Windows 11 ISO at: $($existingIso.FullName) (Size: $($fileSize.ToString('0.00')) GB)" "Info"
+        $choice = Read-Host "Use this existing ISO for the update? (y/n) [Default: y]"
+        $downloadISO = -not ([string]::IsNullOrEmpty($choice) -or $choice.ToLower() -eq "y")
+    }
+    
+    # Download ISO if needed
+    if ($downloadISO) {
+        $success = Get-Windows11ISO -OutputPath $IsoPath
+        if (-not $success) {
+            Exit-WithError "Failed to obtain Windows 11 24H2 ISO"
+        }
+    }
+    
+    # Mount ISO and start update - will now always run if we have a valid ISO
+    if (Test-Path $IsoPath) {
+        Start-WindowsUpdate -IsoPath $IsoPath
+    } else {
+        Exit-WithError "Windows 11 ISO not found at path: $IsoPath"
     }
 }
 
@@ -392,63 +523,7 @@ function Get-Windows11ISO {
     }
 }
 
-# Main flow control function - modified to handle ISO directly
-function Start-Win11Upgrade {
-    Write-ColorOutput "=========================================================" "Info"
-    Write-ColorOutput "      WINDOWS 11 24H2 AUTOMATED UPGRADE UTILITY" "Step"
-    Write-ColorOutput "                  WITH TPM/CPU BYPASS" "Step"
-    Write-ColorOutput "=========================================================" "Info"
-    
-    # Check if update is needed
-    if (-not (Test-NeedsUpdate)) {
-        Write-ColorOutput "No update needed. Exiting." "Info"
-        exit 0
-    }
-    
-    # Apply compatibility bypasses first
-    Write-Step "2" "Installing Windows 11 Compatibility Bypasses"
-    Install-CompatibilityBypass
-    
-    # Define ISO path
-    $IsoPath = "$env:USERPROFILE\Downloads\Windows11_24H2.iso"
-    
-    # Check first if ISO exists without downloading
-    $existingIso = $null
-    $possibleIsoPatterns = @(
-        "$env:USERPROFILE\Downloads\*Win*11*.iso",
-        "$env:USERPROFILE\Downloads\*Windows*11*.iso"
-    )
-    
-    foreach ($pattern in $possibleIsoPatterns) {
-        $matchingFiles = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-        if ($matchingFiles -and $matchingFiles.Count -gt 0) {
-            $existingIso = $matchingFiles[0]
-            $IsoPath = $existingIso.FullName
-            Write-ColorOutput "Found existing Windows 11 ISO: $IsoPath" "Success"
-            break
-        }
-    }
-    
-    # If no ISO exists or user chooses to download a new one
-    if (-not $existingIso) {
-        $downloadISO = $true
-        Write-ColorOutput "No existing Windows 11 ISO found. Proceeding to download..." "Info"
-    } else {
-        $fileSize = $existingIso.Length / 1GB
-        Write-ColorOutput "Found existing Windows 11 ISO at: $($existingIso.FullName) (Size: $($fileSize.ToString('0.00')) GB)" "Info"
-        $choice = Read-Host "Use this existing ISO for the update? (y/n) [Default: y]"
-        $downloadISO = -not ([string]::IsNullOrEmpty($choice) -or $choice.ToLower() -eq "y")
-    }
-    
-    # Download ISO if needed
-    if ($downloadISO) {
-        $success = Get-Windows11ISO -OutputPath $IsoPath
-        if (-not $success) {
-            Exit-WithError "Failed to obtain Windows 11 24H2 ISO"
-        }
-    }
-    
-    # Function to mount ISO and run silent setup
+# Function to mount ISO and run silent setup - Fixed function structure
 function Start-WindowsUpdate {
     param([string]$IsoPath)
     
@@ -580,7 +655,7 @@ Telemetry=Disable
         Write-ColorOutput "Starting silent Windows 11 24H2 Update..." "Info"
         
         # Build setup arguments for completely silent operation
-        $setupArgs = "/auto upgrade /quiet /noreboot /pkey XXXXX-XXXXX-XXXXX-XXXXX-XXXXX /migratedrivers all /showoobe none /telemetry disable /dynamicupdate disable /compat ignorewarning"
+        $setupArgs = "/auto upgrade /quiet /noreboot /migratedrivers all /showoobe none /telemetry disable /dynamicupdate disable /compat ignorewarning"
         
         # Add unattend and config files
         if (Test-Path $autoUnattendPath) {
@@ -695,8 +770,5 @@ while (`$true) {
     }
     catch {
         Exit-WithError "Failed to start Windows 11 Setup: $_"
-        }
     }
 }
-# Run the upgrade process
-Start-Win11Upgrade
