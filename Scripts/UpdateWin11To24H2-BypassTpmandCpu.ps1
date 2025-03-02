@@ -331,6 +331,256 @@ function Start-Win11Upgrade {
     }
 }
 
+# Function to mount ISO and run silent setup - Fixed function structure
+function Start-WindowsUpdate {
+    param([string]$IsoPath)
+    
+    Write-Step "3" "Starting Windows 11 24H2 Silent Update Process"
+    
+    # Mount the ISO
+    try {
+        Write-ColorOutput "Mounting Windows 11 ISO..." "Info"
+        $mountResult = Mount-DiskImage -ImagePath $IsoPath -PassThru
+        $driveLetter = ($mountResult | Get-Volume).DriveLetter
+        Write-ColorOutput "ISO mounted successfully on drive $($driveLetter):" "Success"
+    }
+    catch {
+        Exit-WithError "Failed to mount ISO: $_"
+    }
+    
+    # Create a comprehensive autounattend.xml file for completely silent installation
+    $autoUnattendPath = "$env:TEMP\autounattend.xml"
+    $autoUnattendXml = @"
+<?xml version="1.0" encoding="utf-8"?>
+<unattend xmlns="urn:schemas-microsoft-com:unattend">
+    <settings pass="windowsPE">
+        <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <UserData>
+                <AcceptEula>true</AcceptEula>
+            </UserData>
+            <ComplianceCheck>
+                <DisplayReport>never</DisplayReport>
+            </ComplianceCheck>
+            <Diagnostics>
+                <OptIn>false</OptIn>
+            </Diagnostics>
+            <DynamicUpdate>
+                <Enable>false</Enable>
+                <WillShowUI>never</WillShowUI>
+            </DynamicUpdate>
+            <Display>
+                <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+            </Display>
+        </component>
+        <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <SetupUILanguage>
+                <UILanguage>en-US</UILanguage>
+                <WillShowUI>never</WillShowUI>
+            </SetupUILanguage>
+        </component>
+    </settings>
+    <settings pass="oobeSystem">
+        <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <OOBE>
+                <HideEULAPage>true</HideEULAPage>
+                <HideLocalAccountScreen>true</HideLocalAccountScreen>
+                <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+                <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+                <NetworkLocation>Home</NetworkLocation>
+                <ProtectYourPC>1</ProtectYourPC>
+                <SkipMachineOOBE>true</SkipMachineOOBE>
+                <SkipUserOOBE>true</SkipUserOOBE>
+            </OOBE>
+            <UserAccounts>
+                <DontDisplayLastUserName>false</DontDisplayLastUserName>
+            </UserAccounts>
+        </component>
+        <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+            <InputLocale>en-US</InputLocale>
+            <SystemLocale>en-US</SystemLocale>
+            <UILanguage>en-US</UILanguage>
+            <UserLocale>en-US</UserLocale>
+        </component>
+    </settings>
+</unattend>
+"@
+
+    try {
+        Set-Content -Path $autoUnattendPath -Value $autoUnattendXml -Force
+        Write-ColorOutput "Created silent setup configuration file" "Success"
+    }
+    catch {
+        Exit-WithError "Failed to create autounattend.xml file: $_"
+    }
+    
+    # Create an EI.cfg file to prevent edition upgrade prompts
+    $eiCfgPath = "$env:TEMP\EI.cfg"
+    $eiCfgContent = @"
+[Channel]
+_Default
+"@
+
+    try {
+        Set-Content -Path $eiCfgPath -Value $eiCfgContent -Force
+        
+        # Copy EI.cfg to the root of the mounted ISO drive
+        Copy-Item -Path $eiCfgPath -Destination "${driveLetter}:\" -Force -ErrorAction SilentlyContinue
+        Write-ColorOutput "Created edition configuration file" "Success"
+    }
+    catch {
+        Write-ColorOutput "Warning: Failed to create EI.cfg file: $_" "Warning"
+        # Continue anyway as this is not critical
+    }
+    
+    # Create a setup configuration file that enables silent setup
+    $setupConfigPath = "$env:TEMP\SetupConfig.ini"
+    $setupConfigContent = @"
+[SetupConfig]
+Priority=5
+BitLocker=AlwaysSuspend
+Compat=IgnoreWarning
+MigrateDrivers=All
+DynamicUpdate=Disable
+ShowOOBE=None
+Telemetry=Disable
+"@
+
+    try {
+        Set-Content -Path $setupConfigPath -Value $setupConfigContent -Force
+        Write-ColorOutput "Created setup configuration file" "Success"
+    }
+    catch {
+        Exit-WithError "Failed to create SetupConfig.ini file: $_"
+    }
+    
+    # Start the Windows Setup
+    try {
+        $setupPath = "${driveLetter}:\setup.exe"
+        if (-not (Test-Path $setupPath)) {
+            Exit-WithError "Could not find setup.exe on the mounted ISO"
+        }
+        
+        Write-ColorOutput "Starting silent Windows 11 24H2 Update..." "Info"
+        
+        # Build setup arguments for completely silent operation
+        $setupArgs = "/auto upgrade /quiet /noreboot /migratedrivers all /showoobe none /telemetry disable /dynamicupdate disable /compat ignorewarning"
+        
+        # Add unattend and config files
+        if (Test-Path $autoUnattendPath) {
+            $setupArgs += " /unattend:`"$autoUnattendPath`""
+        }
+        
+        if (Test-Path $setupConfigPath) {
+            $setupArgs += " /configfile:`"$setupConfigPath`""
+        }
+        
+        # Create a script to monitor the upgrade progress
+        $progressMonitorPath = "$env:TEMP\UpgradeProgressMonitor.ps1"
+        $progressMonitorContent = @"
+# Windows 11 Upgrade Progress Monitor
+`$setupProgressPath = "C:\`$WINDOWS.~BT\Sources\SetupProgress.xml"
+`$logPath = "C:\`$WINDOWS.~BT\Sources\Panther"
+
+function Write-ProgressUpdate {
+    param([string]`$Message, [string]`$Color = "White")
+    
+    `$timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    Write-Host "`$timestamp - `$Message" -ForegroundColor `$Color
+}
+
+# Wait for setup to start
+Write-ProgressUpdate "Waiting for Windows 11 upgrade to initialize..." "Cyan"
+`$retryCount = 0
+while (-not (Test-Path "C:\`$WINDOWS.~BT")) {
+    Start-Sleep -Seconds 10
+    `$retryCount++
+    if (`$retryCount -gt 30) {
+        Write-ProgressUpdate "Setup initialization timeout. Please check setup manually." "Red"
+        exit 1
+    }
+}
+
+Write-ProgressUpdate "Windows 11 upgrade process has started" "Green"
+
+# Monitor progress
+while (`$true) {
+    if (Test-Path `$setupProgressPath) {
+        try {
+            `$progress = [xml](Get-Content `$setupProgressPath -ErrorAction SilentlyContinue)
+            `$phase = `$progress.SetupProgress.InstallPhase
+            `$percent = `$progress.SetupProgress.PercentComplete
+            
+            Write-ProgressUpdate "Phase: `$phase - Progress: `$percent%" "Yellow"
+        }
+        catch {
+            Write-ProgressUpdate "Reading progress data..." "Cyan"
+        }
+    }
+    elseif (Test-Path `$logPath) {
+        `$latestLog = Get-ChildItem `$logPath -Filter "*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if (`$latestLog) {
+            `$lastLines = Get-Content `$latestLog.FullName -Tail 5 -ErrorAction SilentlyContinue
+            Write-ProgressUpdate "Latest log activity:" "Cyan"
+            foreach (`$line in `$lastLines) {
+                Write-Host "   `$line"
+            }
+        }
+    }
+    
+    # Check if the upgrade has completed or failed
+    if (-not (Test-Path "C:\`$WINDOWS.~BT")) {
+        if (Test-Path "C:\Windows.old") {
+            Write-ProgressUpdate "Windows 11 upgrade appears to have completed successfully!" "Green"
+        }
+        else {
+            Write-ProgressUpdate "Windows 11 upgrade process may have failed or been cancelled." "Red"
+        }
+        break
+    }
+    
+    Start-Sleep -Seconds 60
+}
+"@
+        
+        Set-Content -Path $progressMonitorPath -Value $progressMonitorContent -Force
+        
+        # Start setup process
+        $setupProc = Start-Process -FilePath $setupPath -ArgumentList $setupArgs -PassThru -NoNewWindow
+        Write-ColorOutput "Windows 11 24H2 Setup launched with Process ID: $($setupProc.Id)" "Success"
+        Write-ColorOutput "Setup is now running in silent mode" "Info"
+        Write-ColorOutput "The system will restart automatically when ready" "Warning"
+        
+        # Start the progress monitor in a new window
+        Start-Process -FilePath "powershell.exe" -ArgumentList "-ExecutionPolicy Bypass -File `"$progressMonitorPath`"" -WindowStyle Normal
+        
+        # Add registry key to auto-login after upgrade
+        try {
+            $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+            $username = ($currentUser -split '\\')[1]
+            
+            # Don't store the actual password, just enable auto-login for the current user after upgrade
+            Write-ColorOutput "Setting up auto-login after upgrade for current user..." "Info"
+            
+            # Create the registry keys for autologon
+            $autoLogonKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+            Set-ItemProperty -Path $autoLogonKey -Name "AutoAdminLogon" -Value "1" -Force
+            Set-ItemProperty -Path $autoLogonKey -Name "DefaultUserName" -Value $username -Force
+            # DefaultPassword is intentionally not set for security reasons
+            Set-ItemProperty -Path $autoLogonKey -Name "AutoLogonCount" -Value "1" -Force
+        }
+        catch {
+            Write-ColorOutput "Warning: Could not configure auto-login after upgrade: $_" "Warning"
+            # Continue anyway as this is not critical
+        }
+        
+        Write-ColorOutput "Progress monitor launched in a separate window" "Success"
+        Write-ColorOutput "You can now safely close this window - the update will continue" "Info"
+    }
+    catch {
+        Exit-WithError "Failed to start Windows 11 Setup: $_"
+    }
+}
+
 # Function to download Windows 11 24H2 ISO using Fido
 function Get-Windows11ISO {
     param([string]$OutputPath)
