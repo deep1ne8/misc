@@ -686,25 +686,30 @@ function Export-DiagnosticReport {
 '@
 
     # Add recommendations based on diagnostic results
-    if (-not $DiagnosticResults.LicenseTest.HasTeamsLicense -or -not $DiagnosticResults.LicenseTest.HasExchangeLicense) {
+    if ($DiagnosticResults.LicenseTest -and 
+        (-not $DiagnosticResults.LicenseTest.HasTeamsLicense -or -not $DiagnosticResults.LicenseTest.HasExchangeLicense)) {
         $htmlReport += "<li class='error'>Assign proper Microsoft 365 licenses that include both Teams and Exchange Online.</li>"
     }
     
-    if (-not $DiagnosticResults.AutodiscoverTest.Success) {
+    if ($DiagnosticResults.AutodiscoverTest -and 
+        -not $DiagnosticResults.AutodiscoverTest.Success) {
         $htmlReport += "<li class='error'>Fix Autodiscover configuration issues. This is critical for Teams-Exchange integration.</li>"
     }
     
-    if ($DiagnosticResults.MailboxTest.PotentialMigrationIssues) {
+    if ($DiagnosticResults.MailboxTest -and 
+        $DiagnosticResults.MailboxTest.PotentialMigrationIssues) {
         $htmlReport += "<li class='warning'>Clean up GoDaddy migration artifacts from the mailbox.</li>"
     }
     
-    if ($DiagnosticResults.TeamsTest.Success -and 
+    if ($DiagnosticResults.TeamsTest -and 
+        $DiagnosticResults.TeamsTest.Success -and 
         $DiagnosticResults.TeamsTest.TeamsUser -and 
         -not $DiagnosticResults.TeamsTest.TeamsUser.ExchangeEnabled) {
         $htmlReport += "<li class='error'>Enable Exchange integration for Teams user.</li>"
     }
     
-    if (-not $DiagnosticResults.PermissionsTest.ApplicationPermissions) {
+    if ($DiagnosticResults.PermissionsTest -and 
+        -not $DiagnosticResults.PermissionsTest.ApplicationPermissions) {
         $htmlReport += "<li class='warning'>Add required application permissions for Teams to access Exchange data.</li>"
     }
     
