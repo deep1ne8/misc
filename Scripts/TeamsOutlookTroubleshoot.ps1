@@ -503,7 +503,7 @@ function Test-AzureADAttributes {
     }
 }
 
-function Remediate-CommonIssues {
+function Resolve-CommonIssues {
     param(
         [string]$Email,
         [PSCustomObject]$DiagnosticResults
@@ -559,6 +559,7 @@ function Remediate-CommonIssues {
             # Remove GoDaddy proxy addresses
             $mailbox = $DiagnosticResults.MailboxTest.Mailbox
             $cleanedAddresses = $mailbox.EmailAddresses | Where-Object { $_ -notmatch "godaddy|secureserver" }
+            Set-Mailbox -Identity $Email -EmailAddresses $cleanedAddresses
             
             # This would update the email addresses
             # Set-Mailbox -Identity $Email -EmailAddresses $cleanedAddresses
@@ -610,7 +611,7 @@ function Export-DiagnosticReport {
     Write-Log "Generating diagnostic report to: $ReportPath" -Level Info
     
     # Create HTML report
-    $htmlReport = @"
+    $htmlReport = @'
 <!DOCTYPE html>
 <html>
 <head>
@@ -682,7 +683,7 @@ function Export-DiagnosticReport {
     <div class="section">
         <h2>Recommendations</h2>
         <ul>
-"@
+'@
 
     # Add recommendations based on diagnostic results
     if (-not $DiagnosticResults.LicenseTest.HasTeamsLicense -or -not $DiagnosticResults.LicenseTest.HasExchangeLicense) {
@@ -743,6 +744,47 @@ if (-not $connected) {
 # Run diagnostic tests
 $diagnosticResults = [PSCustomObject]@{}
 
+```powershell
 # Test user existence
 Write-Log "Running User Existence test..." -Level Info
-$diagnosticResults | Add-Member -MemberType NoteProperty -Name "UserTest"
+$diagnosticResults | Add-Member -MemberType NoteProperty -Name "UserTest" -Value (Test-UserExistence -Email $UserEmail)
+
+# Test user licensing
+Write-Log "Running User Licensing test..." -Level Info
+$diagnosticResults | Add-Member -MemberType NoteProperty -Name "LicenseTest" -Value (Test-UserLicensing -Email $UserEmail)
+
+# Test Autodiscover configuration
+Write-Log "Running Autodiscover Configuration test..." -Level Info
+$diagnosticResults | Add-Member -MemberType NoteProperty -Name "AutodiscoverTest" -Value (Test-AutodiscoverConfiguration -Email $UserEmail)
+
+# Test mailbox permissions
+Write-Log "Running Mailbox Permissions test..." -Level Info
+$diagnosticResults | Add-Member -MemberType NoteProperty -Name "PermissionsTest" -Value (Test-MailboxPermissions -Email $UserEmail)
+
+# Test Teams configuration
+Write-Log "Running Teams Configuration test..." -Level Info
+$diagnosticResults | Add-Member -MemberType NoteProperty -Name "TeamsTest" -Value (Test-TeamsConfiguration -Email $UserEmail)
+
+# Test mailbox attributes
+Write-Log "Running Mailbox Attributes test..." -Level Info
+$diagnosticResults | Add-Member -MemberType NoteProperty -Name "MailboxTest" -Value (Test-MailboxAttributes -Email $UserEmail)
+
+# Test Azure AD attributes
+Write-Log "Running Azure AD Attributes test..." -Level Info
+$diagnosticResults | Add-Member -MemberType NoteProperty -Name "AzureADTest" -Value (Test-AzureADAttributes -Email $UserEmail)
+
+# Remediate common issues if the switch is provided
+if ($Remediate) {
+    Write-Log "Remediation switch is enabled. Attempting to resolve common issues..." -Level Info
+    $remediationResults = Resolve-CommonIssues -Email $UserEmail -DiagnosticResults $diagnosticResults
+    $diagnosticResults | Add-Member -MemberType NoteProperty -Name "RemediationResults" -Value $remediationResults
+}
+
+# Export diagnostic report
+$reportPath = Export-DiagnosticReport -DiagnosticResults $diagnosticResults
+Write-Log "Diagnostic report saved to: $reportPath" -Level Success
+
+Write-Log "Diagnostic process completed for user: $UserEmail" -Level Success
+Write-Host "`n============================================================" -ForegroundColor Cyan
+Write-Host "  Diagnostic process completed. Please review the report." -ForegroundColor Cyan
+Write-Host "============================================================`n" -ForegroundColor Cyan
