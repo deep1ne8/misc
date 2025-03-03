@@ -35,7 +35,7 @@ param(
     [string]$UserEmail,
     
     [Parameter(Mandatory = $false)]
-    [string]$LogPath = "$env:USERPROFILE\Desktop\TeamsExchangeDiagnostic_$(Get-Date -Format 'yyyyMMdd_HHmmss').log",
+    [string]$LogPath = "$env:SystemRoot\Temp\TeamsExchangeDiagnostic_$(Get-Date -Format 'yyyyMMdd_HHmmss').log",
     
     [Parameter(Mandatory = $false)]
     [switch]$Remediate
