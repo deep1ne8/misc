@@ -117,9 +117,9 @@ $unwantedLanguages = @(
 $languageArray = ($ListInstalledLanguages -split ";") | Where-Object { $_ -ne "x-none" -and $_ -ne "en-us" }
 
 # Format the output
-Write-Host "UIFallbackLanguages contains the following languages (excluding x-none):"
+Write-Host "UIFallbackLanguages contains the following languages (excluding x-none and en-us):"
 $unwantedLanguages = $languageArray | ForEach-Object { 
-    Write-Host "- $UnwantedLanguages" -ForegroundColor Cyan
+    Write-Host "- $_" -ForegroundColor Cyan
 }
 
 # Generate XML content to remove unwanted languages
