@@ -166,13 +166,14 @@ if ($confirmation -ne "Y" -and $confirmation -ne "y") {
 # Run Office Deployment Tool to remove the languages
 Write-Host "`nStarting Office Deployment Tool to remove unwanted languages, this may take a few minutes..." -ForegroundColor Green
 Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
-Write-Host "`n"
-Get-Output -Path "$ODTlog\*.log" -Tail 100
+Get-Content -Path "$ODTlog\*.log" -Tail 100
+
 Write-Host "`n"
 Write-Host "Verbose: Office language removal process completed." -ForegroundColor Green
 
 Write-Host "`n"
 Write-Host "Please restart your computer for the changes to take effect." -ForegroundColor Yellow
+    Return
     }
 }
 
