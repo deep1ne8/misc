@@ -105,7 +105,7 @@ if (!(Test-Path $setupPath)) {
 }
 
 Write-Host "✅ ODT setup.exe is ready at $setupPath" -ForegroundColor Green
-
+Write-HOst "`n"
 <#
 # Define the languages you want to uninstall
 $unwantedLanguages = @(
@@ -124,7 +124,7 @@ $languageArray = ($ListInstalledLanguages -split ";") | Where-Object { $_ -ne "x
 # Format the output
 Write-Host "UIFallbackLanguages contains the following languages (excluding x-none and en-us):"
 $unwantedLanguages = $languageArray | ForEach-Object { 
-    Write-Host "- $_" -ForegroundColor Cyan
+    Write-Host "$_" -ForegroundColor Cyan
 }
 
 # Generate XML content to remove unwanted languages
