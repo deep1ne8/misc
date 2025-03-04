@@ -124,16 +124,11 @@ $languageArray = ($ListInstalledLanguages -split ";") | Where-Object { $_ -ne "x
 # Format the output
 Write-Host "UIFallbackLanguages contains the following languages (excluding x-none and en-us):"
 Write-Host "`n"
-$unwantedLanguages = $languageArray | ForEach-Object { 
+$languageArray | ForEach-Object { 
     Write-Host "$_" -ForegroundColor Cyan
 }
+$unwantedLanguages = $languageArray
 
-
-Write-Host "`n"
-Write-Host "Final Verification, The following languages will be removed:" -ForegroundColor Yellow
-Write-Host "`n"
-$unwantedLanguages
-Write-Host "`n"
 
 # Generate XML content to remove unwanted languages
 $xmlContent = @"
@@ -155,13 +150,12 @@ $xmlContent | Set-Content -Path $xmlPath -Encoding UTF8
 Write-Host "`n"
 Write-Host "Verbose: Generated RemoveLanguages.xml with the following languages:" -ForegroundColor Yellow
 
-# List the unwanted languages
-Write-Host "Verbose: Unwanted languages to be removed:" -ForegroundColor Yellow
 Write-Host "`n"
-
+Write-Host "Final Verification, The following languages will be removed:" -ForegroundColor Yellow
+Write-Host "`n"
 $unwantedLanguages
-
 Write-Host "`n"
+
 Start-Sleep -Seconds 2
 Write-Host "Are you sure you want to remove these languages? (Y/N) " -ForegroundColor Yellow -NoNewline
 $confirmation = Read-Host
