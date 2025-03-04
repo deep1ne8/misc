@@ -70,7 +70,12 @@ if ($null -eq $ListInstalledLanguages) {
     return
 }
 
-Write-Host "Verbose: Starting Office Language Remover..." -ForegroundColor Yellow
+Write-Host "`n"
+# Banner
+Write-Host "`n============================================================" -ForegroundColor Cyan
+Write-Host "  Starting Office Language Remover..." -ForegroundColor Cyan
+Write-Host "============================================================`n" -ForegroundColor Cyan
+
 Start-Sleep -Seconds 2
 Write-Host "`n"
 # Create ODT directory if it doesn't exist
@@ -169,7 +174,7 @@ Write-Host "Please restart your computer for the changes to take effect." -Foreg
     }
 }
 
-
+Write-Host "`n"
 # Run the function
 $manufacturer = (Get-WmiObject -Class Win32_ComputerSystem).Manufacturer
 if ($manufacturer -like "*Dell*") {
