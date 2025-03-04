@@ -123,9 +123,17 @@ $languageArray = ($ListInstalledLanguages -split ";") | Where-Object { $_ -ne "x
 
 # Format the output
 Write-Host "UIFallbackLanguages contains the following languages (excluding x-none and en-us):"
+Write-Host "`n"
 $unwantedLanguages = $languageArray | ForEach-Object { 
     Write-Host "$_" -ForegroundColor Cyan
 }
+
+
+Write-Host "`n"
+Write-Host "Final Verification, The following languages will be removed:" -ForegroundColor Yellow
+Write-Host "`n"
+$unwantedLanguages
+Write-Host "`n"
 
 # Generate XML content to remove unwanted languages
 $xmlContent = @"
@@ -162,7 +170,7 @@ if ($confirmation -ne "Y" -and $confirmation -ne "y") {
     return
 }else {
 # Run Office Deployment Tool to remove the languages
-Write-Host "`nStarting Office Deployment Tool to remove unwanted languages..." -ForegroundColor Green
+Write-Host "`nStarting Office Deployment Tool to remove unwanted languages, this may take a few minutes..." -ForegroundColor Green
 Start-Process -FilePath $setupPath -ArgumentList "/configure $xmlPath" -NoNewWindow -Wait
 Write-Host "`n"
 Get-Output -Path "$ODTlog\*.log" -Tail 100
