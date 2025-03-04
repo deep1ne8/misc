@@ -54,7 +54,7 @@ $odtFolder = "C:\ODT"
 $setupPath = "$odtFolder\setup.exe"
 $xmlPath = "$odtFolder\RemoveLanguages.xml"
 $downloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/ODTTool/setup.exe"
-$ListInstalledLanguages = Get-Item "HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources\EnabledEditingLanguages" -ErrorAction SilentlyContinue | Where-Object {$_.Property -ne "en-us" -and $_.Property -ne "en-gb"} | Select-Object Property
+$ListInstalledLanguages = (Get-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Office\16.0\Common\LanguageResources" -Name "UIFallbackLanguages").UIFallbackLanguages
 $ODTlog = Join-Path -Path $odtFolder -ChildPath "ODTlog" -ErrorAction SilentlyContinue
 
 if (-not (Test-Path $ODTlog -PathType Container)) {
@@ -101,6 +101,7 @@ if (!(Test-Path $setupPath)) {
 
 Write-Host "✅ ODT setup.exe is ready at $setupPath" -ForegroundColor Green
 
+<#
 # Define the languages you want to uninstall
 $unwantedLanguages = @(
     "af-za", "sq-al", "ar-sa", "hy-am", "bn-in", "bg-bg", "ca-es", "hr-hr", "cs-cz", 
@@ -110,6 +111,16 @@ $unwantedLanguages = @(
     "pt-pt", "pa-in", "ro-ro", "ru-ru", "sr-latn-rs", "sk-sk", "sl-si", "es-es", "sv-se", 
     "ta-in", "tr-tr", "uk-ua", "vi-vn", "cy-gb", "xh-za", "zu-za"
 )
+#>
+
+# Split the string by semicolons and exclude x-none and en-us
+$languageArray = ($ListInstalledLanguages -split ";") | Where-Object { $_ -ne "x-none" -and $_ -ne "en-us" }
+
+# Format the output
+Write-Host "UIFallbackLanguages contains the following languages (excluding x-none):"
+$unwantedLanguages = $languageArray | ForEach-Object { 
+    Write-Host "- $UnwantedLanguages" -ForegroundColor Cyan
+}
 
 # Generate XML content to remove unwanted languages
 $xmlContent = @"
@@ -135,7 +146,7 @@ Write-Host "Verbose: Generated RemoveLanguages.xml with the following languages:
 Write-Host "Verbose: Unwanted languages to be removed:" -ForegroundColor Yellow
 Write-Host "`n"
 
-$ListInstalledLanguages | ForEach-Object { Write-Host " - $_" -ForegroundColor Magenta }
+$unwantedLanguages
 
 Write-Host "`n"
 Start-Sleep -Seconds 2
