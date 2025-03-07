@@ -3,7 +3,7 @@
 # Created: March 7, 2025
 
 # Configuration Variables - Modify these for your environment
-$PervasiveServerName = "MY-Apps.digney.local" # Replace with your actual Pervasive database server
+$PervasiveServerName = "DYA-Apps.digney.local" # Replace with your actual Pervasive database server
 $PervasivePort = 1583 # Default Pervasive port, change if different
 $PervasiveServiceNames = @("PSQL", "Pervasive.SQL", "Pervasive PSQL Workgroup Engine", "Pervasive PSQL Workgroup Engine")
 $LogPath = "$env:SYSTEMROOT\TEMP\PervasiveTroubleshooter.log"
