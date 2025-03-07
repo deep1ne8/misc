@@ -5,7 +5,7 @@
 # Configuration Variables - Modify these for your environment
 $ServerName = "DYA-APPS" # Default server name from the document, modify if different
 $TimberlineSharePath = "\\DYA-APPS\Timberline Office"
-$LogPath = "$env:SYSTEMOOT\Temp\Sage300CRE_Troubleshooter.log"
+$LogPath = "$env:SYSTEMOOT\Windows\Temp\Sage300CRE_Troubleshooter.log"
 
 # Function to write to both console and log file
 function Write-Log {
