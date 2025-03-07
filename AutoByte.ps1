@@ -7,7 +7,7 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/UpdateWin11To24H2-BypassTpmandCpu.ps1"; Description = "UpdateWin11To24H2-BypassTpmandCpu" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
-    #@{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckIfOneDriveSyncFolder.ps1"; Description = "CheckIfOneDriveSyncFolder" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/TestSage.ps1"; Description = "TestSage" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetSpeedTest.ps1"; Description = "InternetSpeedTest" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetLatencyTest.ps1"; Description = "InternetLatencyTest" },
@@ -57,11 +57,11 @@ Write-Host ""
         Write-Host "$index. $($script.Description)" -ForegroundColor Green
         $index++
     }
-    Write-Host "13. Exit" -ForegroundColor Red
+    Write-Host "14. Exit" -ForegroundColor Red
     Write-Host ""
     Write-Host "================================================================" -ForegroundColor Cyan
 
-    $choice = Read-Host "Enter your choice (1-13)"  
+    $choice = Read-Host "Enter your choice (1-14)"  
     switch ($choice) {
         "1" { InitiateScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
         "2" { InitiateScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
