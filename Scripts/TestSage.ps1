@@ -6,7 +6,7 @@
 $PervasiveServerName = "MY-Apps.digney.local" # Replace with your actual Pervasive database server
 $PervasivePort = 1583 # Default Pervasive port, change if different
 $PervasiveServiceNames = @("PSQL", "Pervasive.SQL", "Pervasive PSQL Workgroup Engine", "Pervasive PSQL Workgroup Engine")
-$LogPath = "$env:USERPROFILE\Desktop\PervasiveTroubleshooter.log"
+$LogPath = "$env:SYSTEMROOT\TEMP\PervasiveTroubleshooter.log"
 
 # Function to write to both console and log file
 function Write-Log {
@@ -188,7 +188,7 @@ if ($foundPervasiveService -and $isAdmin) {
 
 # Step 7: Create a test file to check local write permissions
 Write-Log "Testing local file system write permissions..." "INFO"
-$testFilePath = "$env:TEMP\pervasive_test.txt"
+$testFilePath = "$env:SYSTEMROOT\TEMP\pervasive_test.txt"
 try {
     "Pervasive test file - Created at $(Get-Date)" | Out-File -FilePath $testFilePath -Force
     if (Test-Path $testFilePath) {
