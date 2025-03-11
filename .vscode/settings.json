@@ -1,3 +1,6 @@
 {
-    "terminal.explorerKind": "both"
+    "terminal.explorerKind": "both",
+    "githubPullRequests.ignoredPullRequestBranches": [
+        "main"
+    ]
 }
