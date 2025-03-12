@@ -4,89 +4,98 @@ using namespace System.Security.Principal
 
 # Thomson Reuters Workpapers Troubleshooting Script
 function Resolve-ThomsonReutersWorkpapers {
-    param (
-        [switch]$Verbose
-    )
-    
     # Elevated privilege check
     $currentPrincipal = [WindowsPrincipal]::new([WindowsIdentity]::GetCurrent())
     if (-not $currentPrincipal.IsInRole([WindowsBuiltInRole]::Administrator)) {
         throw "Requires administrative privileges. Please run as administrator."
     }
-    
-    # Logging
+
+    # Logging mechanism
     $logPath = Join-Path -Path $env:TEMP -ChildPath "ThomsonReutersDiagnostics_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
     Write-Host "Logging to: $logPath" -ForegroundColor Cyan
 
-    # Clean browser cache
-    Write-Host "Clearing browser caches..." -ForegroundColor Yellow
-    $browserPaths = @(
-        "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache",
-        "$env:LOCALAPPDATA\Mozilla\Firefox\Profiles\*.default\cache2",
-        "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache"
-    )
-    foreach ($path in $browserPaths) {
-        if (Test-Path $path) {
-            Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
-        }
-    }
-    Start-Sleep -Seconds 2
-
-    # Terminate Thomson Reuters related processes
-    Write-Host "Stopping related processes..." -ForegroundColor Yellow
-    $trProcesses = @('EXCEL', 'WINWORD', 'OUTLOOK', 'chrome', 'firefox', 'msedge', 'WorkPaperMonitor')
-    foreach ($proc in $trProcesses) {
-        Stop-Process -Name $proc -Force -ErrorAction SilentlyContinue
-    }
-    Start-Sleep -Seconds 2
-
-    # Restart WorkPaper Monitor service
-    Write-Host "Restarting Thomson Reuters Workpapers services..." -ForegroundColor Yellow
-    $services = Get-Service -Name "*Workpapers*" -ErrorAction SilentlyContinue
-    foreach ($service in $services) {
-        Restart-Service -Name $service.Name -Force -ErrorAction SilentlyContinue
-    }
-    Start-Sleep -Seconds 3
-
-    # Clear local WorkPaper cache
-    Write-Host "Clearing WorkPaper Monitor local cache..." -ForegroundColor Yellow
-    $wpCachePath = "$env:LOCALAPPDATA\ThomsonReuters\Workpapers"
-    if (Test-Path $wpCachePath) {
-        Remove-Item -Path "$wpCachePath\*" -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    Start-Sleep -Seconds 2
-
-    # Flush DNS & Renew Network
-    Write-Host "Flushing DNS and renewing network..." -ForegroundColor Yellow
-    ipconfig /flushdns | Out-Null
-    ipconfig /release | Out-Null
-    ipconfig /renew | Out-Null
-    Start-Sleep -Seconds 3
-
-    # Check system dependencies
-    Write-Host "Checking required system dependencies..." -ForegroundColor Yellow
-    $dotNetInstalled = (Get-WindowsFeature -Name NET-Framework-Core).Installed
-    if (-not $dotNetInstalled) {
-        Write-Host ".NET Framework missing. Installing..." -ForegroundColor Red
-        Install-WindowsFeature -Name NET-Framework-Core -IncludeAllSubFeature
-    }
-    Start-Sleep -Seconds 2
-
-    # Run DNS resolution check
-    Write-Host "Checking DNS resolution..." -ForegroundColor Yellow
     try {
-        Resolve-DnsName 'www.thomsonreuters.com' -ErrorAction Stop | Out-File -FilePath $logPath -Append
-    } catch {
-        Write-Host "DNS resolution failed." -ForegroundColor Red
+        # Check .NET Framework Installation
+        Write-Host "Checking .NET Framework installation..." -ForegroundColor Yellow
+        $dotNetInstalled = Get-ItemProperty -Path "HKLM:\\SOFTWARE\\Microsoft\\NET Framework Setup\\NDP\\v4\\Full" -Name Release -ErrorAction SilentlyContinue
+        if ($dotNetInstalled -and $dotNetInstalled.Release -ge 528040) {
+            Write-Host ".NET Framework 4.8 or later is installed." -ForegroundColor Green
+        } else {
+            Write-Host ".NET Framework 4.8 is NOT installed. Please install it." -ForegroundColor Red
+        }
+
+        # Clean browser cache
+        Write-Host "Clearing browser cache..." -ForegroundColor Yellow
+        $browserPaths = @(
+            "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache",
+            "$env:LOCALAPPDATA\Mozilla\Firefox\Profiles\*.default\cache2",
+            "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache"
+        )
+        foreach ($path in $browserPaths) {
+            if (Test-Path $path) {
+                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        # Terminate Thomson Reuters related processes
+        Write-Host "Terminating Thomson Reuters related processes..." -ForegroundColor Yellow
+        $trProcesses = @('EXCEL', 'WINWORD', 'OUTLOOK', 'chrome', 'firefox', 'msedge')
+        foreach ($proc in $trProcesses) {
+            Stop-Process -Name $proc -Force -ErrorAction SilentlyContinue
+        }
+
+        # Restart WorkPaper Monitor Services
+        Write-Host "Restarting WorkPaper Monitor services..." -ForegroundColor Yellow
+        Get-Service -Name "WorkPaperMonitor" -ErrorAction SilentlyContinue | Restart-Service -Force
+
+        # Clear Local WorkPaper Cache
+        Write-Host "Clearing WorkPaper cache..." -ForegroundColor Yellow
+        $workpaperCache = "$env:LOCALAPPDATA\Thomson Reuters\WorkPapers\Cache"
+        if (Test-Path $workpaperCache) {
+            Remove-Item -Path $workpaperCache -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        # Flush DNS & Renew Network
+        Write-Host "Flushing DNS & Renewing Network..." -ForegroundColor Yellow
+        ipconfig /flushdns | Out-Null
+        Start-Process -FilePath "ipconfig" -ArgumentList "/release" -NoNewWindow -Wait
+        Start-Process -FilePath "ipconfig" -ArgumentList "/renew" -NoNewWindow -Wait
+
+        # System diagnostics
+        Write-Host "Running system diagnostics..." -ForegroundColor Yellow
+        $dnsResult = $null
+        try {
+            $dnsResult = Resolve-DnsName 'www.thomsonreuters.com' -ErrorAction Stop
+        } catch {
+            $dnsResult = "DNS resolution failed"
+        }
+
+        # Collect diagnostic results
+        $diagnosticResults = @{
+            NetworkStatus  = (Test-NetConnection -ComputerName "www.thomsonreuters.com").PingSucceeded
+            DNSResolution  = $dnsResult
+            FirewallStatus = (Get-NetFirewallRule -Enabled True).Count
+        }
+        $diagnosticResults | ConvertTo-Json | Out-File -FilePath $logPath -Append
+    }
+    catch {
+        $errorDetails = @{
+            Message    = $_.Exception.Message
+            Position   = $_.InvocationInfo.PositionMessage
+            Time       = Get-Date
+        }
+        $errorDetails | ConvertTo-Json | Out-File -FilePath $logPath -Append
+        Write-Error "Critical error during Thomson Reuters Workpapers resolution: $($_.Exception.Message) at $($_.InvocationInfo.PositionMessage)"
     }
 
-    Write-Host "Diagnostics complete. Log saved to: $logPath" -ForegroundColor Green
+    Write-Host "Diagnostic log saved to: $logPath" -ForegroundColor Green
+    Write-Host "Please restart your computer and retry opening Workpapers." -ForegroundColor Yellow
     #Get-Content -Path $logPath
 }
 
-# Execute troubleshooting
+# Execution wrapper
 try {
     Resolve-ThomsonReutersWorkpapers -Verbose
 } catch {
-    Write-Error "Unhandled exception: $_"
+    Write-Error "Unhandled exception in Thomson Reuters Workpapers resolution: $_"
 }
