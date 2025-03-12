@@ -1,4 +1,4 @@
-#Requires -Version 7.0
+using namespace System
 using namespace System.Diagnostics
 using namespace System.Security.Principal
 
