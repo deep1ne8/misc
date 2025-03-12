@@ -75,7 +75,8 @@ Write-Host ""
         "10" { InitiateScriptFromUrl $GitHubScripts[9].ScriptUrl; Show-ReturnMenu }
         "11" { InitiateScriptFromUrl $GitHubScripts[10].ScriptUrl; Show-ReturnMenu }
         "12" { InitiateScriptFromUrl $GitHubScripts[11].ScriptUrl; Show-ReturnMenu }
-        "13" {
+        "13" { InitiateScriptFromUrl $GitHubScripts[12].ScriptUrl; Show-ReturnMenu }
+        "14" {
             Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
             return
         }
