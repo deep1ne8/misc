@@ -17,20 +17,7 @@ function Resolve-ThomsonReutersWorkpapers {
         # Verbose logging
         Write-Verbose "Logging to: $logPath"
     }
-    begin {
-        # Elevated privilege check
-        $currentPrincipal = [WindowsPrincipal]::new([WindowsIdentity]::GetCurrent())
-        if (-not $currentPrincipal.IsInRole([WindowsBuiltInRole]::Administrator)) {
-            # Throw error if not running as administrator
-            throw "Requires administrative privileges. Please run as administrator."
-        }
 
-        # Logging mechanism
-        $logPath = Join-Path -Path $env:TEMP -ChildPath "ThomsonReutersDiagnostics_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
-
-        # Verbose logging
-        Write-Verbose "Logging to: $logPath"
-    }
         try {
             # Clean browser cache
             $browserPaths = @(
@@ -139,7 +126,7 @@ function Resolve-ThomsonReutersWorkpapers {
         Write-Host "Please restart your computer and retry opening workpapers." -ForegroundColor Yellow
         Write-Host ""
         Get-Content -Path $logPath
-        
+
         # Verbose output
         if ($Verbose) {
             Get-Content -Path $logPath
