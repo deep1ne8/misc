@@ -2,7 +2,7 @@
 function Install-RemotePackage {
     param (
         [Parameter(Mandatory=$true)]
-        [string]$Url = (Read-Host "Enter the URL of the remote package to install"),
+        [string]$Url,
         
         [Parameter(Mandatory=$false)]
         [string]$DestinationPath = "C:\Temp\$(Split-Path -Leaf $Url)",
