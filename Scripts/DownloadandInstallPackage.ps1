@@ -1,12 +1,25 @@
 # Function to install a remote package
 function Install-RemotePackage {
     param (
-        [string]$Url,
+        [Parameter(Mandatory=$true)]
+        [string]$Url = (Read-Host "Enter the URL of the remote package to install"),
+        
+        [Parameter(Mandatory=$false)]
         [string]$DestinationPath = "C:\Temp\$(Split-Path -Leaf $Url)",
+        
+        [Parameter(Mandatory=$false)]
         [string]$LogPath,
+        
+        [Parameter(Mandatory=$false)]
         [switch]$CleanupAfterInstall,
+        
+        [Parameter(Mandatory=$false)]
         [switch]$Force
     )
+    
+    if ($LogPath) {
+        $LogPath = Join-Path -Path $LogPath -ChildPath "$(Split-Path -Leaf $Url).log"
+    }
     
     Write-Host "Starting installation for: $Url"
     
@@ -42,15 +55,4 @@ function Install-RemotePackage {
     }
 }
 
-# Basic silent installation of an EXE
-Install-RemotePackage -Url "https://download.example.com/application.exe"
-
-# Silent MSI installation with custom path and cleanup
-Install-RemotePackage -Url "https://download.example.com/package.msi" `
-                     -DestinationPath "D:\Software\package.msi" `
-                     -LogPath "D:\Logs\install.log" `
-                     -CleanupAfterInstall
-
-# Force reinstallation with verbose output
-Install-RemotePackage -Url "https://download.example.com/setup.exe" `
-                     -Force
+Install-RemotePackage
