@@ -2,7 +2,7 @@
 function Install-RemotePackage {
     param (
         [Parameter(Mandatory=$true)]
-        [string]$Url,
+        [string]$Url = (Read-Host "Enter the URL of the remote package to install"),
         
         [Parameter(Mandatory=$false)]
         [string]$DestinationPath = "C:\Temp\$(Split-Path -Leaf $Url)",
@@ -27,11 +27,22 @@ function Install-RemotePackage {
         New-Item -ItemType Directory -Path "C:\Temp" | Out-Null
     }
     
-    if (Test-Path $DestinationPath -and -Not $Force) {
-        Write-Host "File already exists at $DestinationPath. Use -Force to overwrite." -ForegroundColor Yellow
-    } else {
-        Write-Host "Downloading file to: $DestinationPath"
-        Invoke-WebRequest -Uri $Url -OutFile $DestinationPath
+    if (Test-Path $DestinationPath) {
+        if (-Not $Force) {
+            Write-Host "File already exists at $DestinationPath. Use -Force to overwrite." -ForegroundColor Yellow
+            return
+        } else {
+            Write-Host "Force mode enabled, overwriting existing file." -ForegroundColor Cyan
+            Remove-Item -Path $DestinationPath -Force
+        }
+    }
+
+    Write-Host "Downloading file to: $DestinationPath"
+    try {
+        Invoke-WebRequest -Uri $Url -OutFile $DestinationPath -ErrorAction Stop
+    } catch {
+        Write-Host "Error downloading file: $_" -ForegroundColor Red
+        return
     }
     
     if ($Url -match "\.msi$") {
@@ -55,4 +66,4 @@ function Install-RemotePackage {
     }
 }
 
-Install-RemotePackage
+Install-RemotePackage -Force
