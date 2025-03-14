@@ -80,8 +80,8 @@ function Install-Revit {
         [string]$InstallerPath
     )
     Write-LogMessage "Starting Revit installation..."
-    $args = "/q"
-    Start-Process -FilePath $InstallerPath -ArgumentList $args -Wait -PassThru
+    $installArgs = "/q"
+    Start-Process -FilePath $InstallerPath -ArgumentList $installArgs -Wait -PassThru
     Write-LogMessage "Installation completed."
 }
 
