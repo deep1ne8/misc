@@ -2,7 +2,7 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DiskCleaner.ps1"; Description = "DiskCleaner" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/EnableFilesOnDemand.ps1"; Description = "EnableFilesOnDemand" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DownloadandInstallPackage.ps1"; Description = "DownloadandInstallPackage" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/NetworkScan.ps1"; Description = "NetworkScan" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallRevit2024.2.ps1"; Description = "NetworkScan" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/BloatWareRemover.ps1"; Description = "DellBloatWareRemover" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WindowsSystemRepair.ps1"; Description = "WindowsSystemRepair" },
