@@ -1,6 +1,3 @@
-#Requires -Version 5.1
-#Requires -RunAsAdministrator
-
 [CmdletBinding()]
 param (
     [Parameter(Position = 0)]
