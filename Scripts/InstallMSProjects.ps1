@@ -42,7 +42,7 @@ try {
 if (Test-Path $odtInstallerPath) {
     Write-Host "Installing Microsoft Project..." -ForegroundColor Cyan
     try {
-        Start-Process -FilePath $odtInstallerPath -ArgumentList "/configure $MSProjectConfigFile" -Wait
+        Start-Process -FilePath $odtInstallerPath -ArgumentList "/configure $MSProjectConfigFile" -Wait -NoNewWindow
     } catch {
         Write-Host "Failed to install Microsoft Project: $($_.Exception.Message)" -ForegroundColor Red
         return
