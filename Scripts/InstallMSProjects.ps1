@@ -1,6 +1,6 @@
 # Define variables
 $odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18324-20194.exe"
-$GitHubConfigUrl = "https://raw.githubusercontent.com/deep1ne/misc/main/ODTTool/MSProjects.xml"
+$GitHubConfigUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/ODTTool/MSProjects.xml"
 $odtInstallerPath = "$env:TEMP\odt_setup.exe"
 $odtExtractPath = "$env:TEMP\ODT"
 $MSProjectConfigFile = "$odtExtractPath\MSProjects.xml"
