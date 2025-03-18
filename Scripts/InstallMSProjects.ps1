@@ -1,12 +1,10 @@
 # Define variables
 $odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18324-20194.exe"
-$GitHubParentUrl = "https://github.com/deep1ne/misc/refs/heads/main/"
-$MSProjectConfigPath = $GitHubParentUrl + "ODTTool"
+$GitHubConfigUrl = "https://raw.githubusercontent.com/deep1ne/misc/main/ODTTool/MSProjects.xml"
 $odtInstallerPath = "$env:TEMP\odt_setup.exe"
 $odtExtractPath = "$env:TEMP\ODT"
-$MSProjectConfigFile = $MSProjectConfigPath + "MSProjects.xml"
+$MSProjectConfigFile = "$odtExtractPath\MSProjects.xml"
 $MSProjectExePath = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\PROJECT.EXE" -ErrorAction SilentlyContinue)."(default)"
-
 
 # Step 1: Download the Office Deployment Tool (ODT)
 Write-Host "Downloading the Office Deployment Tool..." -ForegroundColor Cyan
@@ -17,16 +15,17 @@ try {
     return
 }
 
-if (-not(Test-Path $odtExtractPath)) {
+# Step 2: Create Extraction Directory
+if (-not (Test-Path $odtExtractPath)) {
     try {
-        mkdir $odtExtractPath
+        New-Item -ItemType Directory -Path $odtExtractPath -Force | Out-Null
     } catch {
         Write-Host "Failed to create directory for ODT extraction: $($_.Exception.Message)" -ForegroundColor Red
         return
     }
 }
 
-# Step 2: Extract the ODT
+# Step 3: Extract the ODT
 Write-Host "Extracting the Office Deployment Tool..." -ForegroundColor Cyan
 try {
     Start-Process -FilePath $odtInstallerPath -ArgumentList "/extract:$odtExtractPath /quiet" -Wait
@@ -35,22 +34,35 @@ try {
     return
 }
 
-
-# Step 4: Install Project using the ODT
-Write-Host "Installing Microsoft Project..." -ForegroundColor Cyan
+# Step 4: Download MSProjects.xml configuration file
+Write-Host "Downloading Microsoft Project configuration file..." -ForegroundColor Cyan
 try {
-    Start-Process -FilePath "$odtExtractPath\setup.exe" -ArgumentList "/configure $MSProjectConfigFile" -Wait -Verbose
+    Invoke-WebRequest -Uri $GitHubConfigUrl -OutFile $MSProjectConfigFile
 } catch {
-    Write-Host "Failed to install Microsoft Project: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Failed to download Microsoft Project configuration file: $($_.Exception.Message)" -ForegroundColor Red
     return
 }
 
-# Step 5: Verify Project installation
-Write-Host "Verifying Teams installation..." -ForegroundColor Cyan
+# Step 5: Install Project using the ODT
+$setupPath = "$odtExtractPath\setup.exe"
+if (Test-Path $setupPath) {
+    Write-Host "Installing Microsoft Project..." -ForegroundColor Cyan
+    try {
+        Start-Process -FilePath $setupPath -ArgumentList "/configure $MSProjectConfigFile" -Wait
+    } catch {
+        Write-Host "Failed to install Microsoft Project: $($_.Exception.Message)" -ForegroundColor Red
+        return
+    }
+} else {
+    Write-Host "Setup.exe not found. Extraction may have failed." -ForegroundColor Red
+    return
+}
+
+# Step 6: Verify Project installation
+Write-Host "Verifying Microsoft Project installation..." -ForegroundColor Cyan
 if (Test-Path $MSProjectExePath) {
-    Write-Host "MSProjectExePath: $MSProjectExePath" -foregroundColor Green
+    Write-Host "MSProjectExePath: $MSProjectExePath" -ForegroundColor Green
     Write-Host "Microsoft Project has been installed successfully." -ForegroundColor Green
 } else {
     Write-Host "Microsoft Project installation failed." -ForegroundColor Red
 }
-return
