@@ -48,7 +48,7 @@ try {
 # Step 5: Verify Project installation
 Write-Host "Verifying Teams installation..." -ForegroundColor Cyan
 if (Test-Path $MSProjectExePath) {
-    Write-Host "MSProjectExePath: $MSProjectExePath"
+    Write-Host "MSProjectExePath: $MSProjectExePath" -foregroundColor Green
     Write-Host "Microsoft Project has been installed successfully." -ForegroundColor Green
 } else {
     Write-Host "Microsoft Project installation failed." -ForegroundColor Red
