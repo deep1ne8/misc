@@ -7,7 +7,7 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WindowsSystemRepair.ps1"; Description = "WindowsSystemRepair" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/NewTeamsReadinessCheckScript.ps1"; Description = "NewTeamsReadinessCheckScript" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallMSProjects.ps1"; Description = "InstallMSProjects" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetSpeedTest.ps1"; Description = "InternetSpeedTest" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetLatencyTest.ps1"; Description = "InternetLatencyTest" },
