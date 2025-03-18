@@ -1,10 +1,10 @@
 # Define variables
 $odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18324-20194.exe"
 $GitHubParentUrl = "https://github.com/deep1ne/misc/refs/heads/main/"
-$MSProjectConfigPath = Join-Path -Path $GitHubParentUrl -ChildPath "ODTTool"
+$MSProjectConfigPath = $GitHubParentUrl + "ODTTool"
 $odtInstallerPath = "$env:TEMP\odt_setup.exe"
 $odtExtractPath = "$env:TEMP\ODT"
-$MSProjectConfigFile = Join-Path -Path $MSProjectConfigPath -ChildPath "MSProjects.xml"
+$MSProjectConfigFile = $MSProjectConfigPath + "MSProjects.xml"
 $MSProjectExePath = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\PROJECT.EXE" -ErrorAction SilentlyContinue)."(default)"
 
 
