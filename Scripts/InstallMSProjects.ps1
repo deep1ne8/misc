@@ -37,7 +37,7 @@ try {
 # Step 4: Download MSProjects.xml configuration file
 Write-Host "Downloading Microsoft Project configuration file..." -ForegroundColor Cyan
 try {
-    Invoke-WebRequest -Uri $GitHubConfigUrl -OutFile $MSProjectConfigFile
+    Invoke-WebRequest -Uri $GitHubConfigUrl -OutFile $MSProjectConfigFile -UseBasicParsing
 } catch {
     Write-Host "Failed to download Microsoft Project configuration file: $($_.Exception.Message)" -ForegroundColor Red
     return
