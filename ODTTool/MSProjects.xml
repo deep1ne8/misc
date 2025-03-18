@@ -1,40 +1,14 @@
-<Configuration ID="ae5ff81d-c3b4-4245-b704-747e10125808">
-<Info Description="Project Installation"/>
-<Add OfficeClientEdition="64" Channel="Current">
-<Product ID="O365ProPlusRetail">
-<Language ID="en-us"/>
-<ExcludeApp ID="Access"/>
-<ExcludeApp ID="Excel"/>
-<ExcludeApp ID="Groove"/>
-<ExcludeApp ID="Lync"/>
-<ExcludeApp ID="OneDrive"/>
-<ExcludeApp ID="OneNote"/>
-<ExcludeApp ID="Outlook"/>
-<ExcludeApp ID="OutlookForWindows"/>
-<ExcludeApp ID="PowerPoint"/>
-<ExcludeApp ID="Publisher"/>
-<ExcludeApp ID="Teams"/>
-<ExcludeApp ID="Word"/>
-</Product>
-<Product ID="ProjectProRetail">
-<Language ID="en-us"/>
-<ExcludeApp ID="Access"/>
-<ExcludeApp ID="Excel"/>
-<ExcludeApp ID="Groove"/>
-<ExcludeApp ID="Lync"/>
-<ExcludeApp ID="OneDrive"/>
-<ExcludeApp ID="OneNote"/>
-<ExcludeApp ID="Outlook"/>
-<ExcludeApp ID="OutlookForWindows"/>
-<ExcludeApp ID="PowerPoint"/>
-<ExcludeApp ID="Publisher"/>
-<ExcludeApp ID="Teams"/>
-<ExcludeApp ID="Word"/>
-</Product>
-</Add>
-<Updates Enabled="TRUE"/>
-<AppSettings>
-<Setup Name="Company" Value="Digney York Associates"/>
-</AppSettings>
-<Display Level="None" AcceptEULA="TRUE"/>
+<Configuration>
+    <Add OfficeClientEdition="64" Channel="PerpetualVL2016">
+        <Product ID="ProjectStdXVolume" PIDKEY="G6W2J-J8NPJ-M3PTD-22XJX-WT2C8">
+            <Language ID="en-us" />
+            <ExcludeApp ID="Groove" />
+        </Product>
+    </Add>
+    <Display Level="None" AcceptEULA="TRUE" />
+    <Property Name="AUTOACTIVATE" Value="1" />
+    <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+    <Property Name="SharedComputerLicensing" Value="0" />
+    <Property Name="PinIconsToTaskbar" Value="TRUE" />
+    <Updates Enabled="TRUE" />
 </Configuration>
