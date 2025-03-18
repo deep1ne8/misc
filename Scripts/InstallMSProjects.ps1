@@ -1,21 +1,13 @@
 # Define variables
-$odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18324-20194.exe"
+#$odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18324-20194.exe"
+$odtDownloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/ODTTool/setup.exe"
 $GitHubConfigUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/ODTTool/MSProjects.xml"
-$odtInstallerPath = "$env:TEMP\odt_setup.exe"
 $odtExtractPath = "$env:TEMP\ODT"
+$odtInstallerPath = "$odtExtractPath\setup.exe"
 $MSProjectConfigFile = "$odtExtractPath\MSProjects.xml"
-$MSProjectExePath = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\PROJECT.EXE" -ErrorAction SilentlyContinue)."(default)"
+$MSProjectExePath = Get-ChildItem -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Name -like "*Project*"}
 
-# Step 1: Download the Office Deployment Tool (ODT)
-Write-Host "Downloading the Office Deployment Tool..." -ForegroundColor Cyan
-try {
-    Invoke-WebRequest -Uri $odtDownloadUrl -OutFile $odtInstallerPath
-} catch {
-    Write-Host "Failed to download Office Deployment Tool: $($_.Exception.Message)" -ForegroundColor Red
-    return
-}
-
-# Step 2: Create Extraction Directory
+# Step 1: Create Directory
 if (-not (Test-Path $odtExtractPath)) {
     try {
         New-Item -ItemType Directory -Path $odtExtractPath -Force | Out-Null
@@ -25,16 +17,17 @@ if (-not (Test-Path $odtExtractPath)) {
     }
 }
 
-# Step 3: Extract the ODT
-Write-Host "Extracting the Office Deployment Tool..." -ForegroundColor Cyan
+
+# Step 2: Download the Office Deployment Tool (ODT)
+Write-Host "Downloading the Office Deployment Tool..." -ForegroundColor Cyan
 try {
-    Start-Process -FilePath $odtInstallerPath -ArgumentList "/extract:$odtExtractPath /quiet" -Wait
+    Invoke-WebRequest -Uri $odtDownloadUrl -OutFile $odtInstallerPath
 } catch {
-    Write-Host "Failed to extract Office Deployment Tool: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Failed to download Office Deployment Tool: $($_.Exception.Message)" -ForegroundColor Red
     return
 }
 
-# Step 4: Download MSProjects.xml configuration file
+# Step 3: Download MSProjects.xml configuration file
 Write-Host "Downloading Microsoft Project configuration file..." -ForegroundColor Cyan
 try {
     Invoke-WebRequest -Uri $GitHubConfigUrl -OutFile $MSProjectConfigFile -UseBasicParsing
@@ -44,7 +37,7 @@ try {
 }
 
 # Step 5: Install Project using the ODT
-$setupPath = "$odtExtractPath\setup.exe"
+$setupPath = "$odtinInstallerPath"
 if (Test-Path $setupPath) {
     Write-Host "Installing Microsoft Project..." -ForegroundColor Cyan
     try {
