@@ -10,4 +10,5 @@
     <Property Name="DeviceBasedLicensing" Value="0" />
     <Property Name="SCLCacheOverride" Value="0" />
     <Property Name="PinIconsToTaskbar" Value="TRUE" />
+    <Updates Enabled="TRUE" Channel="Current" />
 </Configuration>
