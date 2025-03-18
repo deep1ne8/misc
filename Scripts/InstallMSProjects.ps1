@@ -66,3 +66,4 @@ if (Test-Path $MSProjectExePath) {
 } else {
     Write-Host "Microsoft Project installation failed." -ForegroundColor Red
 }
+return
