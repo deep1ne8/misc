@@ -7,6 +7,8 @@ $odtInstallerPath = "$odtExtractPath\setup.exe"
 $MSProjectConfigFile = "$odtExtractPath\MSProjects.xml"
 $MSProjectExePath = Get-ChildItem -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Name -like "*Project*"}
 
+Write-Host "Installing Microsoft Project..." -ForegroundColor Cyan
+
 # Step 1: Create Directory
 if (-not (Test-Path $odtExtractPath)) {
     try {
