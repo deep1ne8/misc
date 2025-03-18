@@ -5,7 +5,13 @@ $GitHubConfigUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/m
 $odtExtractPath = "$env:TEMP\ODT"
 $odtInstallerPath = "$odtExtractPath\setup.exe"
 $MSProjectConfigFile = "$odtExtractPath\MSProjects.xml"
-$MSProjectExePath = Get-ChildItem -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall" -Verbose -ErrorAction SilentlyContinue | Where-Object {$_.Name -like "*Project*"}
+$MSProjectExePath = "C:\Program Files\Microsoft Office\root\Office16\WINPROJ.EXE"
+
+# Check if Microsoft Project is already installed
+if (Test-Path $MSProjectExePath) {
+    Write-Host "Microsoft Project is already installed." -ForegroundColor Green
+    return
+}
 
 Write-Host "Installing Microsoft Project..." -ForegroundColor Cyan
 
@@ -55,8 +61,7 @@ if (Test-Path $odtInstallerPath) {
 # Step 6: Verify Project installation
 Write-Host "Verifying Microsoft Project installation..." -ForegroundColor Cyan
 if (Test-Path $MSProjectExePath) {
-    Write-Host "MSProjectExePath: $MSProjectExePath" -ForegroundColor Green
-    Write-Host "Microsoft Project has been installed successfully." -ForegroundColor Green
+    Write-Host "Microsoft Project is installed at: $MSProjectExePath" -ForegroundColor Green
 } else {
     Write-Host "Microsoft Project installation failed." -ForegroundColor Red
 }
