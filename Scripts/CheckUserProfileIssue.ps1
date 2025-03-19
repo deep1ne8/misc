@@ -84,7 +84,7 @@ try {
         Write-Message "Checking permissions for $profileFolder..."
         $acl = Get-Acl $profileFolder
         $acl | Format-List | Out-File -Append -FilePath $logFilePath
-        Write-Host "$acl | Format-List"
+        Write-Host "$acl" -ForegroundColor Green
     }
 } catch {
     Write-Message "Error while checking profile folder permissions: $_" "Red"
