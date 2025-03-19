@@ -1,120 +1,444 @@
-# PowerShell script to troubleshoot and fix Windows 11 temporary profile issues
-$logFilePath = "C:\Logs\Profile_Troubleshoot_Log.txt"
+# Windows 11 23H2 Profile Fix Script
+# Run with administrator privileges for complete functionality
+# This script attempts to fix common profile loading issues with Windows 11 23H2
 
-# Create the log directory if it doesn't exist
-if (-not (Test-Path "C:\Logs")) {
-    New-Item -Path "C:\" -Name "Logs" -ItemType Directory | Out-Null
-}
-
-# Function to write to both console and log file
-function Write-Message {
-    param (
-        [string]$message,
-        [string]$color = "White"
-    )
-    
-    # Write to console
+# Function to write colored output
+function Write-ColorOutput {
+    param([string]$message, [string]$color = "White")
     Write-Host $message -ForegroundColor $color
+}
+
+Write-ColorOutput "Windows 11 23H2 Profile Fix Tool" "Cyan"
+Write-ColorOutput "===========================" "Cyan"
+Write-ColorOutput "This script will attempt to fix profile sign-in issues on Windows 11 23H2" "Yellow"
+Write-ColorOutput "Please ensure you run this as Administrator" "Yellow"
+Write-ColorOutput ""
+
+# Check if running as administrator
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-ColorOutput "ERROR: This script must be run as Administrator!" "Red"
+    Write-ColorOutput "Please restart PowerShell as Administrator and try again." "Red"
+    exit 1
+}
+
+# Create backup of registry keys
+function Backup-Registry {
+    Write-ColorOutput "Creating registry backup..." "Yellow"
     
-    # Append to log file
-    $message | Out-File -Append -FilePath $logFilePath
-}
-
-# 1. Check Event Viewer for user profile errors
-Write-Message "Checking Event Viewer for profile errors..."
-try {
-    $profileErrors = Get-WinEvent -LogName Application | Where-Object { $_.Id -in (1511, 1515, 1500, 1530, 1533) }
-    if ($profileErrors) {
-        Write-Message "User Profile Service Errors Found!" "Red"
-        $profileErrors | Select-Object TimeCreated, Id, Message | Format-Table -AutoSize | Out-File -Append -FilePath $logFilePath
-    } else {
-        Write-Message "No User Profile Errors Found in Event Viewer." "Green"
+    $backupDir = "$env:USERPROFILE\Desktop\ProfileFix_Backup"
+    if (-not (Test-Path $backupDir)) {
+        New-Item -ItemType Directory -Path $backupDir | Out-Null
     }
-} catch {
-    Write-Message "Error while checking Event Viewer: $_" "Red"
+    
+    $backupFile = "$backupDir\ProfileList_Backup_$(Get-Date -Format 'yyyyMMdd_HHmmss').reg"
+    reg export "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" $backupFile /y
+    
+    Write-ColorOutput "Registry backup saved to: $backupFile" "Green"
 }
 
-# 2. Check for profile corruption in the Windows Registry
-Write-Message "Checking Windows Registry for profile corruption..."
-try {
-    $corruptProfiles = Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" | Where-Object { $_.Name -match '\.bak$' }
-    if ($corruptProfiles) {
-        Write-Message "Corrupt profile detected:" "Red"
-        $corruptProfiles.Name | Out-File -Append -FilePath $logFilePath
-        foreach ($profile in $corruptProfiles) {
-            Write-Message "Deleting corrupt profile registry entry: $($profile.Name)" "Red"
-            Remove-Item -Path $profile.PSPath -Recurse -Force
+# Fix 1: Reset the User Profile Service
+function Reset-ProfileService {
+    Write-ColorOutput "Resetting User Profile Service..." "Yellow"
+    
+    try {
+        # Stop the User Profile Service
+        Stop-Service -Name "ProfSvc" -Force -ErrorAction Stop
+        Write-ColorOutput "User Profile Service stopped successfully." "Green"
+        
+        # Start the User Profile Service
+        Start-Service -Name "ProfSvc" -ErrorAction Stop
+        Write-ColorOutput "User Profile Service restarted successfully." "Green"
+    }
+    catch {
+        Write-ColorOutput "ERROR resetting User Profile Service: $_" "Red"
+    }
+}
+
+# Fix 2: Repair corrupted profile registry entries
+function Repair-ProfileRegistry {
+    Write-ColorOutput "Repairing profile registry entries..." "Yellow"
+    
+    $profileListPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
+    $profileKeys = Get-ChildItem -Path $profileListPath
+    
+    foreach ($key in $profileKeys) {
+        $sid = Split-Path -Path $key.PSPath -Leaf
+        
+        # Skip non-user SIDs
+        if ($sid -notmatch 'S-1-5-21') { continue }
+        
+        # Fix 2.1: Fix duplicate .bak profile keys
+        if ($sid.EndsWith(".bak")) {
+            $originalSid = $sid -replace "\.bak$", ""
+            $originalExists = Test-Path "$profileListPath\$originalSid"
+            
+            if ($originalExists) {
+                Write-ColorOutput "Found duplicate profile key with .bak extension: $sid" "Yellow"
+                
+                # Prompt user about which profile to keep
+                Write-ColorOutput "Would you like to remove the .bak profile key? This might resolve profile loading issues. (Y/N)" "Cyan"
+                $response = Read-Host
+                
+                if ($response.ToUpper() -eq "Y") {
+                    Remove-Item -Path "$profileListPath\$sid" -Force -Recurse
+                    Write-ColorOutput "Removed duplicate .bak profile key: $sid" "Green"
+                }
+            }
         }
-        Write-Message "Corrupt profile registry entries deleted. Restart the computer." "Green"
-    } else {
-        Write-Message "No corrupt profiles found in registry." "Green"
+        
+        # Fix 2.2: Check and fix ProfileImagePath
+        $profilePath = (Get-ItemProperty -Path $key.PSPath -Name "ProfileImagePath" -ErrorAction SilentlyContinue).ProfileImagePath
+        
+        if ($profilePath -and -not (Test-Path $profilePath)) {
+            Write-ColorOutput "Profile path does not exist: $profilePath for SID $sid" "Yellow"
+            
+            # Check if there's a similarly named folder in C:\Users
+            $username = Split-Path -Path $profilePath -Leaf
+            $possiblePath = "C:\Users\$username"
+            
+            if (Test-Path $possiblePath) {
+                Write-ColorOutput "Found possible correct path: $possiblePath" "Green"
+                
+                # Set the correct path
+                Set-ItemProperty -Path $key.PSPath -Name "ProfileImagePath" -Value $possiblePath
+                Write-ColorOutput "Fixed ProfileImagePath for SID $sid" "Green"
+            }
+        }
+        
+        # Fix 2.3: Fix State flag if incorrect
+        $stateValue = (Get-ItemProperty -Path $key.PSPath -Name "State" -ErrorAction SilentlyContinue).State
+        if ($null -ne $stateValue -and $stateValue -ne 0) {
+            Write-ColorOutput "Profile has non-zero state value ($stateValue) for SID $sid" "Yellow"
+            Set-ItemProperty -Path $key.PSPath -Name "State" -Value 0
+            Write-ColorOutput "Reset State value to 0 for SID $sid" "Green"
+        }
     }
-} catch {
-    Write-Message "Error while checking registry: $_" "Red"
 }
 
-# 3. Check if the user profile exists on disk
-Write-Message "Checking if user profile exists on disk..."
-try {
-    $profileList = Get-ChildItem "C:\Users" | Select-Object -ExpandProperty Name
-    $profileList | ForEach-Object { Write-Message "Existing Profile: $_" }
-    if ($profileList -contains 'TEMP') {
-        Write-Message "Temporary profile detected...." "Red"
+# Fix 3: Repair file system permissions
+function Repair-ProfilePermissions {
+    Write-ColorOutput "Repairing profile folder permissions..." "Yellow"
+    
+    $userFolders = Get-ChildItem -Path "C:\Users" -Directory | Where-Object { $_.Name -notmatch "Public|Default|defaultuser0|All Users" }
+    
+    foreach ($folder in $userFolders) {
+        $username = $folder.Name
+        Write-ColorOutput "Checking permissions for $username profile..." "Yellow"
+        
+        # Get username from folder
+        $ntAccount = New-Object System.Security.Principal.NTAccount("$username")
         try {
-            #Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-            #Remove-Item -Path "C:\Users\TEMP" -Recurse -Force -ErrorAction SilentlyContinue
-            $profileList
-            Write-Message "TEMP profile detected.." "Green"
-        } catch {
-            Write-Message "Please delete TEMP profile." "Red"
+            $sid = $ntAccount.Translate([System.Security.Principal.SecurityIdentifier]).Value
         }
-    } else {
-        Write-Message "No TEMP profile found." "Green"
+        catch {
+            Write-ColorOutput "Could not translate $username to SID, skipping..." "Yellow"
+            continue
+        }
+        
+        # Check if profile exists in registry
+        $profileInRegistry = Test-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid"
+        if (-not $profileInRegistry) {
+            $profileInRegistry = Test-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid.bak"
+        }
+        
+        if ($profileInRegistry) {
+            try {
+                # Reset permissions on the profile folder
+                $folderPath = $folder.FullName
+                
+                # Take ownership
+                $takeown = Start-Process -FilePath "takeown.exe" -ArgumentList "/f `"$folderPath`" /r /d y" -NoNewWindow -Wait -PassThru
+                
+                # Grant the user full control
+                $icacls = Start-Process -FilePath "icacls.exe" -ArgumentList "`"$folderPath`" /grant `"$username`":(F) /t /c /q" -NoNewWindow -Wait -PassThru
+                
+                if ($takeown.ExitCode -eq 0 -and $icacls.ExitCode -eq 0) {
+                    Write-ColorOutput "Successfully repaired permissions for $username profile" "Green"
+                }
+                else {
+                    Write-ColorOutput "Error resetting permissions for $username profile" "Red"
+                }
+                
+                # Fix AppData folder specifically
+                $appDataPath = "$folderPath\AppData"
+                if (Test-Path $appDataPath) {
+                    $takeownAppData = Start-Process -FilePath "takeown.exe" -ArgumentList "/f `"$appDataPath`" /r /d y" -NoNewWindow -Wait -PassThru
+                    $icaclsAppData = Start-Process -FilePath "icacls.exe" -ArgumentList "`"$appDataPath`" /grant `"$username`":(F) /t /c /q" -NoNewWindow -Wait -PassThru
+                    
+                    if ($takeownAppData.ExitCode -eq 0 -and $icaclsAppData.ExitCode -eq 0) {
+                        Write-ColorOutput "Successfully repaired permissions for $username AppData folder" "Green"
+                    }
+                }
+            }
+            catch {
+                Write-ColorOutput "ERROR repairing permissions: $_" "Red"
+            }
+        }
+        else {
+            Write-ColorOutput "No registry entry found for $username profile, cannot fully repair." "Yellow"
+        }
     }
-} catch {
-    Write-Message "Error while checking user profiles on disk: $_" "Red"
 }
 
-# 4. Check profile folder permissions for all users
-Write-Message "Checking profile folder permissions for all user profiles..."
+# Fix 4: Rebuild corrupted Group Policy settings
+function Repair-GroupPolicy {
+    Write-ColorOutput "Resetting Group Policy settings related to profiles..." "Yellow"
+    
+    try {
+        # Force a Group Policy update
+        gpupdate /force
+        
+        # Reset User Profile service-related Group Policy settings
+        $gpoPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\System"
+        
+        # Check if path exists
+        if (Test-Path $gpoPath) {
+            # Remove any problematic profile settings
+            $keysToCheck = @(
+                "DeleteRoamingCache",
+                "EnableProfileQuota",
+                "ProfileQuotaWarning",
+                "ProfileQuotaLimit",
+                "ProfileErrorAction",
+                "ProfileDlgTimeOut"
+            )
+            
+            foreach ($key in $keysToCheck) {
+                if (Get-ItemProperty -Path $gpoPath -Name $key -ErrorAction SilentlyContinue) {
+                    Remove-ItemProperty -Path $gpoPath -Name $key -Force
+                    Write-ColorOutput "Removed potentially problematic GPO setting: $key" "Green"
+                }
+            }
+        }
+        
+        Write-ColorOutput "Group Policy settings reset complete." "Green"
+    }
+    catch {
+        Write-ColorOutput "ERROR resetting Group Policy settings: $_" "Red"
+    }
+}
+
+# Fix 5: Repair system files
+function Repair-SystemFiles {
+    Write-ColorOutput "Running System File Checker to repair system files..." "Yellow"
+    Write-ColorOutput "This may take several minutes..." "Yellow"
+    
+    # Run SFC
+    $sfc = Start-Process -FilePath "sfc.exe" -ArgumentList "/scannow" -NoNewWindow -Wait -PassThru
+    
+    if ($sfc.ExitCode -eq 0) {
+        Write-ColorOutput "System File Checker completed successfully." "Green"
+    }
+    else {
+        Write-ColorOutput "System File Checker encountered issues. Exit code: $($sfc.ExitCode)" "Yellow"
+    }
+    
+    # Run DISM
+    Write-ColorOutput "Running DISM to repair Windows image..." "Yellow"
+    Write-ColorOutput "This may take several minutes..." "Yellow"
+    
+    $dism = Start-Process -FilePath "dism.exe" -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -NoNewWindow -Wait -PassThru
+    
+    if ($dism.ExitCode -eq 0) {
+        Write-ColorOutput "DISM repair completed successfully." "Green"
+    }
+    else {
+        Write-ColorOutput "DISM repair encountered issues. Exit code: $($dism.ExitCode)" "Yellow"
+    }
+}
+
+# Fix 6: Reset Windows Credential Manager
+function Reset-CredentialManager {
+    Write-ColorOutput "Resetting Windows Credential Manager..." "Yellow"
+    
+    try {
+        # Stop the Credential Manager service
+        Stop-Service -Name "VaultSvc" -Force -ErrorAction Stop
+        
+        # Clear credentials cache
+        $credPath = "$env:LOCALAPPDATA\Microsoft\Credentials"
+        if (Test-Path $credPath) {
+            Write-ColorOutput "Backing up credentials to Desktop..." "Yellow"
+            $credBackupPath = "$env:USERPROFILE\Desktop\CredentialBackup_$(Get-Date -Format 'yyyyMMdd_HHmmss')"
+            Copy-Item -Path $credPath -Destination $credBackupPath -Recurse
+            
+            # Clear credentials
+            Remove-Item -Path "$credPath\*" -Force -Recurse
+            Write-ColorOutput "Credentials cache cleared." "Green"
+        }
+        
+        # Start the service again
+        Start-Service -Name "VaultSvc" -ErrorAction Stop
+        Write-ColorOutput "Credential Manager reset successfully." "Green"
+    }
+    catch {
+        Write-ColorOutput "ERROR resetting Credential Manager: $_" "Red"
+    }
+}
+
+# Fix 7: Clean up temporary profiles
+function Remove-TemporaryProfiles {
+    Write-ColorOutput "Cleaning up temporary profiles..." "Yellow"
+    
+    $tempProfiles = Get-ChildItem -Path "C:\Users" -Filter "TEMP*" -Directory -ErrorAction SilentlyContinue
+    
+    if ($tempProfiles) {
+        foreach ($profile in $tempProfiles) {
+            try {
+                Remove-Item -Path $profile.FullName -Force -Recurse
+                Write-ColorOutput "Removed temporary profile: $($profile.FullName)" "Green"
+            }
+            catch {
+                Write-ColorOutput "ERROR removing temporary profile $($profile.FullName): $_" "Red"
+            }
+        }
+    }
+    else {
+        Write-ColorOutput "No temporary profiles found." "Green"
+    }
+}
+
+# Fix 8: Fix specific 23H2 issues - Registry tweaks
+function Set-23H2Fixes {
+    Write-ColorOutput "Setting specific Windows 11 23H2 fixes..." "Yellow"
+    
+    try {
+        # Fix 1: Adjust User Profile Service start type
+        Set-Service -Name "ProfSvc" -StartupType Automatic
+        
+        # Fix 2: Add registry optimization for User Profile Service
+        $regPath = "HKLM:\SYSTEM\CurrentControlSet\Services\ProfSvc\Parameters"
+        if (-not (Test-Path $regPath)) {
+            New-Item -Path $regPath -Force | Out-Null
+        }
+        
+        # Set optimized values
+        Set-ItemProperty -Path $regPath -Name "ServiceDll" -Value "%SystemRoot%\System32\profsvc.dll" -Type ExpandString
+        Set-ItemProperty -Path $regPath -Name "ServiceMain" -Value "UserProfileServiceMain" -Type String
+        Set-ItemProperty -Path $regPath -Name "ServiceDllUnloadOnStop" -Value 1 -Type DWord
+        
+        # Fix 3: Fix User Profile event channel
+        $eventCmd = "wevtutil set-log Microsoft-Windows-User Profile Service/Operational /enabled:true"
+        Invoke-Expression $eventCmd
+        
+        Write-ColorOutput "Windows 11 23H2 specific fixes applied." "Green"
+    }
+    catch {
+        Write-ColorOutput "ERROR applying 23H2 fixes: $_" "Red"
+    }
+}
+
+# Fix 9: Clear profile cache on domain controllers (if applicable)
+function Clear-DomainProfileCache {
+    Write-ColorOutput "Checking for domain environment..." "Yellow"
+    
+    $computerSystem = Get-CimInstance Win32_ComputerSystem
+    if ($computerSystem.PartOfDomain) {
+        Write-ColorOutput "Machine is domain-joined to: $($computerSystem.Domain)" "Green"
+        
+        # Prompt for domain admin credentials for remote operations
+        Write-ColorOutput "Would you like to clear profile cache on domain controllers? (Only select Y if you have domain admin privileges) (Y/N)" "Cyan"
+        $response = Read-Host
+        
+        if ($response.ToUpper() -eq "Y") {
+            $domainCred = Get-Credential -Message "Enter domain admin credentials" -UserName "$($computerSystem.Domain)\administrator"
+            
+            if ($domainCred) {
+                try {
+                    # Get domain controllers
+                    $dcs = Get-ADDomainController -Filter * -Credential $domainCred -ErrorAction Stop |
+                           Select-Object -ExpandProperty Name
+                    
+                    foreach ($dc in $dcs) {
+                        Write-ColorOutput "Connecting to domain controller: $dc" "Yellow"
+                        
+                        # Clear profile cache
+                        $session = New-PSSession -ComputerName $dc -Credential $domainCred -ErrorAction Stop
+                        
+                        Invoke-Command -Session $session -ScriptBlock {
+                            # Restart Netlogon service (refreshes profile cache)
+                            Restart-Service -Name Netlogon -Force
+                            Write-Output "Netlogon service restarted on $env:COMPUTERNAME"
+                        }
+                        
+                        Remove-PSSession $session
+                        Write-ColorOutput "Profile cache cleared on domain controller: $dc" "Green"
+                    }
+                }
+                catch {
+                    Write-ColorOutput "ERROR clearing domain profile cache: $_" "Red"
+                    Write-ColorOutput "You may need to contact your domain administrator to clear profile caches on the domain controllers." "Yellow"
+                }
+            }
+        }
+    }
+    else {
+        Write-ColorOutput "Machine is not domain-joined. Skipping domain profile cache clearing." "Green"
+    }
+}
+
+# Fix 10: Update user profile caching behavior
+function Update-ProfileCaching {
+    Write-ColorOutput "Updating profile caching behavior..." "Yellow"
+    
+    try {
+        # Enable profile unloading
+        $unloadPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Winlogon"
+        Set-ItemProperty -Path $unloadPath -Name "AutoRestartShell" -Value 1 -Type DWord
+        
+        # Set cached logons count for domain-joined machines
+        $computerSystem = Get-CimInstance Win32_ComputerSystem
+        if ($computerSystem.PartOfDomain) {
+            Set-ItemProperty -Path $unloadPath -Name "CachedLogonsCount" -Value 10 -Type String
+            Write-ColorOutput "Updated CachedLogonsCount to 10" "Green"
+        }
+        
+        Write-ColorOutput "Profile caching behavior updated." "Green"
+    }
+    catch {
+        Write-ColorOutput "ERROR updating profile caching: $_" "Red"
+    }
+}
+
+# Main script execution
 try {
-    $profiles = Get-ChildItem "C:\Users" | Where-Object { $_.PSIsContainer }
-    foreach ($profile in $profiles) {
-        $profileFolder = $profile.FullName
-        Write-Message "Checking permissions for $profileFolder..."
-        $acl = Get-Acl $profileFolder
-        $acl | Format-List | Out-File -Append -FilePath $logFilePath
-        Write-Host "$acl" -ForegroundColor Green
+    # Create registry backup before making changes
+    Backup-Registry
+    
+    # Start with easier fixes, then progress to more invasive ones
+    Reset-ProfileService
+    Repair-ProfileRegistry
+    Reset-CredentialManager
+    Remove-TemporaryProfiles
+    Update-ProfileCaching
+    Set-23H2Fixes
+    
+    # Ask user if they want to continue with more invasive fixes
+    Write-ColorOutput "Initial fixes complete. Would you like to continue with more comprehensive fixes?" "Cyan"
+    Write-ColorOutput "These may take longer and require a system restart afterwards. (Y/N)" "Cyan"
+    $response = Read-Host
+    
+    if ($response.ToUpper() -eq "Y") {
+        Repair-ProfilePermissions
+        Repair-GroupPolicy
+        Clear-DomainProfileCache
+        Repair-SystemFiles
+        
+        Write-ColorOutput "All fixes have been applied." "Green"
+        Write-ColorOutput "It is STRONGLY recommended to restart your computer now." "Yellow"
+        Write-ColorOutput "Would you like to restart now? (Y/N)" "Cyan"
+        $restart = Read-Host
+        
+        if ($restart.ToUpper() -eq "Y") {
+            Restart-Computer -Force
+        }
     }
-} catch {
-    Write-Message "Error while checking profile folder permissions: $_" "Red"
-}
-
-# 5. Check if Group Policy Profile Path is configured
-Write-Message "Checking Group Policy Profile Path (if configured)..."
-try {
-    $gpoProfilePath = Get-GPResultantSetOfPolicy -ReportType Html -Path "C:\GPOReport.html"
-    if ($gpoProfilePath -match "ProfilePath") {
-        Write-Message "Group Policy Profile Path is configured." "Red"
-    } else {
-        Write-Message "No GPO Profile Path configured." "Green"
+    else {
+        Write-ColorOutput "Basic fixes have been applied. Please restart your computer to apply changes." "Yellow"
     }
-} catch {
-    Write-Message "Unable to retrieve Group Policy result. Skipping..." "Yellow"
 }
-
-# 6. Check disk for errors
-Write-Message "Checking disk for errors (this may take a moment)..."
-try {
-    $diskCheckResult = Repair-Volume -DriveLetter C -Scan
-    if ($diskCheckResult -match "NoErrorsFound") {
-        Write-Message "Disk check completed with no errors." "Green"
-    } else {
-        Write-Message "Potential disk errors detected. Review logs above." "Red"
-    }
-} catch {
-    Write-Message "Error while performing disk check: $_" "Red"
+catch {
+    Write-ColorOutput "ERROR: Script execution failed: $_" "Red"
+    Write-ColorOutput "Please check the error message and try again." "Red"
 }
-
-# Final restart reminder
-Write-Message "Please restart the computer to apply changes." "Yellow"
