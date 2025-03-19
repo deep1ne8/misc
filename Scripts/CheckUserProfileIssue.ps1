@@ -1,60 +1,90 @@
-# Run this script as Administrator
-Write-Host "Checking for Windows 11 Temporary Profile Issues..." -ForegroundColor Cyan
+# PowerShell script to troubleshoot and fix Windows 11 temporary profile issues
+$logFilePath = "C:\Logs\Profile_Troubleshoot_Log.txt"
 
-# ---------------------- CHECK EVENT VIEWER FOR PROFILE ERRORS ----------------------
-Write-Host "`nChecking Event Viewer for profile errors..." -ForegroundColor Yellow
-$profileErrors = Get-EventLog -LogName Application -Source "User Profile Service" -Newest 20 | Where-Object { $_.EventID -in (1511, 1515) }
+# Create the log file if it doesn't exist
+if (-not (Test-Path "C:\Logs")) {
+    New-Item -Path "C:\" -Name "Logs" -ItemType Directory
+}
 
+# Function to write to both console and log file
+function Write-Message {
+    param (
+        [string]$message,
+        [string]$color = "White"
+    )
+    
+    # Write to console
+    Write-Host $message -ForegroundColor $color
+    
+    # Append to log file
+    $message | Out-File -Append -FilePath $logFilePath
+}
+
+# 1. Check Event Viewer for user profile errors
+Log-Message "Checking Event Viewer for profile errors..."
+$profileErrors = Get-WinEvent -LogName Application | Where-Object { $_.Id -in (1511, 1515, 1500, 1530, 1533) }
 if ($profileErrors) {
-    Write-Host "User Profile Service Errors Found!" -ForegroundColor Red
-    $profileErrors | Select-Object TimeGenerated, EventID, Message | Format-Table -AutoSize
+    Log-Message "User Profile Service Errors Found!" "Red"
+    $profileErrors | Select-Object TimeCreated, Id, Message | Format-Table -AutoSize | Out-File -Append -FilePath $logFilePath
 } else {
-    Write-Host "No User Profile Errors Found in Event Viewer." -ForegroundColor Green
+    Log-Message "No User Profile Errors Found in Event Viewer." "Green"
 }
 
-# ---------------------- CHECK WINDOWS REGISTRY FOR CORRUPT PROFILES ----------------------
-Write-Host "`nChecking Windows Registry for profile corruption..." -ForegroundColor Yellow
-$profileRegPath = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
-$corruptProfiles = Get-ChildItem -Path $profileRegPath | Where-Object { $_.Name -match '\.bak$' }
-
+# 2. Check for profile corruption in the Windows Registry
+Log-Message "Checking Windows Registry for profile corruption..."
+$corruptProfiles = Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" | Where-Object { $_.Name -match '\.bak$' }
 if ($corruptProfiles) {
-    Write-Host "Corrupt profile detected:" -ForegroundColor Red
-    $corruptProfiles | Select-Object Name
+    Log-Message "Corrupt profile detected:" "Red"
+    $corruptProfiles.Name | Out-File -Append -FilePath $logFilePath
+    Log-Message "Deleting corrupt profile registry entry..." "Red"
+    Remove-Item -Path $corruptProfiles.PSPath -Recurse -Force
+    Log-Message "Corrupt profile registry entry deleted. Restart the computer." "Green"
 } else {
-    Write-Host "No corrupt profiles found in the registry." -ForegroundColor Green
+    Log-Message "No corrupt profiles found in registry." "Green"
 }
 
-# ---------------------- CHECK IF USER PROFILE EXISTS ON DISK ----------------------
-Write-Host "`nChecking if user profile exists on disk..." -ForegroundColor Yellow
-$profilesOnDisk = Get-ChildItem "C:\Users" | Select-Object Name
-Write-Host "Existing User Profiles on Disk:" -ForegroundColor Cyan
-$profilesOnDisk | Format-Table -AutoSize
-
-# ---------------------- CHECK PROFILE FOLDER PERMISSIONS ----------------------
-$profilePath = "C:\Users"
-Write-Host "`nChecking profile folder permissions..." -ForegroundColor Yellow
-$profilePermissions = Get-Acl $profilePath | Select-Object -ExpandProperty Access
-$profilePermissions | Format-Table IdentityReference, FileSystemRights, AccessControlType -AutoSize
-
-# ---------------------- CHECK GPO PROFILE PATH ----------------------
-Write-Host "`nChecking Group Policy Profile Path (if configured)..." -ForegroundColor Yellow
-$gpoProfilePath = Get-ItemProperty -Path "HKLM:\Software\Microsoft\Windows\CurrentVersion\Policies\System" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty "ProfilePath"
-if ($gpoProfilePath) {
-    Write-Host "Group Policy is redirecting profiles to: $gpoProfilePath" -ForegroundColor Red
+# 3. Check if the user profile exists on disk
+Log-Message "Checking if user profile exists on disk..."
+$profileList = Get-ChildItem "C:\Users" | Select-Object -ExpandProperty Name
+$profileList | ForEach-Object { Log-Message "Existing Profile: $_" }
+if ($profileList -contains 'TEMP') {
+    Log-Message "Temporary profile detected. Deleting..." "Red"
+    Remove-Item -Path "C:\Users\TEMP" -Recurse -Force
+    Log-Message "TEMP profile deleted. Restart the computer." "Green"
 } else {
-    Write-Host "No GPO Profile Path configured." -ForegroundColor Green
+    Log-Message "No TEMP profile found." "Green"
 }
 
-# ---------------------- CHECK DISK FOR ERRORS ----------------------
-Write-Host "`nChecking disk for errors (this may take a moment)..." -ForegroundColor Yellow
-$diskErrors = Get-WinEvent -LogName System -MaxEvents 50 | Where-Object { $_.Id -in (7, 55, 98, 26226) }
-if ($diskErrors) {
-    Write-Host "Potential disk errors detected! Review the logs below:" -ForegroundColor Red
-    $diskErrors | Select-Object TimeCreated, Id, Message | Format-Table -AutoSize
-} else {
-    Write-Host "No disk errors detected." -ForegroundColor Green
+# 4. Check profile folder permissions
+Log-Message "Checking profile folder permissions..."
+$profileFolder = "C:\Users\BMason" # Replace with the actual profile name
+$acl = Get-Acl $profileFolder
+$acl | Format-List | Out-File -Append -FilePath $logFilePath
+# Ensure the user has FullControl (F)
+icacls $profileFolder /grant BMason:(F) /T
+Log-Message "Permissions for $profileFolder updated." "Green"
+
+# 5. Check if Group Policy Profile Path is configured
+Log-Message "Checking Group Policy Profile Path (if configured)..."
+try {
+    $gpoProfilePath = Get-GPResultantSetOfPolicy -ReportType Html -Path "C:\GPOReport.html"
+    if ($gpoProfilePath -match "ProfilePath") {
+        Log-Message "Group Policy Profile Path is configured." "Red"
+    } else {
+        Log-Message "No GPO Profile Path configured." "Green"
+    }
+} catch {
+    Log-Message "Unable to retrieve Group Policy result. Skipping..." "Yellow"
 }
 
-Write-Host "`nTroubleshooting completed. Review the results and proceed with fixes if needed." -ForegroundColor Cyan
+# 6. Check disk for errors
+Log-Message "Checking disk for errors (this may take a moment)..."
+$diskCheckResult = chkdsk
+if ($diskCheckResult -match "is healthy") {
+    Log-Message "Disk check completed with no errors." "Green"
+} else {
+    Log-Message "Potential disk errors detected. Review logs above." "Red"
+}
 
-# ---------------------- END OF SCRIPT ----------------------
+# Final restart reminder
+Log-Message "Please restart the computer to apply changes." "Yellow"
