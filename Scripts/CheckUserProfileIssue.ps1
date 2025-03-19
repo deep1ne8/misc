@@ -48,9 +48,14 @@ Write-Message "Checking if user profile exists on disk..."
 $profileList = Get-ChildItem "C:\Users" | Select-Object -ExpandProperty Name
 $profileList | ForEach-Object { Write-Message "Existing Profile: $_" }
 if ($profileList -contains 'TEMP') {
-    Write-Message "Temporary profile detected. Deleting..." "Red"
-    Remove-Item -Path "C:\Users\TEMP" -Recurse -Force
-    Write-Message "TEMP profile deleted. Restart the computer." "Green"
+    Write-Message "Temporary profile detected. Attempting to delete..." "Red"
+    try {
+        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path "C:\Users\TEMP" -Recurse -Force
+        Write-Message "TEMP profile deleted successfully. Restart the computer." "Green"
+    } catch {
+        Write-Message "Failed to delete TEMP profile. Ensure no processes are using the files and try again." "Red"
+    }
 } else {
     Write-Message "No TEMP profile found." "Green"
 }
