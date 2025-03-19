@@ -59,13 +59,14 @@ try {
     $profileList = Get-ChildItem "C:\Users" | Select-Object -ExpandProperty Name
     $profileList | ForEach-Object { Write-Message "Existing Profile: $_" }
     if ($profileList -contains 'TEMP') {
-        Write-Message "Temporary profile detected. Attempting to delete..." "Red"
+        Write-Message "Temporary profile detected...." "Red"
         try {
-            Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-            Remove-Item -Path "C:\Users\TEMP" -Recurse -Force
-            Write-Message "TEMP profile deleted successfully. Restart the computer." "Green"
+            #Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+            #Remove-Item -Path "C:\Users\TEMP" -Recurse -Force -ErrorAction SilentlyContinue
+            $profileList
+            Write-Message "TEMP profile detected.." "Green"
         } catch {
-            Write-Message "Failed to delete TEMP profile. Ensure no processes are using the files and try again." "Red"
+            Write-Message "Please delete TEMP profile." "Red"
         }
     } else {
         Write-Message "No TEMP profile found." "Green"
@@ -83,6 +84,7 @@ try {
         Write-Message "Checking permissions for $profileFolder..."
         $acl = Get-Acl $profileFolder
         $acl | Format-List | Out-File -Append -FilePath $logFilePath
+        Write-Host "$acl | Format-List"
     }
 } catch {
     Write-Message "Error while checking profile folder permissions: $_" "Red"
@@ -104,8 +106,8 @@ try {
 # 6. Check disk for errors
 Write-Message "Checking disk for errors (this may take a moment)..."
 try {
-    $diskCheckResult = chkdsk
-    if ($diskCheckResult -match "is healthy") {
+    $diskCheckResult = Repair-Volume -DriveLetter C -Scan
+    if ($diskCheckResult -match "NoErrorsFound") {
         Write-Message "Disk check completed with no errors." "Green"
     } else {
         Write-Message "Potential disk errors detected. Review logs above." "Red"
