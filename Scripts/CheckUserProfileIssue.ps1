@@ -123,62 +123,86 @@ function Repair-ProfilePermissions {
     $userFolders = Get-ChildItem -Path "C:\Users" -Directory | Where-Object { $_.Name -notmatch "Public|Default|defaultuser0|All Users" }
     
     foreach ($folder in $userFolders) {
-        $username = $folder.Name
-        Write-ColorOutput "Checking permissions for $username profile..." "Yellow"
+        $folderName = $folder.Name
+        Write-ColorOutput "Checking permissions for profile folder: $folderName..." "Yellow"
         
-        # Get username from folder
-        $ntAccount = New-Object System.Security.Principal.NTAccount("$username")
-        try {
-            $sid = $ntAccount.Translate([System.Security.Principal.SecurityIdentifier]).Value
-        }
-        catch {
-            Write-ColorOutput "Could not translate $username to SID, skipping..." "Yellow"
-            continue
-        }
-        
-        # Check if profile exists in registry
-        $profileInRegistry = Test-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid"
-        if (-not $profileInRegistry) {
-            $profileInRegistry = Test-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid.bak"
+        # First try to find the SID from the registry that maps to this folder name
+        $foundSid = $null
+        $profileList = Get-ChildItem "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList" | 
+                       Where-Object { $_.PSChildName -match 'S-1-5-21' }
+                       
+        foreach ($profile in $profileList) {
+            $profilePath = (Get-ItemProperty -Path $profile.PSPath -Name "ProfileImagePath" -ErrorAction SilentlyContinue).ProfileImagePath
+            if ($profilePath -and $profilePath -eq "C:\Users\$folderName") {
+                $foundSid = $profile.PSChildName
+                break
+            }
         }
         
-        if ($profileInRegistry) {
+        # If we couldn't find it in registry, try to translate the folder name to a SID as fallback
+        if (-not $foundSid) {
             try {
-                # Reset permissions on the profile folder
-                $folderPath = $folder.FullName
-                
-                # Take ownership
-                $takeown = Start-Process -FilePath "takeown.exe" -ArgumentList "/f `"$folderPath`" /r /d y" -NoNewWindow -Wait -PassThru
-                
-                # Grant the user full control
-                $icacls = Start-Process -FilePath "icacls.exe" -ArgumentList "`"$folderPath`" /grant `"$username`":(F) /t /c /q" -NoNewWindow -Wait -PassThru
+                $ntAccount = New-Object System.Security.Principal.NTAccount("$folderName")
+                $foundSid = $ntAccount.Translate([System.Security.Principal.SecurityIdentifier]).Value
+            }
+            catch {
+                Write-ColorOutput "Could not determine SID for folder $folderName, using folder name as username..." "Yellow"
+                $foundSid = $null
+            }
+        }
+        
+        # Use the actual folder name for operations regardless of SID resolution
+        $folderName = $folder.Name
+        $folderPath = $folder.FullName
+        
+        # Check if profile exists in registry if we found a SID
+        $profileInRegistry = $false
+        if ($foundSid) {
+            $profileInRegistry = Test-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$foundSid"
+            if (-not $profileInRegistry) {
+                $profileInRegistry = Test-Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$foundSid.bak"
+            }
+        }
+        
+        # Proceed with repair even if not in registry - using folder name as the actual username
+        try {
+            # Reset permissions on the profile folder
+            Write-ColorOutput "Repairing permissions for folder: $folderPath" "Yellow"
+            
+            # Take ownership
+            $takeown = Start-Process -FilePath "takeown.exe" -ArgumentList "/f `"$folderPath`" /r /d y" -NoNewWindow -Wait -PassThru
+            
+            # Grant the user full control - using actual folder name
+            $icacls = Start-Process -FilePath "icacls.exe" -ArgumentList "`"$folderPath`" /grant `"$folderName`":(F) /t /c /q" -NoNewWindow -Wait -PassThru
                 
                 if ($takeown.ExitCode -eq 0 -and $icacls.ExitCode -eq 0) {
-                    Write-ColorOutput "Successfully repaired permissions for $username profile" "Green"
+                    Write-ColorOutput "Successfully repaired permissions for $folderName profile" "Green"
                 }
                 else {
-                    Write-ColorOutput "Error resetting permissions for $username profile" "Red"
+                    Write-ColorOutput "Error resetting permissions for $folderName profile" "Red"
                 }
                 
                 # Fix AppData folder specifically
                 $appDataPath = "$folderPath\AppData"
                 if (Test-Path $appDataPath) {
                     $takeownAppData = Start-Process -FilePath "takeown.exe" -ArgumentList "/f `"$appDataPath`" /r /d y" -NoNewWindow -Wait -PassThru
-                    $icaclsAppData = Start-Process -FilePath "icacls.exe" -ArgumentList "`"$appDataPath`" /grant `"$username`":(F) /t /c /q" -NoNewWindow -Wait -PassThru
+                    $icaclsAppData = Start-Process -FilePath "icacls.exe" -ArgumentList "`"$appDataPath`" /grant `"$folderName`":(F) /t /c /q" -NoNewWindow -Wait -PassThru
                     
                     if ($takeownAppData.ExitCode -eq 0 -and $icaclsAppData.ExitCode -eq 0) {
-                        Write-ColorOutput "Successfully repaired permissions for $username AppData folder" "Green"
+                        Write-ColorOutput "Successfully repaired permissions for $folderName AppData folder" "Green"
                     }
                 }
             }
             catch {
                 Write-ColorOutput "ERROR repairing permissions: $_" "Red"
-            }
         }
         else {
-            Write-ColorOutput "No registry entry found for $username profile, cannot fully repair." "Yellow"
+            # Just inform but continue anyway
+            Write-ColorOutput "No registry entry found for $folderName profile folder, proceeding with repair anyway." "Yellow"
         }
     }
+    
+    Write-ColorOutput "Profile permission repairs completed." "Green"
 }
 
 # Fix 4: Rebuild corrupted Group Policy settings
