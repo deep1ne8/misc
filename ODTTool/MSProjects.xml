@@ -1,6 +1,6 @@
 <Configuration>
     <Add OfficeClientEdition="64" Channel="PerpetualVL2016">
-        <Product ID="ProjectStdXVolume" PIDKEY="REDACTED_OFFICE_MAK">
+        <Product ID="ProjectStdXVolume" PIDKEY="">
             <Language ID="en-us" />
             <ExcludeApp ID="Groove" />
         </Product>
