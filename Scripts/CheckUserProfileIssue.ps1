@@ -55,14 +55,18 @@ if ($profileList -contains 'TEMP') {
     Write-Message "No TEMP profile found." "Green"
 }
 
-# 4. Check profile folder permissions
-Write-Message "Checking profile folder permissions..."
-$profileFolder = "C:\Users\BMason" # Replace with the actual profile name
-$acl = Get-Acl $profileFolder
-$acl | Format-List | Out-File -Append -FilePath $logFilePath
-# Ensure the user has FullControl (F)
-icacls $profileFolder /grant BMason:(F) /T
-Write-Message "Permissions for $profileFolder updated." "Green"
+# 4. Check profile folder permissions for all users
+Write-Message "Checking profile folder permissions for all user profiles..."
+$profiles = Get-ChildItem "C:\Users" | Where-Object { $_.PSIsContainer }
+foreach ($profile in $profiles) {
+    $profileFolder = $profile.FullName
+    Write-Message "Checking permissions for $profileFolder..."
+    $acl = Get-Acl $profileFolder
+    $acl | Format-List | Out-File -Append -FilePath $logFilePath
+    # Ensure the user has FullControl (F)
+    icacls $profileFolder /grant *S-1-5-32-544:(F) /T
+    Write-Message "Permissions for $profileFolder updated." "Green"
+}
 
 # 5. Check if Group Policy Profile Path is configured
 Write-Message "Checking Group Policy Profile Path (if configured)..."
