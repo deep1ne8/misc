@@ -3,51 +3,72 @@ $pingCount = 10
 $results = @()
 $wifiSignal = $null
 
-# Function to calculate jitter
+# Function to calculate jitter manually (PS 5.1 does not support .Average on arrays)
 function Get-Jitter {
     param([int[]]$latencies)
     if ($latencies.Count -lt 2) { return 0 }
+
     $differences = @()
     for ($i = 1; $i -lt $latencies.Count; $i++) {
         $differences += [math]::Abs($latencies[$i] - $latencies[$i - 1])
     }
+
     return [math]::Round(($differences | Measure-Object -Average).Average, 2)
 }
 
-# Function to perform latency test
+# Function to perform latency test with live progress output
 function Test-Latency {
     param([string]$target)
-    $pings = Test-Connection -ComputerName $target -Count $pingCount -ErrorAction SilentlyContinue
-    $latencies = @()
     
-    if ($pings) {
-        foreach ($ping in $pings) {
-            $latencies += $ping.ResponseTime
+    Write-Host "`nTesting latency to: $target..." -ForegroundColor Cyan
+    $latencies = @()
+    $lostPackets = 0
+
+    for ($i = 1; $i -le $pingCount; $i++) {
+        $ping = Test-Connection -ComputerName $target -Count 1 -ErrorAction SilentlyContinue
+
+        if ($ping) {
+            $latency = $ping.ResponseTime
+            $latencies += $latency
+            Write-Host "[Ping $i] ✅ $latency ms" -ForegroundColor Green -NoNewline
+        } else {
+            $lostPackets++
+            Write-Host "[Ping $i] ❌ Request timed out" -ForegroundColor Red -NoNewline
         }
+
+        Write-Host " | Progress: [$i/$pingCount]"
+        Start-Sleep -Milliseconds 500  # Small delay for readability
     }
 
-    # Calculate statistics
-    $min = ($latencies | Measure-Object -Minimum).Minimum
-    $max = ($latencies | Measure-Object -Maximum).Maximum
-    $avg = ($latencies | Measure-Object -Average).Average
-    $loss = 100 - (($latencies.Count / $pingCount) * 100)
-    $jitter = Get-Jitter -latencies $latencies
+    if ($latencies.Count -gt 0) {
+        $min = ($latencies | Measure-Object -Minimum).Minimum
+        $max = ($latencies | Measure-Object -Maximum).Maximum
+        $avg = ($latencies | Measure-Object -Average).Average
+        $loss = [math]::Round(($lostPackets / $pingCount) * 100, 2)
+        $jitter = Get-Jitter -latencies $latencies
+    } else {
+        $min = "N/A"
+        $max = "N/A"
+        $avg = "N/A"
+        $loss = "100%"
+        $jitter = "N/A"
+    }
 
     return [PSCustomObject]@{
         Target = $target
-        Avg = [math]::Round($avg, 2)
-        Min = $min
-        Max = $max
+        Avg = "$avg ms"
+        Min = "$min ms"
+        Max = "$max ms"
         Loss = "$loss%"
         Jitter = "$jitter ms"
     }
 }
 
-# Function to check Wi-Fi signal strength
+# Function to check Wi-Fi signal strength (PS 5.1 Compatible)
 function Get-WiFi-Signal {
     $wifiInfo = netsh wlan show interfaces | Select-String "Signal"
     if ($wifiInfo) {
-        $signalStrength = $wifiInfo -replace ".*Signal\s*:\s*", "" -replace "%", ""
+        $signalStrength = (($wifiInfo -match "Signal\s*:\s*(\d+)") | Out-Null); $matches[1] -as [int]
         $rssi = [math]::Round(($signalStrength / 2) - 100, 2) # Convert % to RSSI (dBm)
         return $rssi
     }
@@ -63,6 +84,7 @@ foreach ($target in $targets) {
 }
 
 # Display results
+Write-Host "`n--- Final Latency Results ---" -ForegroundColor Cyan
 $results | Format-Table -AutoSize -Property Target, Avg, Min, Max, Loss, Jitter
 
 # Wi-Fi Signal Analysis
@@ -79,37 +101,5 @@ if ($null -ne $wifiSignal) {
         Write-Host "🚨 Weak Signal Strength! (High chance of packet loss and lag)" -ForegroundColor Red
         Write-Host "   🔎 Possible Causes: Distance from router, interference from walls/devices."
         Write-Host "   🛠 Potential Solutions: Move closer to router, switch to 5GHz band, reduce interference, or upgrade router."
-    }
-}
-
-# Network Analysis with Causes & Solutions
-Write-Host "`n--- Network Analysis ---" -ForegroundColor Cyan
-foreach ($result in $results) {
-    Write-Host "`nAnalyzing: $($result.Target)" -ForegroundColor Green
-
-    # Packet Loss Analysis
-    if ($result.Loss -match "\d+" -and [int]$result.Loss -gt 2) {
-        Write-Host "⚠️ Packet Loss Detected: $($result.Loss)" -ForegroundColor Yellow
-        Write-Host "   🔎 Possible Causes: ISP issues, router congestion, weak WiFi signal, firewall interference."
-        Write-Host "   🛠 Potential Solutions: Restart router, switch to a wired connection, check ISP status, reduce network load."
-    }
-
-    # High Latency Spikes
-    if ($result.Max -gt 150) {
-        Write-Host "⚠️ High Latency Spikes: Max = $($result.Max) ms" -ForegroundColor Red
-        Write-Host "   🔎 Possible Causes: Network congestion, ISP throttling, poor routing, VPN interference."
-        Write-Host "   🛠 Potential Solutions: Restart modem, change DNS servers, disable VPN, check for background downloads."
-    }
-
-    # High Jitter Detection
-    if ($result.Jitter -match "\d+" -and [int]$result.Jitter -gt 10) {
-        Write-Host "⚠️ High Jitter: $($result.Jitter)" -ForegroundColor Yellow
-        Write-Host "   🔎 Possible Causes: Wireless interference, overloaded router, ISP instability."
-        Write-Host "   🛠 Potential Solutions: Use wired connection, upgrade router, reduce connected devices."
-    }
-
-    # Stable Connection Analysis
-    if ($result.Loss -eq "0%" -and $result.Max -le 150 -and [int]$result.Jitter -le 10) {
-        Write-Host "✅ Connection is stable for $($result.Target)" -ForegroundColor Green
     }
 }
