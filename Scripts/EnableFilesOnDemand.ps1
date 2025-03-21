@@ -67,7 +67,7 @@ try {
     Write-Log "Getting OneDrive folder path for: $UserName" "VERBOSE"
     Write-Host ""
     try {
-        $OneDrivePath = (Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OneDrive - *" }).FullName
+        $OneDrivePath = (Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OneDrive *" }).FullName
     } catch {
         throw "OneDrive folder path not found for user $LoggedInUser."
     }
