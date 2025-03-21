@@ -134,7 +134,7 @@ $script:ScriptDefinitions = @(
         RequiresAdmin = $false
     },
     @{ 
-        ScriptUrl = "$script:ScriptRepository/InternetLatencyTest.ps1"
+        ScriptUrl = "$script:ScriptRepository/InternetLatencyTestNew.ps1"
         Description = "Internet Latency Test" 
         Category = "Network Diagnostics"
         Details = "Tests network latency to various endpoints"
@@ -1309,7 +1309,7 @@ function Exit-Application {
     
     # Exit with a slight delay for visual feedback
     Start-Sleep -Seconds 1
-    exit
+    return 1
 }
 #endregion
 
@@ -1342,6 +1342,6 @@ catch {
     $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     
     # Exit with error code
-    exit 1
+    return
 }
 #endregion
