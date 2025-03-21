@@ -1309,8 +1309,8 @@ function Exit-Application {
     
     # Exit with a slight delay for visual feedback
     Start-Sleep -Seconds 1
-    return 1
-}
+    return
+} 
 #endregion
 
 #region Main Execution
