@@ -627,23 +627,22 @@ function Invoke-ScriptFromUrl {
         return $true
     }
     catch {
-        Write-Log "Error executing script from URL: $_" -Level ERROR
-        Write-Host "Error: $($_.Exception.Message)" -ForegroundColor $script:Colors.Error
-        
-        # Clean up on failure
-        if (Test-Path -Path $tempScriptPath) {
-            Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
+                Write-Log "Error executing script from URL: $_" -Level ERROR
+                Write-Host "Error: $($_.Exception.Message)" -ForegroundColor $script:Colors.Error
+                
+                # Clean up temporary script file
+                if (Test-Path -Path $tempScriptPath) {
+                    Remove-Item -Path $tempScriptPath -Force -ErrorAction SilentlyContinue
+            }
         }
-        
-        return $false
     }
-}
 
-function Show-ScriptCategoryMenu {
+function Show-ScriptCategories {
     <#
     .SYNOPSIS
         Displays scripts grouped by category
     #>
+
     [CmdletBinding()]
     param()
     
