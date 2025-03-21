@@ -30,10 +30,10 @@ function Test-Latency {
         if ($ping) {
             $latency = $ping.ResponseTime
             $latencies += $latency
-            Write-Host "[Ping $i] ✅ $latency ms" -ForegroundColor Green -NoNewline
+            Write-Host "[Ping $i] $latency ms" -ForegroundColor Green -NoNewline
         } else {
             $lostPackets++
-            Write-Host "[Ping $i] ❌ Request timed out" -ForegroundColor Red -NoNewline
+            Write-Host "[Ping $i] Request timed out" -ForegroundColor Red -NoNewline
         }
 
         Write-Host " | Progress: [$i/$pingCount]"
@@ -101,14 +101,14 @@ if ($null -ne $wifiSignal) {
     Write-Host "`n--- Wi-Fi Signal Analysis ---" -ForegroundColor Cyan
     Write-Host "Signal Strength: $wifiSignal dBm" -ForegroundColor Yellow
     if ($wifiSignal -gt -50) {
-        Write-Host "✅ Excellent Signal Strength (Strong Connection)" -ForegroundColor Green
+        Write-Host "Excellent Signal Strength (Strong Connection)" -ForegroundColor Green
     } elseif ($wifiSignal -gt -60) {
-        Write-Host "✅ Good Signal Strength (Stable Connection)" -ForegroundColor Green
+        Write-Host "Good Signal Strength (Stable Connection)" -ForegroundColor Green
     } elseif ($wifiSignal -gt -70) {
-        Write-Host "⚠️ Moderate Signal Strength (May cause occasional lag)" -ForegroundColor Yellow
+        Write-Host "Moderate Signal Strength (May cause occasional lag)" -ForegroundColor Yellow
     } else {
-        Write-Host "🚨 Weak Signal Strength! (High chance of packet loss and lag)" -ForegroundColor Red
-        Write-Host "   🔎 Possible Causes: Distance from router, interference from walls/devices."
-        Write-Host "   🛠 Potential Solutions: Move closer to router, switch to 5GHz band, reduce interference, or upgrade router."
+        Write-Host "Weak Signal Strength! (High chance of packet loss and lag)" -ForegroundColor Red
+        Write-Host "Possible Causes: Distance from router, interference from walls/devices."
+        Write-Host "Potential Solutions: Move closer to router, switch to 5GHz band, reduce interference, or upgrade router."
     }
 }
