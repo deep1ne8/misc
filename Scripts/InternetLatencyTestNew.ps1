@@ -66,13 +66,22 @@ function Test-Latency {
 
 # Function to check Wi-Fi signal strength (PS 5.1 Compatible)
 function Get-WiFi-Signal {
-    $wifiInfo = netsh wlan show interfaces | Select-String "Signal"
-    if ($wifiInfo) {
-        $signalStrength = (($wifiInfo -match "Signal\s*:\s*(\d+)") | Out-Null); $matches[1] -as [int]
-        $rssi = [math]::Round(($signalStrength / 2) - 100, 2) # Convert % to RSSI (dBm)
-        return $rssi
+    try {
+        $wifiInfo = netsh wlan show interfaces | Select-String "Signal"
+        if ($wifiInfo) {
+            if ($wifiInfo -match "Signal\s*:\s*(\d+)") {
+                $signalStrength = $matches[1] -as [int]
+                if ($signalStrength -ne $null) {
+                    $rssi = [math]::Round(($signalStrength / 2) - 100, 2) # Convert % to RSSI (dBm)
+                    return $rssi
+                }
+            }
+        }
+        return $null
+    } catch {
+        Write-Host "Error retrieving Wi-Fi signal strength: $_" -ForegroundColor Red
+        return $null
     }
-    return $null
 }
 
 # Check if on Wi-Fi and get signal strength
