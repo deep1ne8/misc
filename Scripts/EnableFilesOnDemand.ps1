@@ -67,7 +67,18 @@ try {
     Write-Log "Getting OneDrive folder path for: $UserName" "VERBOSE"
     Write-Host ""
     try {
-        $OneDrivePath = (Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OneDrive*" })
+        $OneDriveFolders = Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OneDrive*" }
+        if ($OneDriveFolders) {
+            Write-Log "Found the following OneDrive folders:" "INFO"
+            foreach ($Folder in $OneDriveFolders) {
+                Write-Log " - $($Folder.FullName)" "INFO"
+            }
+            # Use the first OneDrive folder as the path
+            $OneDrivePath = $OneDriveFolders[0].FullName
+        } else {
+            Write-Log "No OneDrive folders found in the user's profile." "WARNING"
+            throw "OneDrive folder path not found for user $UserName."
+        }
     } catch {
         Write-Log "Error occurred while getting OneDrive folder path: $_" "ERROR"
         $OneDriveFolders = Get-ChildItem -Path "$($UserProfileFolder.FullName)" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like "OneDrive*" }
