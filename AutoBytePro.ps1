@@ -64,10 +64,10 @@ $script:ScriptDefinitions = @(
         RequiresAdmin = $true
     },
     @{ 
-        ScriptUrl = "$script:ScriptRepository/EnableFilesOnDemand.ps1"
-        Description = "Enable Files On-Demand"
-        Category = "Cloud Storage"
-        Details = "Configures OneDrive Files On-Demand feature"
+        ScriptUrl = "$script:ScriptRepository/InstallOffice.ps1"
+        Description = "Office365 Deployment"
+        Category = "Software Installation"
+        Details = "Installs Microsoft Office 365 applications"
         RequiresAdmin = $true
     },
     @{ 
