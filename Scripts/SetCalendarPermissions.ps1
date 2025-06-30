@@ -119,7 +119,7 @@ function Export-CalendarPermissionsForAllMailboxes {
 
 function Import-MailboxesFromCSV {
     param([string]$Path)
-    if (-not (Test-Path $Path)) { Write-Log "CSV not found: $Path" "ERROR"; return @() }
+    if (-not (Test-Path $Path)) { Write-Log "CSV not found: ${Path}" "ERROR"; return @() }
     $csv = Import-Csv -Path $Path
     $col = ($csv | Get-Member -MemberType NoteProperty).Name | Where-Object { $_ -match "Email|UPN" } | Select-Object -First 1
     if (-not $col) { Write-Log "No valid email/UPN column in CSV." "ERROR"; return @() }
@@ -147,7 +147,7 @@ function Set-ModernCalendarPermissions {
                     Write-Log "Added $Permission to $email" "SUCCESS"
                 }
             }
-        } catch { Write-Log "Failed for $email: $_" "ERROR" }
+        } catch { Write-Log "Failed for ${email}: $_" "ERROR" }
     }
 }
 
