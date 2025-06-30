@@ -68,7 +68,7 @@ function Write-Progress-Enhanced {
     $statusText = "$Status - $Current of $Total ($percent%)"
     if ($CurrentItem) { $statusText += " - $CurrentItem" }
     Write-Progress -Activity $Activity -Status $statusText -PercentComplete $percent
-    Write-Log "Progress: $statusText" "VERBOSE"
+    Write-Log "Progress: ${statusText}" "VERBOSE"
 }
 
 function Test-ModernExchangeConnection {
