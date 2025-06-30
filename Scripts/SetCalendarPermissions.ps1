@@ -129,7 +129,7 @@ function Import-MailboxesFromCSV {
 function Set-ModernCalendarPermissions {
     param([string[]]$EmailAddresses, [string]$Permission, [switch]$WhatIf)
     foreach ($email in $EmailAddresses) {
-        $path = "$email:\Calendar"
+        $path = "${email}:\Calendar"
         try {
             $existing = Get-EXOMailboxFolderPermission -Identity $path -User Default -ErrorAction SilentlyContinue
             if ($existing -and $existing.AccessRights -contains $Permission) {
