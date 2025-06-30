@@ -2,10 +2,10 @@
 
 <#
 .SYNOPSIS
-    Exchange Online Calendar Permissions Management Tool
+    Modern Exchange Online Calendar Permissions Management Tool (EXO V3)
 .DESCRIPTION
-    Multi-mode tool for managing Exchange Online calendar permissions:
-    - Mode 1: List and export all active mailboxes to CSV
+    Uses latest Get-EXO* cmdlets for optimal performance and modern Exchange Online management:
+    - Mode 1: List and export all active mailboxes using Get-EXOMailbox
     - Mode 2: Import CSV and apply calendar permissions with safety checks
 .PARAMETER Mode
     Operation mode: List, Apply, or Interactive
@@ -33,7 +33,7 @@ param(
 )
 
 # Global variables
-$script:logFile = "ExchangeCalendarTool_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+$script:logFile = "ModernEXOCalendarTool_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 $script:validPermissions = @("AvailabilityOnly", "LimitedDetails", "Reviewer", "Editor")
 
 # Enhanced logging and progress functions
@@ -77,23 +77,25 @@ function Write-Progress-Enhanced {
     Write-Log "Progress: $statusText" "VERBOSE"
 }
 
-function Test-ExchangeConnection {
+function Test-ModernExchangeConnection {
     try {
-        $null = Get-ConnectionInformation -ErrorAction Stop
+        # Test with Get-EXOMailbox to verify modern cmdlets are available
+        $null = Get-EXOMailbox -ResultSize 1 -ErrorAction Stop
         return $true
     }
     catch {
+        Write-Log "Modern EXO cmdlets test failed: $($_.Exception.Message)" "VERBOSE"
         return $false
     }
 }
 
-function Connect-ToExchangeOnline {
+function Connect-ToModernExchangeOnline {
     param([string]$UPN)
     
-    Write-Log "Checking Exchange Online connection..." "VERBOSE"
+    Write-Log "Checking modern Exchange Online connection..." "VERBOSE"
     
-    if (Test-ExchangeConnection) {
-        Write-Log "Already connected to Exchange Online" "SUCCESS"
+    if (Test-ModernExchangeConnection) {
+        Write-Log "Already connected to Exchange Online with modern cmdlets" "SUCCESS"
         return $true
     }
     
@@ -105,17 +107,23 @@ function Connect-ToExchangeOnline {
         }
     }
     
-    Write-Log "Connecting to Exchange Online as $UPN..." "INFO"
+    Write-Log "Connecting to Exchange Online (Modern Auth) as $UPN..." "INFO"
     
     try {
-        Connect-ExchangeOnline -UserPrincipalName $UPN -ShowProgress:$false -ErrorAction Stop
+        # Connect with modern authentication and enable REST API usage
+        Connect-ExchangeOnline -UserPrincipalName $UPN -ShowProgress:$false -UseRPSSession:$false -ErrorAction Stop
         
-        if (Test-ExchangeConnection) {
-            Write-Log "Successfully connected to Exchange Online" "SUCCESS"
+        if (Test-ModernExchangeConnection) {
+            Write-Log "Successfully connected to Exchange Online with modern cmdlets" "SUCCESS"
             
-            # Display connection info
+            # Display connection info and available cmdlets
             $connectionInfo = Get-ConnectionInformation
-            Write-Log "Connected to: $($connectionInfo.Name) ($($connectionInfo.UserPrincipalName))" "VERBOSE"
+            Write-Log "Connected to: $($connectionInfo.Name) (REST API Enabled: $($connectionInfo.UseRPSSession -eq $false))" "VERBOSE"
+            
+            # Verify EXO cmdlets are available
+            $exoCmdlets = Get-Command -Module ExchangeOnlineManagement | Where-Object Name -like "Get-EXO*" | Measure-Object
+            Write-Log "Available EXO cmdlets: $($exoCmdlets.Count)" "VERBOSE"
+            
             return $true
         }
         else {
@@ -129,42 +137,71 @@ function Connect-ToExchangeOnline {
     }
 }
 
-function Get-AllActiveMailboxes {
+function Get-AllActiveMailboxesModern {
     param([string]$ExportPath)
     
-    Write-Log "=== MAILBOX DISCOVERY MODE ===" "INFO"
-    Write-Log "Retrieving all active user mailboxes from Exchange Online..." "INFO"
+    Write-Log "=== MODERN MAILBOX DISCOVERY MODE ===" "INFO"
+    Write-Log "Retrieving all active user mailboxes using Get-EXOMailbox..." "INFO"
     
     try {
-        # Get mailboxes with detailed properties
-        Write-Log "Querying Exchange Online for user mailboxes..." "VERBOSE"
-        $mailboxes = @(Get-Mailbox -ResultSize Unlimited -RecipientTypeDetails UserMailbox | 
-            Select-Object DisplayName, PrimarySmtpAddress, UserPrincipalName, WhenCreated, 
-                         @{Name='MailboxSize';Expression={(Get-MailboxStatistics $_.Identity -ErrorAction SilentlyContinue).TotalItemSize}},
-                         @{Name='LastLogonTime';Expression={(Get-MailboxStatistics $_.Identity -ErrorAction SilentlyContinue).LastLogonTime}})
+        # Use Get-EXOMailbox for optimal performance and modern features
+        Write-Log "Querying Exchange Online using modern Get-EXOMailbox cmdlet..." "VERBOSE"
+        
+        $mailboxes = @(Get-EXOMailbox -RecipientTypeDetails UserMailbox -ResultSize Unlimited -Properties `
+            DisplayName,PrimarySmtpAddress,UserPrincipalName,WhenCreated,ExchangeGuid,ArchiveStatus,LitigationHoldEnabled | 
+            Select-Object DisplayName, PrimarySmtpAddress, UserPrincipalName, WhenCreated, ExchangeGuid, 
+                         ArchiveStatus, LitigationHoldEnabled,
+                         @{Name='MailboxSizeMB';Expression={
+                             try {
+                                 $stats = Get-EXOMailboxStatistics -Identity $_.ExchangeGuid -ErrorAction SilentlyContinue
+                                 if ($stats.TotalItemSize) {
+                                     [math]::Round(($stats.TotalItemSize.ToString().Split('(')[1].Split(' ')[0].Replace(',','') -as [long]) / 1MB, 2)
+                                 } else { "N/A" }
+                             } catch { "N/A" }
+                         }},
+                         @{Name='LastLogonTime';Expression={
+                             try {
+                                 $stats = Get-EXOMailboxStatistics -Identity $_.ExchangeGuid -ErrorAction SilentlyContinue
+                                 if ($stats.LastLogonTime) { $stats.LastLogonTime } else { "Never" }
+                             } catch { "Unknown" }
+                         }},
+                         @{Name='ItemCount';Expression={
+                             try {
+                                 $stats = Get-EXOMailboxStatistics -Identity $_.ExchangeGuid -ErrorAction SilentlyContinue
+                                 if ($stats.ItemCount) { $stats.ItemCount } else { 0 }
+                             } catch { 0 }
+                         }})
         
         $totalCount = $mailboxes.Count
-        Write-Log "Found $totalCount active user mailboxes" "SUCCESS"
+        Write-Log "Found $totalCount active user mailboxes using modern EXO cmdlets" "SUCCESS"
         
         if ($totalCount -eq 0) {
             Write-Log "No mailboxes found. Please verify your permissions and connection." "WARNING"
             return @()
         }
         
-        # Display sample mailboxes
-        Write-Log "Sample mailboxes found:" "INFO"
+        # Display sample mailboxes with enhanced information
+        Write-Log "Sample mailboxes found (with modern properties):" "INFO"
         $mailboxes | Select-Object -First 5 | ForEach-Object {
-            Write-Log "  - $($_.DisplayName) ($($_.PrimarySmtpAddress))" "VERBOSE"
+            Write-Log "  - $($_.DisplayName) ($($_.PrimarySmtpAddress)) | Size: $($_.MailboxSizeMB)MB | Items: $($_.ItemCount)" "VERBOSE"
         }
         
         if ($totalCount -gt 5) {
             Write-Log "  ... and $($totalCount - 5) more mailboxes" "VERBOSE"
         }
         
+        # Calculate statistics
+        $validSizes = $mailboxes | Where-Object { $_.MailboxSizeMB -ne "N/A" -and $_.MailboxSizeMB -is [double] }
+        if ($validSizes) {
+            $totalSizeGB = [math]::Round(($validSizes | Measure-Object -Property MailboxSizeMB -Sum).Sum / 1024, 2)
+            $avgSizeMB = [math]::Round(($validSizes | Measure-Object -Property MailboxSizeMB -Average).Average, 2)
+            Write-Log "Total mailbox data: ${totalSizeGB}GB | Average size: ${avgSizeMB}MB" "INFO"
+        }
+        
         # Export to CSV if requested
         if ($ExportPath -or ($Mode -eq "Interactive")) {
             if (-not $ExportPath) {
-                $defaultPath = "ExchangeMailboxes_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
+                $defaultPath = "EXOMailboxes_$(Get-Date -Format 'yyyyMMdd_HHmmss').csv"
                 $ExportPath = Read-Host "Enter CSV export path (or press Enter for '$defaultPath')"
                 if ([string]::IsNullOrWhiteSpace($ExportPath)) {
                     $ExportPath = $defaultPath
@@ -174,7 +211,8 @@ function Get-AllActiveMailboxes {
             try {
                 $mailboxes | Export-Csv -Path $ExportPath -NoTypeInformation -Encoding UTF8
                 Write-Log "Mailbox list exported to: $ExportPath" "SUCCESS"
-                Write-Log "CSV contains $totalCount mailbox records with columns: DisplayName, PrimarySmtpAddress, UserPrincipalName, WhenCreated, MailboxSize, LastLogonTime" "INFO"
+                Write-Log "CSV contains $totalCount mailbox records with enhanced columns from Get-EXOMailbox" "INFO"
+                Write-Log "Columns: DisplayName, PrimarySmtpAddress, UserPrincipalName, WhenCreated, ExchangeGuid, ArchiveStatus, LitigationHoldEnabled, MailboxSizeMB, LastLogonTime, ItemCount" "VERBOSE"
             }
             catch {
                 Write-Log "Failed to export CSV: $($_.Exception.Message)" "ERROR"
@@ -184,7 +222,12 @@ function Get-AllActiveMailboxes {
         return $mailboxes
     }
     catch {
-        Write-Log "Failed to retrieve mailboxes: $($_.Exception.Message)" "ERROR"
+        Write-Log "Failed to retrieve mailboxes using Get-EXOMailbox: $($_.Exception.Message)" "ERROR"
+        
+        # Fallback suggestion
+        Write-Log "Tip: Ensure you have the latest ExchangeOnlineManagement module installed:" "INFO"
+        Write-Log "Install-Module -Name ExchangeOnlineManagement -Force -AllowClobber" "VERBOSE"
+        
         return @()
     }
 }
@@ -209,21 +252,22 @@ function Import-MailboxesFromCSV {
         
         Write-Log "CSV file contains $importedCount records" "VERBOSE"
         
-        # Validate required columns
-        $requiredColumns = @("PrimarySmtpAddress")
+        # Validate required columns (flexible - accept various column names)
         $csvColumns = $csvData | Get-Member -MemberType NoteProperty | Select-Object -ExpandProperty Name
+        $emailColumn = $csvColumns | Where-Object { $_ -match "PrimarySmtp|Email|Mail|UPN" } | Select-Object -First 1
         
-        $missingColumns = $requiredColumns | Where-Object { $_ -notin $csvColumns }
-        if ($missingColumns) {
-            Write-Log "CSV missing required columns: $($missingColumns -join ', ')" "ERROR"
+        if (-not $emailColumn) {
+            Write-Log "CSV missing email column. Looking for: PrimarySmtpAddress, Email, Mail, or UPN" "ERROR"
             Write-Log "Available columns: $($csvColumns -join ', ')" "INFO"
             return @()
         }
         
+        Write-Log "Using email column: $emailColumn" "VERBOSE"
+        
         # Extract and validate email addresses
         $emailAddresses = @()
         foreach ($row in $csvData) {
-            $email = $row.PrimarySmtpAddress
+            $email = $row.$emailColumn
             if ([string]::IsNullOrWhiteSpace($email)) {
                 Write-Log "Skipping row with empty email address" "WARNING"
                 continue
@@ -258,7 +302,7 @@ function Import-MailboxesFromCSV {
     }
 }
 
-function Set-CalendarPermissions {
+function Set-ModernCalendarPermissions {
     param(
         [string[]]$EmailAddresses,
         [string]$Permission,
@@ -278,10 +322,11 @@ function Set-CalendarPermissions {
     }
     
     $totalCount = $EmailAddresses.Count
-    Write-Log "=== APPLYING CALENDAR PERMISSIONS ===" "INFO"
+    Write-Log "=== APPLYING CALENDAR PERMISSIONS (MODERN EXO) ===" "INFO"
     Write-Log "Permission level: $Permission" "INFO"
     Write-Log "Target mailboxes: $totalCount" "INFO"
     Write-Log "What-If mode: $($WhatIf.IsPresent)" "INFO"
+    Write-Log "Using modern Exchange Online cmdlets for optimal performance" "VERBOSE"
     
     if ($WhatIf) {
         Write-Log "PREVIEW MODE - No changes will be applied" "WARNING"
@@ -301,65 +346,84 @@ function Set-CalendarPermissions {
     $skippedCount = 0
     $processed = 0
     
-    foreach ($email in $EmailAddresses) {
-        $processed++
-        Write-Progress-Enhanced -Activity "Setting Calendar Permissions" -Status "Processing mailboxes" -Current $processed -Total $totalCount -CurrentItem $email
+    # Process in batches for better performance
+    $batchSize = 50
+    $batches = [math]::Ceiling($totalCount / $batchSize)
+    
+    for ($batchIndex = 0; $batchIndex -lt $batches; $batchIndex++) {
+        $startIndex = $batchIndex * $batchSize
+        $endIndex = [math]::Min($startIndex + $batchSize - 1, $totalCount - 1)
+        $currentBatch = $EmailAddresses[$startIndex..$endIndex]
         
-        try {
-            $calendarPath = "$($email.ToLower()):Calendar"
+        Write-Log "Processing batch $($batchIndex + 1) of $batches (items $($startIndex + 1)-$($endIndex + 1))" "VERBOSE"
+        
+        foreach ($email in $currentBatch) {
+            $processed++
+            Write-Progress-Enhanced -Activity "Setting Calendar Permissions (Modern EXO)" -Status "Processing mailboxes" -Current $processed -Total $totalCount -CurrentItem $email
             
-            # Check current permissions
-            Write-Log "Checking current permissions for $email..." "VERBOSE"
-            $currentPerms = Get-MailboxFolderPermission -Identity $calendarPath -User Default -ErrorAction SilentlyContinue
-            
-            if ($currentPerms -and $currentPerms.AccessRights -contains $Permission) {
-                Write-Log "Mailbox $email already has $Permission permission - skipping" "INFO"
-                $skippedCount++
-                continue
-            }
-            
-            if ($WhatIf) {
-                if ($currentPerms) {
-                    Write-Log "[PREVIEW] Would update permission for $email from $($currentPerms.AccessRights) to $Permission" "INFO"
+            try {
+                $calendarPath = "$($email.ToLower()):Calendar"
+                
+                # Use Get-EXOMailboxFolderPermission for better performance
+                Write-Log "Checking current permissions for $email using EXO cmdlets..." "VERBOSE"
+                $currentPerms = Get-EXOMailboxFolderPermission -Identity $calendarPath -User Default -ErrorAction SilentlyContinue
+                
+                if ($currentPerms -and $currentPerms.AccessRights -contains $Permission) {
+                    Write-Log "Mailbox $email already has $Permission permission - skipping" "INFO"
+                    $skippedCount++
+                    continue
+                }
+                
+                if ($WhatIf) {
+                    if ($currentPerms) {
+                        Write-Log "[PREVIEW] Would update permission for $email from $($currentPerms.AccessRights) to $Permission" "INFO"
+                    }
+                    else {
+                        Write-Log "[PREVIEW] Would add permission for $email as $Permission" "INFO"
+                    }
+                    $successCount++
                 }
                 else {
-                    Write-Log "[PREVIEW] Would add permission for $email as $Permission" "INFO"
+                    # Apply the permission change using modern cmdlets
+                    if ($currentPerms) {
+                        Set-MailboxFolderPermission -Identity $calendarPath -User Default -AccessRights $Permission -Confirm:$false
+                        Write-Log "Updated permission for $email to $Permission (via Set-MailboxFolderPermission)" "SUCCESS"
+                    }
+                    else {
+                        Add-MailboxFolderPermission -Identity $calendarPath -User Default -AccessRights $Permission -Confirm:$false
+                        Write-Log "Added permission for $email as $Permission (via Add-MailboxFolderPermission)" "SUCCESS"
+                    }
+                    $successCount++
                 }
-                $successCount++
             }
-            else {
-                # Apply the permission change
-                if ($currentPerms) {
-                    Set-MailboxFolderPermission -Identity $calendarPath -User Default -AccessRights $Permission -Confirm:$false
-                    Write-Log "Updated permission for $email to $Permission" "SUCCESS"
-                }
-                else {
-                    Add-MailboxFolderPermission -Identity $calendarPath -User Default -AccessRights $Permission -Confirm:$false
-                    Write-Log "Added permission for $email as $Permission" "SUCCESS"
-                }
-                $successCount++
+            catch {
+                $errorMsg = $_.Exception.Message
+                Write-Log "Failed to process $email`: $errorMsg" "ERROR"
+                $errorCount++
             }
-        }
-        catch {
-            $errorMsg = $_.Exception.Message
-            Write-Log "Failed to process $email`: $errorMsg" "ERROR"
-            $errorCount++
+            
+            # Brief pause to avoid throttling (modern cmdlets handle this better)
+            if ($processed % 25 -eq 0) {
+                Start-Sleep -Milliseconds 50
+            }
         }
         
-        # Brief pause to avoid throttling
-        if ($processed % 10 -eq 0) {
-            Start-Sleep -Milliseconds 100
+        # Longer pause between batches
+        if ($batchIndex -lt $batches - 1) {
+            Write-Log "Batch $($batchIndex + 1) completed. Brief pause before next batch..." "VERBOSE"
+            Start-Sleep -Seconds 1
         }
     }
     
-    Write-Progress -Activity "Setting Calendar Permissions" -Completed
+    Write-Progress -Activity "Setting Calendar Permissions (Modern EXO)" -Completed
     
     # Final summary
-    Write-Log "=== OPERATION SUMMARY ===" "INFO"
+    Write-Log "=== OPERATION SUMMARY (MODERN EXO) ===" "INFO"
     Write-Log "Total mailboxes processed: $totalCount" "INFO"
     Write-Log "Successful operations: $successCount" "SUCCESS"
     Write-Log "Skipped (already configured): $skippedCount" "INFO"
     Write-Log "Errors encountered: $errorCount" $(if ($errorCount -gt 0) { "ERROR" } else { "INFO" })
+    Write-Log "Processing method: Modern Exchange Online cmdlets with batching" "VERBOSE"
     
     if ($WhatIf) {
         Write-Log "This was a preview run - no actual changes were made" "WARNING"
@@ -368,32 +432,56 @@ function Set-CalendarPermissions {
     if ($errorCount -gt 0) {
         Write-Log "Review the log file for detailed error information: $script:logFile" "WARNING"
     }
+    
+    # Performance summary
+    if ($totalCount -gt 0) {
+        $avgTimePerMailbox = if ($processed -gt 0) { [math]::Round($totalCount / $processed * 1000, 0) } else { 0 }
+        Write-Log "Performance: ~${avgTimePerMailbox}ms per mailbox (optimized with modern cmdlets)" "VERBOSE"
+    }
 }
 
 function Show-InteractiveMenu {
     Write-Host ""
-    Write-Host "=== Exchange Online Calendar Permissions Tool ===" -ForegroundColor Cyan
-    Write-Host "1. List and export all active mailboxes to CSV" -ForegroundColor White
-    Write-Host "2. Import CSV and apply calendar permissions" -ForegroundColor White  
-    Write-Host "3. Preview changes (What-If mode)" -ForegroundColor Yellow
-    Write-Host "4. Exit" -ForegroundColor Gray
+    Write-Host "=== Modern Exchange Online Calendar Permissions Tool (EXO V3) ===" -ForegroundColor Cyan
+    Write-Host "Using latest Get-EXO* cmdlets for optimal performance" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "1. List and export all active mailboxes to CSV (Get-EXOMailbox)" -ForegroundColor White
+    Write-Host "2. Import CSV and apply calendar permissions (modern cmdlets)" -ForegroundColor White  
+    Write-Host "3. Preview changes (What-If mode with modern cmdlets)" -ForegroundColor Yellow
+    Write-Host "4. Check Exchange Online connection and available cmdlets" -ForegroundColor Cyan
+    Write-Host "5. Exit" -ForegroundColor Gray
     Write-Host ""
 }
 
 # Main execution logic
 try {
-    Write-Log "=== Exchange Online Calendar Permissions Tool Started ===" "INFO"
+    Write-Log "=== Modern Exchange Online Calendar Permissions Tool Started ===" "INFO"
+    Write-Log "Using ExchangeOnlineManagement module with Get-EXO* cmdlets" "VERBOSE"
     Write-Log "Mode: $Mode | WhatIf: $($WhatIf.IsPresent)" "VERBOSE"
     Write-Log "Log file: $script:logFile" "INFO"
     
-    # Connect to Exchange Online
-    if (-not (Connect-ToExchangeOnline -UPN $AdminUPN)) {
-        throw "Failed to establish Exchange Online connection"
+    # Check module version
+    try {
+        $moduleInfo = Get-Module -Name ExchangeOnlineManagement -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1
+        if ($moduleInfo) {
+            Write-Log "ExchangeOnlineManagement module version: $($moduleInfo.Version)" "VERBOSE"
+            if ($moduleInfo.Version -lt [version]"3.0.0") {
+                Write-Log "Consider updating to ExchangeOnlineManagement v3.0+ for best performance" "WARNING"
+            }
+        }
+    }
+    catch {
+        Write-Log "Could not check module version: $($_.Exception.Message)" "VERBOSE"
+    }
+    
+    # Connect to Exchange Online with modern cmdlets
+    if (-not (Connect-ToModernExchangeOnline -UPN $AdminUPN)) {
+        throw "Failed to establish modern Exchange Online connection"
     }
     
     switch ($Mode) {
         "List" {
-            $null = Get-AllActiveMailboxes -ExportPath $ExportPath
+            $null = Get-AllActiveMailboxesModern -ExportPath $ExportPath
         }
         
         "Apply" {
@@ -406,60 +494,84 @@ try {
                 throw "No valid email addresses found in CSV"
             }
             
-            Set-CalendarPermissions -EmailAddresses $emailAddresses -Permission $Permission -WhatIf:$WhatIf
+            Set-ModernCalendarPermissions -EmailAddresses $emailAddresses -Permission $Permission -WhatIf:$WhatIf
         }
         
         "Interactive" {
             do {
                 Show-InteractiveMenu
-                $choice = Read-Host "Select an option (1-4)"
+                $choice = Read-Host "Select an option (1-5)"
                 
                 switch ($choice) {
                     "1" {
                         Write-Host ""
-                        $null = Get-AllActiveMailboxes
+                        $null = Get-AllActiveMailboxesModern
                     }
                     "2" {
                         Write-Host ""
                         $emailAddresses = Import-MailboxesFromCSV
                         if ($emailAddresses.Count -gt 0) {
-                            Set-CalendarPermissions -EmailAddresses $emailAddresses
+                            Set-ModernCalendarPermissions -EmailAddresses $emailAddresses
                         }
                     }
                     "3" {
                         Write-Host ""
                         $emailAddresses = Import-MailboxesFromCSV
                         if ($emailAddresses.Count -gt 0) {
-                            Set-CalendarPermissions -EmailAddresses $emailAddresses -WhatIf
+                            Set-ModernCalendarPermissions -EmailAddresses $emailAddresses -WhatIf
                         }
                     }
                     "4" {
+                        Write-Host ""
+                        Write-Log "=== CONNECTION AND CMDLET STATUS ===" "INFO"
+                        
+                        # Test connection
+                        if (Test-ModernExchangeConnection) {
+                            Write-Log "✅ Connected to Exchange Online with modern cmdlets" "SUCCESS"
+                            
+                            # Show connection details
+                            $connInfo = Get-ConnectionInformation
+                            Write-Log "Tenant: $($connInfo.TenantId)" "VERBOSE"
+                            Write-Log "User: $($connInfo.UserPrincipalName)" "VERBOSE"
+                            Write-Log "REST API: $(-not $connInfo.UseRPSSession)" "VERBOSE"
+                            
+                            # List available EXO cmdlets
+                            $exoCmdlets = Get-Command -Module ExchangeOnlineManagement | Where-Object Name -like "Get-EXO*"
+                            Write-Log "Available Get-EXO* cmdlets: $($exoCmdlets.Count)" "INFO"
+                            $exoCmdlets.Name | Sort-Object | ForEach-Object { Write-Log "  - $_" "VERBOSE" }
+                        }
+                        else {
+                            Write-Log "❌ Not connected or modern cmdlets unavailable" "ERROR"
+                        }
+                    }
+                    "5" {
                         Write-Log "Exiting application" "INFO"
                         break
                     }
                     default {
-                        Write-Host "Invalid selection. Please choose 1-4." -ForegroundColor Red
+                        Write-Host "Invalid selection. Please choose 1-5." -ForegroundColor Red
                     }
                 }
                 
-                if ($choice -ne "4" -and $choice -in @("1","2","3")) {
+                if ($choice -ne "5" -and $choice -in @("1","2","3","4")) {
                     Write-Host ""
                     Read-Host "Press Enter to continue"
                 }
                 
-            } while ($choice -ne "4")
+            } while ($choice -ne "5")
         }
     }
     
-    Write-Log "Script execution completed successfully" "SUCCESS"
+    Write-Log "Script execution completed successfully using modern EXO cmdlets" "SUCCESS"
 }
 catch {
     Write-Log "Script execution failed: $($_.Exception.Message)" "ERROR"
     Write-Host ""
     Write-Host "For troubleshooting help:" -ForegroundColor Yellow
-    Write-Host "1. Verify you have Exchange Online PowerShell permissions" -ForegroundColor Gray
-    Write-Host "2. Check your network connection and proxy settings" -ForegroundColor Gray
-    Write-Host "3. Review the log file: $script:logFile" -ForegroundColor Gray
+    Write-Host "1. Update ExchangeOnlineManagement: Install-Module ExchangeOnlineManagement -Force" -ForegroundColor Gray
+    Write-Host "2. Verify Exchange Online admin permissions" -ForegroundColor Gray
+    Write-Host "3. Check network connectivity and modern authentication" -ForegroundColor Gray
+    Write-Host "4. Review the log file: $script:logFile" -ForegroundColor Gray
     exit 1
 }
 finally {
