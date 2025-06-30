@@ -33,3 +33,26 @@ Check out the [Release Notes](https://github.com/deep1ne8/misc/releases) for new
 - Contributions: Open-source contributions are welcome! 🎉
 
 [autoByteImage]: https://github.com/deep1ne8/misc/blob/main/AutoByte_Main.png
+## ImmyBotClone
+
+`ImmyBotClone.ps1` provides a simple example of how you can build a lightweight automation framework similar to ImmyBot. It maintains a device inventory (`Devices.json`) and allows you to execute scripts from the repository on remote machines using PowerShell remoting.
+
+### Prerequisites
+- PowerShell 7 or later
+- Remote systems should have PowerShell remoting enabled (`Enable-PSRemoting -Force`)
+
+On Debian-based systems you can install PowerShell with:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y powershell
+```
+
+Run the script with PowerShell:
+
+```powershell
+./ImmyBotClone.ps1
+```
+
+You can then add devices, list them and execute scripts from the `Scripts` folder on those devices.
+
