@@ -27,7 +27,7 @@ function Connect-ToExchangeOnline {
         Connect-ExchangeOnline -UserPrincipalName $UPN -ShowProgress:$false -UseRPSSession:$false -ErrorAction Stop
         Write-Log "Connected to Exchange Online as $UPN" "SUCCESS"
     } catch {
-        Write-Log "Failed to connect to Exchange Online: $_" "ERROR"
+        Write-Log "Failed to connect to Exchange Online $_" "ERROR"
         exit 1
     }
 }
@@ -50,7 +50,7 @@ function Export-CalendarPermissions {
                     }
                 }
             } catch {
-                Write-Log "Cannot get permissions for $calendarPath: $_" "WARNING"
+                Write-Log "Cannot get permissions for ${calendarPath}: $_" "WARNING"
             }
         }
         if ($results.Count -gt 0) {
