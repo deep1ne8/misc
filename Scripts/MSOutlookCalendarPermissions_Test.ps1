@@ -46,4 +46,4 @@ function Set-CalendarReviewerPermission {
 Set-CalendarReviewerPermission
 
 # Disconnect from Exchange Online
-Disconnect-ExchangeOnline
+#Disconnect-ExchangeOnline
