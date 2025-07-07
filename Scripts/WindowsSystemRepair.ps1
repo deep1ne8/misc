@@ -14,7 +14,7 @@
 param(
     [string]$LogDirectory = "C:\Logs",
     [switch]$SkipVolumeCheck,
-    [switch]$Verbose
+    [switch]$Verbose = $true
 )
 
 # Initialize logging
