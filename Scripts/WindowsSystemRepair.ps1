@@ -48,39 +48,142 @@ function Write-Log {
     }
 }
 
+function Show-Progress {
+    param(
+        [string]$Activity,
+        [int]$DurationMinutes = 15
+    )
+    
+    $endTime = (Get-Date).AddMinutes($DurationMinutes)
+    $counter = 0
+    $spinner = @('|', '/', '-', '\')
+    
+    while ((Get-Date) -lt $endTime) {
+        $remaining = [math]::Round((($endTime - (Get-Date)).TotalMinutes), 1)
+        Write-Host "`r  $($spinner[$counter % 4]) $Activity - Est. $remaining min remaining..." -NoNewline -ForegroundColor Cyan
+        $counter++
+        Start-Sleep -Seconds 2
+    }
+    Write-Host "`r" -NoNewline  # Clear the line
+}
+
 function Invoke-CommandWithLogging {
     param(
         [Parameter(Mandatory)]
         [string]$Command,
         [string]$Description,
-        [switch]$ContinueOnError
+        [switch]$ContinueOnError,
+        [int]$TimeoutMinutes = 30
     )
     
     Write-Log "Executing: $Description" -Level INFO
     
     try {
-        $result = Invoke-Expression $Command 2>&1
+        # Parse command and arguments
+        $parts = $Command -split ' ', 2
+        $executable = $parts[0]
+        $arguments = if ($parts.Count -gt 1) { $parts[1] } else { '' }
         
-        if ($LASTEXITCODE -eq 0 -or $null -eq $LASTEXITCODE) {
-            Write-Log "SUCCESS: $Description completed successfully" -Level SUCCESS
-            if ($Verbose) {
-                Write-Log "Output: $($result | Out-String)" -Level INFO
+        # Create process start info
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = $executable
+        $psi.Arguments = $arguments
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $true
+        
+        # Start process
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $psi
+        
+        # Create string builders for output
+        $outputBuilder = New-Object System.Text.StringBuilder
+        $errorBuilder = New-Object System.Text.StringBuilder
+        
+        # Event handlers for real-time output
+        $outputHandler = {
+            if ($EventArgs.Data) {
+                $outputBuilder.AppendLine($EventArgs.Data)
+                Write-Host "  $($EventArgs.Data)" -ForegroundColor Gray
             }
-            return $true
-        } else {
-            Write-Log "ERROR: $Description failed with exit code $LASTEXITCODE" -Level ERROR
-            Write-Log "Output: $($result | Out-String)" -Level ERROR
-            if (-not $ContinueOnError) {
-                throw "Command failed: $Command"
+        }
+        
+        $errorHandler = {
+            if ($EventArgs.Data) {
+                $errorBuilder.AppendLine($EventArgs.Data)
+                Write-Host "  ERROR: $($EventArgs.Data)" -ForegroundColor Red
+            }
+        }
+        
+        # Register event handlers
+        Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action $outputHandler | Out-Null
+        Register-ObjectEvent -InputObject $process -EventName ErrorDataReceived -Action $errorHandler | Out-Null
+        
+        # Start the process
+        $process.Start() | Out-Null
+        $process.BeginOutputReadLine()
+        $process.BeginErrorReadLine()
+        
+        # Wait for completion with timeout
+        $timeoutMs = $TimeoutMinutes * 60 * 1000
+        $completed = $process.WaitForExit($timeoutMs)
+        
+        # Clean up event handlers
+        Get-EventSubscriber | Where-Object { $_.SourceObject -eq $process } | Unregister-Event
+        
+        if (-not $completed) {
+            Write-Log "WARNING: $Description timed out after $TimeoutMinutes minutes" -Level WARNING
+            try {
+                $process.Kill()
+                $process.WaitForExit(5000)
+            } catch {
+                Write-Log "Failed to terminate process: $_" -Level ERROR
             }
             return $false
         }
+        
+        # Get final output
+        $output = $outputBuilder.ToString()
+        $errorOutput = $errorBuilder.ToString()
+        $exitCode = $process.ExitCode
+        
+        # Process results
+        if ($exitCode -eq 0) {
+            Write-Log "SUCCESS: $Description completed successfully (Exit Code: $exitCode)" -Level SUCCESS
+            if ($Verbose -and $output) {
+                Write-Log "Output: $output" -Level INFO
+            }
+            return $true
+        } else {
+            Write-Log "ERROR: $Description failed with exit code $exitCode" -Level ERROR
+            if ($output) { Write-Log "Output: $output" -Level ERROR }
+            if ($errorOutput) { Write-Log "Error Output: $errorOutput" -Level ERROR }
+            
+            if (-not $ContinueOnError) {
+                throw "Command failed: $Command (Exit Code: $exitCode)"
+            }
+            return $false
+        }
+        
     } catch {
         Write-Log "EXCEPTION: $Description failed with error: $_" -Level ERROR
         if (-not $ContinueOnError) {
             throw
         }
         return $false
+    } finally {
+        # Cleanup
+        if ($process) {
+            try {
+                if (-not $process.HasExited) {
+                    $process.Kill()
+                }
+                $process.Dispose()
+            } catch {
+                # Ignore cleanup errors
+            }
+        }
     }
 }
 
