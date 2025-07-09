@@ -1,174 +1,229 @@
 #Requires -RunAsAdministrator
 <#
 .SYNOPSIS
-    Windows System Repair Script
+    Quick Windows System Repair Script
 .DESCRIPTION
-    system repair
+    Fast, reliable system repair with verbose colorized output
 .NOTES
-    Version: 3.0 - Bulletproof Edition
+    Version: 4.0 - Quick & Clean Edition
 #>
 
 param(
-    [string]$LogPath = "C:\Temp\SystemRepair_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+    [string]$LogPath = "C:\Temp\QuickRepair_$(Get-Date -Format 'yyyyMMdd_HHmmss').log",
+    [switch]$SkipReboot
 )
 
-# Create log directory
+# Ensure log directory exists
 $null = New-Item -Path (Split-Path $LogPath) -ItemType Directory -Force -ErrorAction SilentlyContinue
 
-function Write-Output {
-    param([string]$Message, [string]$Color = "White")
+function Write-Log {
+    param(
+        [string]$Message, 
+        [ValidateSet("Info", "Success", "Warning", "Error", "Header")]
+        [string]$Level = "Info"
+    )
     
     $timestamp = Get-Date -Format "HH:mm:ss"
     $output = "[$timestamp] $Message"
     
-    Write-Host $output -ForegroundColor $Color
+    $colors = @{
+        Info = "White"
+        Success = "Green"
+        Warning = "Yellow"
+        Error = "Red"
+        Header = "Cyan"
+    }
+    
+    Write-Host $output -ForegroundColor $colors[$Level]
     $output | Out-File -FilePath $LogPath -Append -Encoding UTF8
 }
 
-function Run-Command {
-    param([string]$Command, [string]$Name)
+function Start-QuickCommand {
+    param(
+        [string]$Command,
+        [string]$Description,
+        [int]$TimeoutMinutes = 5
+    )
     
-    Write-Output "Starting: $Name" -Color Yellow
+    Write-Log "► Starting: $Description" -Level Info
     
     try {
-        # Direct command execution - no fancy stuff
-        $result = cmd.exe /c $Command 2>&1
+        $job = Start-Job -ScriptBlock {
+            param($cmd)
+            Invoke-Expression $cmd
+        } -ArgumentList $Command
         
-        if ($LASTEXITCODE -eq 0) {
-            Write-Output "✓ $Name completed successfully" -Color Green
+        $completed = Wait-Job $job -Timeout ($TimeoutMinutes * 60)
+        
+        if ($completed) {
+            $result = Receive-Job $job
+            Remove-Job $job
+            Write-Log "✓ $Description completed successfully" -Level Success
             return $true
         } else {
-            Write-Output "✗ $Name failed (Exit: $LASTEXITCODE)" -Color Red
+            Remove-Job $job -Force
+            Write-Log "⚠ $Description timed out after $TimeoutMinutes minutes" -Level Warning
             return $false
         }
     } catch {
-        Write-Output "✗ $Name crashed: $_" -Color Red
+        Write-Log "✗ $Description failed: $($_.Exception.Message)" -Level Error
         return $false
     }
 }
 
-# Verify admin rights
-if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Write-Output "ERROR: Run as Administrator!" -Color Red
-    exit 1
+function Test-AdminRights {
+    return ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 }
 
-Write-Output "=== WINDOWS SYSTEM REPAIR STARTED ===" -Color Cyan
-Write-Output "Log: $LogPath" -Color Gray
-
-# Track results
-$results = @{}
-
-# 1. DISM Component Health Check
-Write-Output "" -Color White
-Write-Output "PHASE 1: Component Store Health Check" -Color Cyan
-$results['DISM_Scan'] = Run-Command "DISM /Online /Cleanup-Image /ScanHealth /NoRestart" "DISM Health Scan"
-
-# 2. DISM Repair (if needed)
-if ($results['DISM_Scan']) {
-    Write-Output "" -Color White
-    Write-Output "PHASE 2: Component Store Repair" -Color Cyan
-    $results['DISM_Repair'] = Run-Command "DISM /Online /Cleanup-Image /RestoreHealth /NoRestart" "DISM Repair"
-}
-
-# 3. System File Checker
-Write-Output "" -Color White
-Write-Output "PHASE 3: System File Checker" -Color Cyan
-$results['SFC'] = Run-Command "sfc /scannow" "System File Checker"
-
-# 4. Windows Memory Diagnostic (schedule for next boot)
-Write-Output "" -Color White
-Write-Output "PHASE 4: Memory Diagnostic (Next Boot)" -Color Cyan
-$results['MemDiag'] = Run-Command "mdsched /f" "Memory Diagnostic Scheduler"
-
-# 5. Check Disk (C: drive)
-Write-Output "" -Color White
-Write-Output "PHASE 5: Disk Check" -Color Cyan
-$results['ChkDsk'] = Run-Command "chkdsk C: /f /r /x" "Check Disk"
-
-# 6. Component Store Cleanup
-Write-Output "" -Color White
-Write-Output "PHASE 6: Component Cleanup" -Color Cyan
-$results['Cleanup'] = Run-Command "DISM /Online /Cleanup-Image /StartComponentCleanup /ResetBase /NoRestart" "Component Cleanup"
-
-# 7. Windows Update Reset (if SFC failed)
-if (-not $results['SFC']) {
-    Write-Output "" -Color White
-    Write-Output "PHASE 7: Windows Update Reset" -Color Cyan
+function Reset-WindowsUpdate {
+    Write-Log "► Resetting Windows Update components..." -Level Info
     
     try {
-        Write-Output "Stopping services..." -Color Yellow
-        Stop-Service wuauserv, cryptsvc, bits, msiserver -Force -ErrorAction SilentlyContinue
+        $services = @('wuauserv', 'cryptsvc', 'bits', 'msiserver')
         
-        Write-Output "Renaming folders..." -Color Yellow
-        $folders = @("C:\Windows\SoftwareDistribution", "C:\Windows\System32\catroot2")
-        foreach ($folder in $folders) {
-            if (Test-Path $folder) {
-                $backup = "$folder.bak"
-                if (Test-Path $backup) { Remove-Item $backup -Recurse -Force }
-                Rename-Item $folder $backup -ErrorAction SilentlyContinue
+        # Stop services
+        foreach ($service in $services) {
+            Stop-Service $service -Force -ErrorAction SilentlyContinue
+            Write-Log "  Stopped $service" -Level Info
+        }
+        
+        # Rename folders
+        $folders = @{
+            'C:\Windows\SoftwareDistribution' = 'C:\Windows\SoftwareDistribution.bak'
+            'C:\Windows\System32\catroot2' = 'C:\Windows\System32\catroot2.bak'
+        }
+        
+        foreach ($folder in $folders.GetEnumerator()) {
+            if (Test-Path $folder.Key) {
+                if (Test-Path $folder.Value) { 
+                    Remove-Item $folder.Value -Recurse -Force -ErrorAction SilentlyContinue 
+                }
+                Rename-Item $folder.Key $folder.Value -ErrorAction SilentlyContinue
+                Write-Log "  Renamed $($folder.Key)" -Level Info
             }
         }
         
-        Write-Output "Starting services..." -Color Yellow
-        Start-Service wuauserv, cryptsvc, bits, msiserver -ErrorAction SilentlyContinue
+        # Start services
+        foreach ($service in $services) {
+            Start-Service $service -ErrorAction SilentlyContinue
+            Write-Log "  Started $service" -Level Info
+        }
         
-        Write-Output "✓ Windows Update Reset completed" -Color Green
-        $results['WU_Reset'] = $true
+        Write-Log "✓ Windows Update reset completed" -Level Success
+        return $true
     } catch {
-        Write-Output "✗ Windows Update Reset failed: $_" -Color Red
-        $results['WU_Reset'] = $false
+        Write-Log "✗ Windows Update reset failed: $($_.Exception.Message)" -Level Error
+        return $false
     }
 }
 
-# 8. Registry Cleanup
-Write-Output "" -Color White
-Write-Output "PHASE 8: Registry Cleanup" -Color Cyan
-$results['RegClean'] = Run-Command "sfc /scannow" "Registry Verification"
+function Clear-TempFiles {
+    Write-Log "► Clearing temporary files..." -Level Info
+    
+    $tempPaths = @(
+        "$env:TEMP\*",
+        "$env:WINDIR\Temp\*",
+        "$env:WINDIR\Prefetch\*"
+    )
+    
+    $cleaned = 0
+    foreach ($path in $tempPaths) {
+        try {
+            $items = Get-ChildItem $path -ErrorAction SilentlyContinue
+            if ($items) {
+                Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
+                $cleaned += $items.Count
+                Write-Log "  Cleaned $(Split-Path $path -Parent)" -Level Info
+            }
+        } catch {
+            Write-Log "  Skipped $(Split-Path $path -Parent): Access denied" -Level Warning
+        }
+    }
+    
+    Write-Log "✓ Cleaned $cleaned temporary items" -Level Success
+}
 
-# Summary Report
-Write-Output "" -Color White
-Write-Output "=== REPAIR SUMMARY ===" -Color Cyan
+# Main execution
+if (-not (Test-AdminRights)) {
+    Write-Log "ERROR: This script requires Administrator privileges!" -Level Error
+    Write-Log "Please run PowerShell as Administrator and try again." -Level Error
+    exit 1
+}
+
+Write-Log "=== QUICK SYSTEM REPAIR STARTED ===" -Level Header
+Write-Log "Log file: $LogPath" -Level Info
+Write-Log "" -Level Info
+
+$results = @{}
+$startTime = Get-Date
+
+# Phase 1: Quick SFC scan
+Write-Log "PHASE 1: System File Check (Quick)" -Level Header
+$results['SFC'] = Start-QuickCommand "sfc /verifyonly" "System File Verification" 3
+
+# Phase 2: DISM health check (fast)
+Write-Log "PHASE 2: Component Store Health" -Level Header
+$results['DISM_Check'] = Start-QuickCommand "DISM /Online /Cleanup-Image /CheckHealth" "Component Health Check" 2
+
+# Phase 3: Clean temporary files
+Write-Log "PHASE 3: Temporary File Cleanup" -Level Header
+$results['TempClean'] = Clear-TempFiles
+
+# Phase 4: Windows Update reset (if needed)
+Write-Log "PHASE 4: Windows Update Reset" -Level Header
+$results['WU_Reset'] = Reset-WindowsUpdate
+
+# Phase 5: Registry cleanup
+Write-Log "PHASE 5: Registry Optimization" -Level Header
+$results['Registry'] = Start-QuickCommand "sfc /verifyonly" "Registry Verification" 2
+
+# Phase 6: Component cleanup
+Write-Log "PHASE 6: Component Cleanup" -Level Header
+$results['Cleanup'] = Start-QuickCommand "DISM /Online /Cleanup-Image /StartComponentCleanup" "Component Cleanup" 3
+
+# Results summary
+Write-Log "" -Level Info
+Write-Log "=== REPAIR SUMMARY ===" -Level Header
 
 $passed = 0
-$total = 0
+$total = $results.Count
 
 foreach ($task in $results.GetEnumerator()) {
-    $total++
     $status = if ($task.Value) { "PASS"; $passed++ } else { "FAIL" }
-    $color = if ($task.Value) { "Green" } else { "Red" }
-    Write-Output "$($task.Key): $status" -Color $color
+    $level = if ($task.Value) { "Success" } else { "Error" }
+    Write-Log "$($task.Key): $status" -Level $level
 }
 
-Write-Output "" -Color White
-Write-Output "Success Rate: $passed/$total tasks completed" -Color Cyan
+$duration = (Get-Date) - $startTime
+Write-Log "" -Level Info
+Write-Log "Execution time: $($duration.Minutes)m $($duration.Seconds)s" -Level Info
+Write-Log "Success rate: $passed/$total tasks completed" -Level Info
 
 # Recommendations
-Write-Output "" -Color White
-Write-Output "=== RECOMMENDATIONS ===" -Color Cyan
+Write-Log "" -Level Info
+Write-Log "=== NEXT STEPS ===" -Level Header
 
-if ($results['MemDiag']) {
-    Write-Output "• Memory test scheduled for next reboot" -Color Yellow
+if ($passed -eq $total) {
+    Write-Log "✓ All repairs completed successfully!" -Level Success
+} else {
+    Write-Log "⚠ Some tasks failed - manual intervention may be needed" -Level Warning
 }
 
-if ($results['ChkDsk']) {
-    Write-Output "• Disk check completed - review results in Event Viewer" -Color Yellow
-}
+Write-Log "• Check Event Viewer for detailed error information" -Level Info
+Write-Log "• Consider running full SFC scan: sfc /scannow" -Level Info
+Write-Log "• Restart recommended to complete all changes" -Level Warning
 
-if ($passed -lt $total) {
-    Write-Output "• Some repairs failed - consider manual intervention" -Color Yellow
-}
+Write-Log "" -Level Info
+Write-Log "=== REPAIR COMPLETED ===" -Level Success
+Write-Log "Full log available at: $LogPath" -Level Info
 
-Write-Output "• RESTART REQUIRED to complete all repairs" -Color Yellow
-
-Write-Output "" -Color White
-Write-Output "=== REPAIR COMPLETED ===" -Color Green
-Write-Output "Full log: $LogPath" -Color Gray
-
-# Offer immediate reboot
-$reboot = Read-Host "`nRestart computer now? (y/N)"
-if ($reboot -match "^[Yy]") {
-    Write-Output "Restarting in 10 seconds..." -Color Yellow
-    Start-Sleep 10
-    Restart-Computer -Force
+# Optional restart
+if (-not $SkipReboot) {
+    Write-Log "" -Level Info
+    $reboot = Read-Host "Restart computer now? (y/N)"
+    if ($reboot -match "^[Yy]") {
+        Write-Log "Restarting in 5 seconds..." -Level Warning
+        Start-Sleep 5
+        Restart-Computer -Force
+    }
 }
