@@ -73,22 +73,37 @@ function Remove-TempFiles {
 
 # Function to stop current process
 function Stop-CurrentProcess {
-    if ($script:currentProcess -and !$script:currentProcess.HasExited) {
-        try {
+    try {
+        if ($script:currentProcess -and !$script:currentProcess.HasExited) {
             $script:currentProcess.Kill()
             Write-Output "Process terminated by user" "Red"
-        } catch {
-            Write-Output "Error terminating process: $($_.Exception.Message)" "Red"
         }
+    } catch {
+        Write-Output "Error terminating process: $($_.Exception.Message)" "Red"
+    } finally {
+        # Always re-enable buttons
+        if ($buttonPanel) { $buttonPanel.Enabled = $true }
+        if ($stopButton) { $stopButton.Enabled = $false }
+        Update-Status "Ready"
     }
 }
 
 # Function to update status
 function Update-Status {
     param([string]$Message)
-    if ($statusLabel) {
-        $statusLabel.Text = $Message
-        [System.Windows.Forms.Application]::DoEvents()
+    try {
+        if ($statusLabel -and $statusLabel.Owner) {
+            if ($statusLabel.Owner.InvokeRequired) {
+                $statusLabel.Owner.Invoke([Action]{
+                    $statusLabel.Text = $Message
+                })
+            } else {
+                $statusLabel.Text = $Message
+            }
+            [System.Windows.Forms.Application]::DoEvents()
+        }
+    } catch {
+        # Silently handle any status update errors
     }
 }
 
@@ -145,32 +160,46 @@ function Start-Script {
         
         # Event handlers for output
         $script:currentProcess.add_OutputDataReceived({
-            if ($eventargs.Data) {
-                Write-Output $eventargs.Data "Black"
+            param($src, $e)
+            if ($e.Data) {
+                $richTextBox.Invoke([Action]{
+                    Write-Output $e.Data "Black"
+                })
             }
         })
         
         $script:currentProcess.add_ErrorDataReceived({
-            if ($eventargs.Data) {
-                Write-Output "ERROR: $($eventargs.Data)" "Red"
+            param($src, $e)
+            if ($e.Data) {
+                $richTextBox.Invoke([Action]{
+                    Write-Output "ERROR: $($e.Data)" "Red"
+                })
             }
         })
         
         $script:currentProcess.add_Exited({
-            $exitCode = $script:currentProcess.ExitCode
-            Write-Output "===========================================" "Blue"
-            if ($exitCode -eq 0) {
-                Write-Output "Script completed successfully (Exit Code: $exitCode)" "Green"
-                Update-Status "Completed: $Description"
-            } else {
-                Write-Output "Script finished with exit code: $exitCode" "Orange"
-                Update-Status "Failed: $Description"
+            param($src, $eArgs)
+            try {
+                $exitCode = $script:currentProcess.ExitCode
+                $richTextBox.Invoke([Action]{
+                    Write-Output "===========================================" "Blue"
+                    if ($exitCode -eq 0) {
+                        Write-Output "Script completed successfully (Exit Code: $exitCode)" "Green"
+                        Update-Status "Completed: $Description"
+                    } else {
+                        Write-Output "Script finished with exit code: $exitCode" "Orange"
+                        Update-Status "Failed: $Description"
+                    }
+                    Write-Output "===========================================" "Blue"
+                    
+                    # Re-enable buttons
+                    $buttonPanel.Enabled = $true
+                    $stopButton.Enabled = $false
+                })
+            } catch {
+                # Handle any errors in the exit event
+                Write-Output "Error in exit handler: $($_.Exception.Message)" "Red"
             }
-            Write-Output "===========================================" "Blue"
-            
-            # Re-enable buttons
-            $buttonPanel.Enabled = $true
-            $stopButton.Enabled = $false
         })
         
         # Start process
@@ -324,7 +353,15 @@ Update-Status "Ready"
 
 # Show the form
 try {
-    [void]$form.ShowDialog()
+    # Set application settings for better stability
+    [System.Windows.Forms.Application]::EnableVisualStyles()
+    [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
+    
+    # Run the application
+    [System.Windows.Forms.Application]::Run($form)
+} catch {
+    Write-Host "Error running application: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "Stack trace: $($_.Exception.StackTrace)" -ForegroundColor Red
 } finally {
     # Cleanup
     Stop-CurrentProcess
