@@ -237,11 +237,15 @@ $clearButton.Text = "Clear Output"
 $clearButton.add_Click({ $richTextBox.Clear(); Update-Status "Output cleared" })
 $toolStrip.Items.Add($clearButton)
 
-# Add spring element to push status to right
-$spring = New-Object System.Windows.Forms.ToolStripLabel
-$spring.Text = ""
-$spring.Spring = $true
-$toolStrip.Items.Add($spring)
+# Add separator and spacer to push status to right
+$toolStrip.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
+
+# Create a flexible space using a ToolStripLabel
+$spacer = New-Object System.Windows.Forms.ToolStripLabel
+$spacer.Text = ""
+$spacer.AutoSize = $false
+$spacer.Width = 200  # Adjust as needed
+$toolStrip.Items.Add($spacer)
 
 # Status label - FIXED: Use 'Right' instead of 'MiddleRight'
 $statusLabel = New-Object System.Windows.Forms.ToolStripLabel
