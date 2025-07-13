@@ -84,7 +84,7 @@ function Stop-CurrentProcess {
 }
 
 # Enhanced function to download, save, and execute script with better error handling
-function Launch-Script {
+function Start-Script {
     param([string]$Url, [string]$Description)
     
     # Clear output and disable buttons during execution
@@ -258,7 +258,7 @@ foreach ($script in $GitHubScripts) {
     $btn.Tag = $script
     $btn.add_Click({
         $scriptInfo = $this.Tag
-        Launch-Script $scriptInfo.ScriptUrl $scriptInfo.Description
+        Start-Script $scriptInfo.ScriptUrl $scriptInfo.Description
     })
     $buttonPanel.Controls.Add($btn)
 }
