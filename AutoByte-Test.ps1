@@ -32,7 +32,7 @@ function Write-Output {
     param([string]$Message, [string]$Color = "Black")
     
     if ($richTextBox.InvokeRequired) {
-        $richTextBox.Invoke({ param($msg, $clr) Write-Output -Message $msg -Color $clr }, $Message, $Color)
+        $richTextBox.Invoke([Action[string, string]]$function:Write-Output, $Message, $Color)
         return
     }
     
@@ -73,7 +73,7 @@ function Stop-CurrentProcess {
 }
 
 # Enhanced function to download, save, and execute script with better error handling
-function Start-Script {
+function Launch-Script {
     param([string]$Url, [string]$Description)
     
     # Clear output and disable buttons during execution
@@ -216,8 +216,7 @@ $toolStrip.Items.Add($clearButton)
 # Status label
 $statusLabel = New-Object System.Windows.Forms.ToolStripLabel
 $statusLabel.Text = "Ready"
-$statusLabel.Spring = $true
-$statusLabel.TextAlign = 'MiddleRight'
+$statusLabel.Alignment = 'MiddleRight'
 $toolStrip.Items.Add($statusLabel)
 
 # Create main container
@@ -233,7 +232,7 @@ $buttonPanel = New-Object System.Windows.Forms.FlowLayoutPanel
 $buttonPanel.Dock = 'Fill'
 $buttonPanel.AutoSize = $true
 $buttonPanel.WrapContents = $true
-$buttonPanel.Padding = '10'
+$buttonPanel.Padding = New-Object System.Windows.Forms.Padding(10)
 $buttonPanel.FlowDirection = 'LeftToRight'
 $buttonPanel.BackColor = [System.Drawing.Color]::LightGray
 
@@ -242,13 +241,13 @@ foreach ($script in $GitHubScripts) {
     $btn = New-Object System.Windows.Forms.Button
     $btn.Text = $script.Description
     $btn.Size = New-Object System.Drawing.Size(180, 35)
-    $btn.Margin = '5'
+    $btn.Margin = New-Object System.Windows.Forms.Padding(5)
     $btn.UseVisualStyleBackColor = $true
     $btn.FlatStyle = 'System'
     $btn.Tag = $script
     $btn.add_Click({
         $scriptInfo = $this.Tag
-        Start-Script $scriptInfo.ScriptUrl $scriptInfo.Description
+        Launch-Script $scriptInfo.ScriptUrl $scriptInfo.Description
     })
     $buttonPanel.Controls.Add($btn)
 }
@@ -257,7 +256,7 @@ foreach ($script in $GitHubScripts) {
 $exitBtn = New-Object System.Windows.Forms.Button
 $exitBtn.Text = 'Exit Application'
 $exitBtn.Size = New-Object System.Drawing.Size(180, 35)
-$exitBtn.Margin = '5'
+$exitBtn.Margin = New-Object System.Windows.Forms.Padding(5)
 $exitBtn.BackColor = [System.Drawing.Color]::LightCoral
 $exitBtn.FlatStyle = 'System'
 $exitBtn.add_Click({ $form.Close() })
