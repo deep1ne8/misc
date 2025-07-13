@@ -83,6 +83,15 @@ function Stop-CurrentProcess {
     }
 }
 
+# Function to update status
+function Update-Status {
+    param([string]$Message)
+    if ($statusLabel) {
+        $statusLabel.Text = $Message
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+}
+
 # Enhanced function to download, save, and execute script with better error handling
 function Start-Script {
     param([string]$Url, [string]$Description)
@@ -91,6 +100,7 @@ function Start-Script {
     $richTextBox.Clear()
     $buttonPanel.Enabled = $false
     $stopButton.Enabled = $true
+    Update-Status "Running: $Description"
     
     try {
         Write-Output "===========================================" "Blue"
@@ -151,8 +161,10 @@ function Start-Script {
             Write-Output "===========================================" "Blue"
             if ($exitCode -eq 0) {
                 Write-Output "Script completed successfully (Exit Code: $exitCode)" "Green"
+                Update-Status "Completed: $Description"
             } else {
                 Write-Output "Script finished with exit code: $exitCode" "Orange"
+                Update-Status "Failed: $Description"
             }
             Write-Output "===========================================" "Blue"
             
@@ -171,6 +183,7 @@ function Start-Script {
         Write-Output "Stack Trace: $($_.Exception.StackTrace)" "Red"
         $buttonPanel.Enabled = $true
         $stopButton.Enabled = $false
+        Update-Status "Error: $($_.Exception.Message)"
     }
 }
 
@@ -195,7 +208,7 @@ $fileMenu.Text = "&File"
 $clearOutputItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $clearOutputItem.Text = "Clear Output"
 $clearOutputItem.ShortcutKeys = "Ctrl+L"
-$clearOutputItem.add_Click({ $richTextBox.Clear() })
+$clearOutputItem.add_Click({ $richTextBox.Clear(); Update-Status "Output cleared" })
 $exitItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $exitItem.Text = "E&xit"
 $exitItem.ShortcutKeys = "Ctrl+Q"
@@ -221,13 +234,19 @@ $toolStrip.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 # Clear button
 $clearButton = New-Object System.Windows.Forms.ToolStripButton
 $clearButton.Text = "Clear Output"
-$clearButton.add_Click({ $richTextBox.Clear() })
+$clearButton.add_Click({ $richTextBox.Clear(); Update-Status "Output cleared" })
 $toolStrip.Items.Add($clearButton)
 
-# Status label
+# Add spring element to push status to right
+$spring = New-Object System.Windows.Forms.ToolStripLabel
+$spring.Text = ""
+$spring.Spring = $true
+$toolStrip.Items.Add($spring)
+
+# Status label - FIXED: Use 'Right' instead of 'MiddleRight'
 $statusLabel = New-Object System.Windows.Forms.ToolStripLabel
 $statusLabel.Text = "Ready"
-$statusLabel.Alignment = 'MiddleRight'
+$statusLabel.Alignment = 'Right'
 $toolStrip.Items.Add($statusLabel)
 
 # Create main container
@@ -297,6 +316,7 @@ $form.Controls.Add($menuStrip)
 Write-Output "AutoBytePro GUI v2.0 - Ready" "Green"
 Write-Output "Select a script from the buttons above to begin execution." "Gray"
 Write-Output "Output will appear here in real-time." "Gray"
+Update-Status "Ready"
 
 # Show the form
 try {
