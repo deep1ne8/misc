@@ -214,3 +214,13 @@ function Stop-CurrentProcess {
         }
     }
 }
+
+# Run the application
+[System.Windows.Forms.Application]::Run( (Start-AutoByteProGUI) )
+
+# Cleanup any temporary files
+foreach ($f in $script:tempFiles) {
+    if (Test-Path $f) {
+        Remove-Item $f -Force -ErrorAction SilentlyContinue
+    }
+}
