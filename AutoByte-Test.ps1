@@ -30,6 +30,12 @@ $GitHubScripts = @(
 # Function to safely append text to RichTextBox
 $script:WriteOutputDelegate = {
     param([string]$Message, [string]$Color = "Black")
+    
+    if ($richTextBox.InvokeRequired) {
+        $richTextBox.Invoke({ param($msg, $clr) Write-Output -Message $msg -Color $clr }, $Message, $Color)
+        return
+    }
+    
     $richTextBox.SelectionStart = $richTextBox.TextLength
     $richTextBox.SelectionLength = 0
     $richTextBox.SelectionColor = [System.Drawing.Color]::FromName($Color)
@@ -78,7 +84,7 @@ function Stop-CurrentProcess {
 }
 
 # Enhanced function to download, save, and execute script with better error handling
-function Start-Script {
+function Launch-Script {
     param([string]$Url, [string]$Description)
     
     # Clear output and disable buttons during execution
@@ -252,7 +258,7 @@ foreach ($script in $GitHubScripts) {
     $btn.Tag = $script
     $btn.add_Click({
         $scriptInfo = $this.Tag
-        Start-Script $scriptInfo.ScriptUrl $scriptInfo.Description
+        Launch-Script $scriptInfo.ScriptUrl $scriptInfo.Description
     })
     $buttonPanel.Controls.Add($btn)
 }
