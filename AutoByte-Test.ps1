@@ -1,10 +1,14 @@
-# AutoBytePro GUI Script - Enhanced Version
+# AutoBytePro GUI Script - Enhanced Version with PSScriptAnalyzer Fixes
 # Description: GUI to select and run PowerShell scripts from GitHub with real-time output
 # Author: Enhanced for improved functionality and error handling
 
 #Requires -Version 5.1
 
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+
+# Set application settings for better stability - MUST be called before creating any forms
+[System.Windows.Forms.Application]::EnableVisualStyles()
+[System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
 
 # Global variables
 $script:currentProcess = $null
@@ -158,27 +162,27 @@ function Start-Script {
         $script:currentProcess.StartInfo = $psi
         $script:currentProcess.EnableRaisingEvents = $true
         
-        # Event handlers for output
+        # Event handlers for output - FIXED: Use different parameter names
         $script:currentProcess.add_OutputDataReceived({
-            param($src, $e)
-            if ($e.Data) {
+            param($processObject, $dataArgs)
+            if ($dataArgs.Data) {
                 $richTextBox.Invoke([Action]{
-                    Write-Output $e.Data "Black"
+                    Write-Output $dataArgs.Data "Black"
                 })
             }
         })
         
         $script:currentProcess.add_ErrorDataReceived({
-            param($src, $e)
-            if ($e.Data) {
+            param($processObject, $errorArgs)
+            if ($errorArgs.Data) {
                 $richTextBox.Invoke([Action]{
-                    Write-Output "ERROR: $($e.Data)" "Red"
+                    Write-Output "ERROR: $($errorArgs.Data)" "Red"
                 })
             }
         })
         
         $script:currentProcess.add_Exited({
-            param($src, $eArgs)
+            param($processObject, $exitArgs)
             try {
                 $exitCode = $script:currentProcess.ExitCode
                 $richTextBox.Invoke([Action]{
@@ -273,10 +277,10 @@ $toolStrip.Items.Add((New-Object System.Windows.Forms.ToolStripSeparator))
 $spacer = New-Object System.Windows.Forms.ToolStripLabel
 $spacer.Text = ""
 $spacer.AutoSize = $false
-$spacer.Width = 200  # Adjust as needed
+$spacer.Width = 200
 $toolStrip.Items.Add($spacer)
 
-# Status label - FIXED: Use 'Right' instead of 'MiddleRight'
+# Status label
 $statusLabel = New-Object System.Windows.Forms.ToolStripLabel
 $statusLabel.Text = "Ready"
 $statusLabel.Alignment = 'Right'
@@ -353,10 +357,6 @@ Update-Status "Ready"
 
 # Show the form
 try {
-    # Set application settings for better stability
-    [System.Windows.Forms.Application]::EnableVisualStyles()
-    [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false)
-    
     # Run the application
     [System.Windows.Forms.Application]::Run($form)
 } catch {
