@@ -1,4 +1,4 @@
-# AutoBytePro GUI – Fixed Complete Version
+# AutoBytePro GUI – Final Working Version
 # Requires PowerShell 5.1 or later
 # Author: Earl “deep1ne” Daniels (enhanced)
 
@@ -16,20 +16,19 @@ $script:currentProcess    = $null
 $script:tempFiles         = @()
 $script:WriteLogDelegate  = $null
 
-# Cross-scope Write-Log function
-function Write-Log { param($m) & $script:WriteLogDelegate $m }
+# Cross-scope Write-Log (delegates created later)
+function Write-Log { param([string]$m) & $script:WriteLogDelegate $m }
 
-# Creates a cross-thread-safe delegate for writing to a RichTextBox (no SelectionStart calls)
+# Creates a cross-thread-safe delegate for a RichTextBox
 function New-WriteLogDelegate {
     param([System.Windows.Forms.RichTextBox]$TextBox)
     $handler = {
         param($msg)
         if ($TextBox.InvokeRequired) {
-            $TextBox.Invoke($script:WriteLogDelegate, $msg)
+            $TextBox.Invoke($script:WriteLogDelegate, @($msg))
             return
         }
-        $timestamp = (Get-Date).ToString('HH:mm:ss')
-        $TextBox.AppendText("$timestamp  $msg`r`n")
+        $TextBox.AppendText("$((Get-Date).ToString('HH:mm:ss'))  $msg`r`n")
         $TextBox.ScrollToCaret()
         [System.Windows.Forms.Application]::DoEvents()
     }
@@ -38,7 +37,7 @@ function New-WriteLogDelegate {
 
 # Builds and returns the main Form
 function Start-AutoByteProGUI {
-    # Main form
+    # --- Form Setup ---
     $form = [System.Windows.Forms.Form]::new()
     $form.Text          = 'AutoBytePro GUI v2.0'
     $form.Size          = [System.Drawing.Size]::new(1000,700)
@@ -46,7 +45,7 @@ function Start-AutoByteProGUI {
     $form.MinimumSize   = [System.Drawing.Size]::new(800,600)
     $form.Icon          = [System.Drawing.SystemIcons]::Application
 
-    # Output box
+    # RichTextBox for output
     $richTextBox = [System.Windows.Forms.RichTextBox]::new()
     $richTextBox.Dock       = 'Fill'
     $richTextBox.ReadOnly   = $true
@@ -65,7 +64,7 @@ function Start-AutoByteProGUI {
     $statusStrip.Items.Add($script:statusLabel) | Out-Null
 
     # Toolbar with Stop & Clear
-    $toolStrip  = [System.Windows.Forms.ToolStrip]::new()
+    $toolStrip = [System.Windows.Forms.ToolStrip]::new()
     $script:stopButton = [System.Windows.Forms.ToolStripButton]::new('Stop')
     $script:stopButton.Enabled = $false
     $script:stopButton.add_Click({ Stop-CurrentProcess })
@@ -82,25 +81,25 @@ function Start-AutoByteProGUI {
 
     # Panel for script buttons
     $script:buttonPanel = [System.Windows.Forms.FlowLayoutPanel]::new()
-    $script:buttonPanel.Dock         = 'Top'
-    $script:buttonPanel.AutoSize     = $true
-    $script:buttonPanel.Padding      = [System.Windows.Forms.Padding]::new(10)
-    $script:buttonPanel.BackColor    = [System.Drawing.Color]::LightGray
+    $script:buttonPanel.Dock      = 'Top'
+    $script:buttonPanel.AutoSize  = $true
+    $script:buttonPanel.Padding   = [System.Windows.Forms.Padding]::new(10)
+    $script:buttonPanel.BackColor = [System.Drawing.Color]::LightGray
 
     # Define GitHub-hosted scripts
     $GitHubScripts = @(
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DiskCleaner.ps1";           Text = "Disk Cleaner" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/EnableFilesOnDemand.ps1";   Text = "Enable Files On Demand" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DiskCleaner.ps1";            Text = "Disk Cleaner" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/EnableFilesOnDemand.ps1";    Text = "Enable Files On Demand" },
         @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DownloadandInstallPackage.ps1"; Text = "Download & Install Package" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckUserProfileIssue.ps1"; Text = "Check User Profile" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/BloatWareRemover.ps1";       Text = "Dell Bloatware Remover" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1";    Text = "Reset & Install Windows Update" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WindowsSystemRepair.ps1";     Text = "Windows System Repair" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckUserProfileIssue.ps1";    Text = "Check User Profile" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/BloatWareRemover.ps1";      Text = "Dell Bloatware Remover" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1";   Text = "Reset & Install Windows Update" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WindowsSystemRepair.ps1";    Text = "Windows System Repair" },
         @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Text = "Reset Windows Search DB" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallMSProjects.ps1";       Text = "Install MS Projects" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1";         Text = "Check Drive Space" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetSpeedTest.ps1";       Text = "Internet Speed Test" },
-        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetLatencyTest.ps1";     Text = "Internet Latency Test" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallMSProjects.ps1";      Text = "Install MS Projects" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1";        Text = "Check Drive Space" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetSpeedTest.ps1";      Text = "Internet Speed Test" },
+        @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetLatencyTest.ps1";    Text = "Internet Latency Test" },
         @{ Url = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WorkPaperMonitorTroubleShooter.ps1"; Text = "Monitor Troubleshooter" }
     )
     foreach ($s in $GitHubScripts) {
@@ -112,7 +111,8 @@ function Start-AutoByteProGUI {
         $btn.add_Click({ Start-Script -Url $this.Tag.Url -Description $this.Tag.Text })
         $script:buttonPanel.Controls.Add($btn)
     }
-    $exitBtn = [System.Windows.Forms.Button]::new('Exit')
+    # Exit button
+    $exitBtn = [System.Windows.Forms.Button]::new('Exit Application')
     $exitBtn.Size      = [System.Drawing.Size]::new(180,35)
     $exitBtn.Margin    = [System.Windows.Forms.Padding]::new(5)
     $exitBtn.BackColor = [System.Drawing.Color]::LightCoral
@@ -120,14 +120,18 @@ function Start-AutoByteProGUI {
     $script:buttonPanel.Controls.Add($exitBtn)
 
     # Layout container
-    $layout = [System.Windows.Forms.TableLayoutPanel]::new()
-    $layout.Dock      = 'Fill'
-    $layout.RowCount  = 2
-    $layout.Controls.Add($script:buttonPanel,    0,0)
-    $layout.Controls.Add($richTextBox,     0,1)
+    $main = [System.Windows.Forms.TableLayoutPanel]::new()
+    $main.Dock       = 'Fill'
+    $main.ColumnCount = 1
+    $main.ColumnStyles.Add((New-Object System.Windows.Forms.ColumnStyle('Percent',100)))
+    $main.RowCount   = 2
+    $main.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('AutoSize')))
+    $main.RowStyles.Add((New-Object System.Windows.Forms.RowStyle('Percent',100)))
+    $main.Controls.Add($script:buttonPanel, 0, 0)
+    $main.Controls.Add($richTextBox,      0, 1)
 
     # Assemble form
-    $form.Controls.Add($layout)
+    $form.Controls.Add($main)
     $form.Controls.Add($toolStrip)
     $form.Controls.Add($statusStrip)
 
@@ -136,6 +140,8 @@ function Start-AutoByteProGUI {
 
     return $form
 }
+
+# Starts, monitors, and logs a script run
 function Start-Script {
     param(
         [Parameter(Mandatory)] [string] $Url,
@@ -169,41 +175,39 @@ function Start-Script {
         $psi.UseShellExecute        = $false
         $psi.CreateNoWindow         = $true
 
-        $script:currentProcess = [System.Diagnostics.Process]::new()
-        $script:currentProcess.StartInfo           = $psi
+        $script:currentProcess                    = [System.Diagnostics.Process]::new()
+        $script:currentProcess.StartInfo          = $psi
         $script:currentProcess.EnableRaisingEvents = $true
 
-        $script:currentProcess.add_OutputDataReceived({
-            param($s,$e)
-            if ($e.Data) { Write-Log $e.Data }
-        })
-        $script:currentProcess.add_ErrorDataReceived({
-            param($s,$e)
-            if ($e.Data) { Write-Log "ERROR: $($e.Data)" }
-        })
+        # Wire up output handlers
+        $script:currentProcess.add_OutputDataReceived({ param($s,$e) if ($e.Data) { Write-Log $e.Data } })
+        $script:currentProcess.add_ErrorDataReceived({ param($s,$e) if ($e.Data) { Write-Log "ERROR: $($e.Data)" } })
         $script:currentProcess.add_Exited({
             param($s,$e)
             $code = $script:currentProcess.ExitCode
+            if ($code -eq 0) { Write-Log "✔ Completed ($code)" } else { Write-Log "✖ Exit Code: $code" }
             $script:buttonPanel.Enabled = $true
             $script:stopButton.Enabled  = $false
             $script:statusLabel.Text    = if ($code -eq 0) { 'Ready' } else { "Error ($code)" }
         })
-        $script:currentProcess.Start() | Out-Null
+
+        # Start
+        $script:currentProcess.Start()            | Out-Null
         $script:currentProcess.BeginOutputReadLine()
         $script:currentProcess.BeginErrorReadLine()
     } catch {
-        Write-Log "ERROR: $_"
+        Write-Log "CRITICAL: $_"
         $script:buttonPanel.Enabled = $true
         $script:stopButton.Enabled  = $false
         $script:statusLabel.Text    = 'Error'
     }
 }
 
+# Allows user to terminate a running process
 function Stop-CurrentProcess {
     if ($script:currentProcess -and -not $script:currentProcess.HasExited) {
         try {
             $script:currentProcess.Kill()
-            $script:currentProcess.WaitForExit()
             Write-Log "Process terminated by user."
         } catch {
             Write-Log "Failed to terminate process: $_"
@@ -215,12 +219,6 @@ function Stop-CurrentProcess {
     }
 }
 
-# Run the application
-[System.Windows.Forms.Application]::Run( (Start-AutoByteProGUI) )
-
-# Cleanup any temporary files
-foreach ($f in $script:tempFiles) {
-    if (Test-Path $f) {
-        Remove-Item $f -Force -ErrorAction SilentlyContinue
-    }
-}
+# Run the application and then cleanup
+[System.Windows.Forms.Application]::Run((Start-AutoByteProGUI))
+foreach ($f in $script:tempFiles) { if (Test-Path $f) { Remove-Item $f -Force -ErrorAction SilentlyContinue } }
