@@ -23,6 +23,8 @@ Execute AutoByteGUI:
 & python .\AutoByteGUI.py
 ```
 
+![AutoByteGUI](https://github.com/deep1ne8/misc/blob/main/AutoByteGUI.png)
+
 ## 📖 Documentation
 For detailed guides and usage instructions, visit the [AutoByte Wiki](https://github.com/deep1ne8/misc/wiki).
 
