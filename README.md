@@ -10,6 +10,8 @@ AutoByte is a **PowerShell automation tool** that simplifies system tasks, makin
 - Seamless integration with PowerShell
 - Open-source and customizable
 
+## Tool in continious development. New features will be added soon!!!!
+
 ## 🚀 Installation
 You can install AutoByte using **PowerShell**:
 ```powershell
