@@ -10,15 +10,17 @@ AutoByte is a **PowerShell automation tool** that simplifies system tasks, makin
 - Seamless integration with PowerShell
 - Open-source and customizable
 
-## 🚀 Installation (via Chocolatey)
-You can install AutoByte using **Chocolatey**:
+## 🚀 Installation
+You can install AutoByte using **PowerShell**:
 ```powershell
-choco install autobyte -y
+git clone https://github.com/deep1ne8/misc.git
+cd .\misc
+& .\AutoByteGUI-Build.ps1
 ```
 
-To uninstall AutoByte:
+Execute AutoByteGUI:
 ```powershell
-choco uninstall autobyte -y
+& python .\AutoByteGUI.py
 ```
 
 ## 📖 Documentation
