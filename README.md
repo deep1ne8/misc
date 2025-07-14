@@ -8,8 +8,8 @@ AutoByte is a **PowerShell automation tool** that simplifies system tasks, makin
 - Automates repetitive system tasks
 - Lightweight and fast execution
 - Seamless integration with PowerShell
-- Open-source and customizable
 
+## This is my personal project to improve my PowerShell skills and to automate repetitive troubleshooting tasks.
 ## Tool in continious development. New features will be added soon!!!!
 
 ## 🚀 Installation
