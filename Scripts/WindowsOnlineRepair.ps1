@@ -98,7 +98,7 @@ function Download-WindowsISO {
             Write-Host "Created directory: $DestinationDirectory"
         }
         catch {
-            throw "Failed to create directory $DestinationDirectory: $_"
+            throw "Failed to create directory ${DestinationDirectory}: $_"
         }
     }
 
