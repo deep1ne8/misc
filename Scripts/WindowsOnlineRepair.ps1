@@ -1,67 +1,49 @@
 <#
 .SYNOPSIS
-    Download a Windows 10/11 ISO and repair your current OS with DISM.
-
-.DESCRIPTION
-    - Auto-detects or lets you specify target OS (10 or 11), release (e.g. 22H2), edition, arch, lang.  
-    - Downloads Fido.ps1 and invokes it to grab the correct ISO.  
-    - Mounts the ISO, runs DISM /RestoreHealth against install.wim/.esd, then unmounts.  
+    Download a Windows 10 or 11 ISO via Fido, mount it, run DISM repair, then unmount.
 
 .PARAMETER DestinationDirectory
-    Where to store Fido.ps1 and the downloaded ISO. Default: C:\WindowsSetup
+    Path to store Fido.ps1 and the downloaded ISO. Defaults to C:\WindowsSetup.
 
 .PARAMETER TargetWin
-    Which Windows to download (10 or 11). Auto-detected if omitted.
+    “10” or “11”. If omitted, auto-detected from the running OS.
 
 .PARAMETER Release
-    Release build (e.g. 22H2). Default: 22H2
+    Release build, e.g. 22H2. Default is 22H2.
 
 .PARAMETER Edition
-    Edition (Pro, Home, etc.). Default: Pro
+    Edition (Pro, Home, etc.). Default is Pro.
 
 .PARAMETER Arch
-    Architecture (x64, x86, arm64). Default: x64
+    Architecture: x64, x86, or arm64. Default is x64.
 
 .PARAMETER Language
-    Language code (Eng). Default: Eng
+    Language code (Eng). Default is Eng.
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Position=0)]
     [string] $DestinationDirectory = "C:\WindowsSetup",
-
-    [Parameter(Position=1)]
     [ValidateSet("10","11")]
     [string] $TargetWin,
-
-    [Parameter(Position=2)]
-    [string] $Release = "22H2",
-
-    [Parameter(Position=3)]
-    [string] $Edition = "Pro",
-
-    [Parameter(Position=4)]
+    [string] $Release      = "22H2",
+    [string] $Edition      = "Pro",
     [ValidateSet("x64","x86","arm64")]
-    [string] $Arch = "x64",
-
-    [Parameter(Position=5)]
-    [string] $Language = "Eng"
+    [string] $Arch         = "x64",
+    [string] $Language     = "Eng"
 )
 
-# ── 1) Ensure we're running as Admin
+# ── 1) Elevation check
 if (-not ([Security.Principal.WindowsPrincipal] `
-        [Security.Principal.WindowsIdentity]::GetCurrent() `
-        ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Warning "❗ Please re-run this script **as Administrator**."
+          [Security.Principal.WindowsIdentity]::GetCurrent() `
+         ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    Write-Warning "Please re-run this script as Administrator."
     exit 1
 }
 
-# ── 2) Functions
+# ── 2) Helpers
 
 function Get-DiskSpace {
-    [CmdletBinding()]
     param(
-        [ValidateNotNullOrEmpty()]
         [string] $Drive = 'C'
     )
     Get-PSDrive -Name $Drive -ErrorAction Stop |
@@ -71,117 +53,107 @@ function Get-DiskSpace {
 }
 
 function Download-WindowsISO {
-    [CmdletBinding()]
     param(
         [Parameter(Mandatory)][string] $DestinationDirectory,
-        [Parameter(Mandatory)][ValidateSet("10","11")] [string] $Win,
+        [Parameter(Mandatory)][ValidateSet("10","11")][string] $Win,
         [Parameter(Mandatory)][string] $Rel,
         [Parameter(Mandatory)][string] $Ed,
-        [Parameter(Mandatory)][ValidateSet("x64","x86","arm64")] [string] $Arch,
+        [Parameter(Mandatory)][ValidateSet("x64","x86","arm64")][string] $Arch,
         [Parameter(Mandatory)][string] $Lang
     )
 
-    # Prepare folder
+    # Ensure folder exists
     if (-not (Test-Path $DestinationDirectory)) {
-        Write-Verbose "Creating folder $DestinationDirectory"
         New-Item -Path $DestinationDirectory -ItemType Directory -Force | Out-Null
     }
 
-    # Download Fido
+    # Download Fido.ps1
     $fidoScript = Join-Path $DestinationDirectory 'Fido.ps1'
-    Write-Host "🔽 Downloading Fido script..."
-    try {
-        Invoke-WebRequest `
-            -Uri 'https://raw.githubusercontent.com/pbatard/Fido/master/Fido.ps1' `
-            -OutFile $fidoScript -UseBasicParsing -ErrorAction Stop
-    } catch {
-        throw "Failed to download Fido.ps1: $_"
-    }
+    Write-Host "Downloading Fido.ps1..."
+    Invoke-WebRequest `
+        -Uri 'https://raw.githubusercontent.com/pbatard/Fido/master/Fido.ps1' `
+        -OutFile $fidoScript -UseBasicParsing -ErrorAction Stop
 
-    # Build ISO filename
+    # Build ISO name & path
     $isoName = "Win${Win}_${Rel}_${Lang}_${Arch}.iso"
     $isoPath = Join-Path $DestinationDirectory $isoName
 
-    # Invoke Fido to download ISO
-    Write-Host "🪟 Running Fido to get Windows $Win $Rel ISO..."
+    # Run Fido to fetch ISO
+    Write-Host "Running Fido to download Windows $Win $Rel..."
     & $fidoScript `
-        -Win $Win `
-        -Rel $Rel `
-        -Ed  $Ed  `
+        -Win  $Win `
+        -Rel  $Rel `
+        -Ed   $Ed  `
         -Lang $Lang `
         -Arch $Arch `
         -OutFile $isoPath `
         -ErrorAction Stop
 
     if (-not (Test-Path $isoPath)) {
-        throw "ISO download failed; file not found at $isoPath"
+        throw "ISO download failed; not found at $isoPath"
     }
 
-    Write-Host "✅ ISO downloaded to $isoPath"
+    Write-Host "ISO downloaded to $isoPath"
     return $isoPath
 }
 
 function Repair-Windows {
-    [CmdletBinding()]
     param(
-        [Parameter(Mandatory)][string] $MountPath  # e.g. 'E:\'
+        [Parameter(Mandatory)][string] $MountPath
     )
 
     $dismExe = Join-Path $env:SystemRoot 'System32\Dism.exe'
-    $wim      = Join-Path $MountPath    'sources\install.wim'
-    $esd      = Join-Path $MountPath    'sources\install.esd'
+    $wim     = Join-Path $MountPath 'sources\install.wim'
+    $esd     = Join-Path $MountPath 'sources\install.esd'
 
     if (Test-Path $wim) {
         $sourceArg = $wim
-    } elseif (Test-Path $esd) {
-        # ESD: use image index 1 by default
+    }
+    elseif (Test-Path $esd) {
         $sourceArg = "esd:$esd:1"
-    } else {
-        throw "No install.wim or install.esd found under $MountPath\sources"
+    }
+    else {
+        throw "No install.wim or install.esd under $MountPath\sources"
     }
 
-    Write-Host "🔧 Repairing Windows (DISM source = $sourceArg)..."
-    try {
-        & $dismExe `
-            /Online /Cleanup-Image /RestoreHealth `
-            "/Source:$sourceArg" /LimitAccess `
-            -ErrorAction Stop
+    Write-Host "Running DISM /RestoreHealth..."
+    & $dismExe `
+        /Online /Cleanup-Image /RestoreHealth `
+        "/Source:$sourceArg" /LimitAccess `
+        -ErrorAction Stop
 
-        Write-Host "✅ DISM RestoreHealth completed successfully."
-    } catch {
-        throw "DISM repair failed: $_"
-    }
+    Write-Host "DISM completed successfully."
 }
 
-# ── 3) Auto-detect TargetWin if not specified
+# ── 3) Auto-detect TargetWin if not supplied
 if (-not $TargetWin) {
     $caption = (Get-CimInstance Win32_OperatingSystem).Caption
-    if ($caption -match 'Windows\s+11') { $TargetWin = '11' }
+    if ($caption -match 'Windows\s+11')   { $TargetWin = '11' }
     elseif ($caption -match 'Windows\s+10') { $TargetWin = '10' }
     else {
-        Write-Warning "Could not auto-detect OS from '$caption'. Defaulting to Windows 10."
+        Write-Warning "Cannot detect OS from '$caption'; defaulting to 10."
         $TargetWin = '10'
     }
-    Write-Host "ℹ️  Target OS set to Windows $TargetWin"
+    Write-Host "Target OS: Windows $TargetWin"
 }
 
-# ── 4) Gather disk-space info
-Write-Host "ℹ️  Disk space on C: drive:"
+# ── 4) Show disk space
+Write-Host "Disk space on C: drive:"
 Get-DiskSpace -Drive 'C' | Format-Table -AutoSize
 
-# ── 5) Ensure Microsoft.PowerShell.Management is loaded
+# ── 5) Ensure module loaded
 if (-not (Get-Module Microsoft.PowerShell.Management)) {
     Import-Module Microsoft.PowerShell.Management -ErrorAction SilentlyContinue
 }
 
-# ── 6) Check current build vs. target build
-$os        = Get-CimInstance Win32_OperatingSystem
-$build     = [int]$os.BuildNumber
-$targetMap = @{ '10' = 19045; '11' = 22621 }
-$targetBuild = $targetMap[$TargetWin]
+# ── 6) Decide whether to download ISO
+$os          = Get-CimInstance Win32_OperatingSystem
+$currentBuild= [int]$os.BuildNumber
+$targets     = @{ '10' = 19045; '11' = 22621 }
+$targetBuild = $targets[$TargetWin]
 
-if ($build -lt $targetBuild) {
-    Write-Host "⚙️  Current build $build < target $targetBuild. Downloading ISO..."
+if ($currentBuild -lt $targetBuild) {
+    Write-Host "Current build $currentBuild is less than target $targetBuild. Downloading ISO..."
     $IsoPath = Download-WindowsISO `
         -DestinationDirectory $DestinationDirectory `
         -Win  $TargetWin `
@@ -189,33 +161,35 @@ if ($build -lt $targetBuild) {
         -Ed   $Edition `
         -Arch $Arch `
         -Lang $Language
-} else {
-    # Assume ISO already in place
+}
+else {
     $isoName = "Win${TargetWin}_${Release}_${Language}_${Arch}.iso"
     $IsoPath = Join-Path $DestinationDirectory $isoName
-    Write-Host "ℹ️  Build $build ≥ $targetBuild. Looking for existing ISO: $IsoPath"
+    Write-Host "Build $currentBuild ≥ $targetBuild; looking for existing ISO at $IsoPath"
 }
 
 if (-not (Test-Path $IsoPath)) {
-    throw "ISO not found at $IsoPath. Cannot proceed."
+    throw "ISO not found at $IsoPath; cannot continue."
 }
 
 # ── 7) Mount the ISO
-Write-Host "📀 Mounting ISO..."
+Write-Host "Mounting ISO..."
 try {
-    $mountResult = Mount-DiskImage -ImagePath $IsoPath -PassThru -ErrorAction Stop
-    # Grab the drive letter
-    $vol = $mountResult | Get-Volume -ErrorAction Stop
-    $driveLetter = $vol.DriveLetter + ':\'
-    Write-Host "✅ ISO mounted at $driveLetter"
-} catch {
+    $mount = Mount-DiskImage -ImagePath $IsoPath -PassThru -ErrorAction Stop
+    $vol   = Get-Volume -DiskImage $mount -ErrorAction Stop
+    $drive = $vol.DriveLetter + ':\'
+    Write-Host "ISO mounted at $drive"
+}
+catch {
     throw "Failed to mount ISO: $_"
 }
 
-# ── 8) Repair Windows
-Repair-Windows -MountPath $driveLetter
+# ── 8) Repair via DISM
+Repair-Windows -MountPath $drive
 
-# ── 9) Clean up: unmount
-Write-Host "📤 Unmounting ISO..."
+# ── 9) Unmount
+Write-Host "Dismounting ISO..."
 Dismount-DiskImage -ImagePath $IsoPath -ErrorAction SilentlyContinue
-Write-Host "All done! 🎉"
+
+# ── Done
+Write-Host "All done!"
