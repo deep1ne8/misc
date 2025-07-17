@@ -45,19 +45,19 @@ if (-not (Test-Path "C:\Windows\System32")) {
 
 # Run SFC
 Write-Host "`n--- Running SFC scan ---`n" -ForegroundColor Yellow
-Start-Process -FilePath "cmd.exe" -ArgumentList "/c sfc /scannow" -Verb RunAs -Wait
+Start-Process -FilePath "cmd.exe" -ArgumentList "/c sfc /scannow" -Verb RunAs -Wait -NoNewWindow
 
 # Run DISM /CheckHealth
 Write-Host "`n--- Running DISM CheckHealth ---`n" -ForegroundColor Yellow
-Start-Process -FilePath "dism.exe" -ArgumentList "/Online","/Cleanup-Image","/CheckHealth" -Verb RunAs -Wait
+Start-Process -FilePath "dism.exe" -ArgumentList "/Online","/Cleanup-Image","/CheckHealth" -Verb RunAs -Wait -NoNewWindow
 
 # Run DISM /ScanHealth
 Write-Host "`n--- Running DISM ScanHealth ---`n" -ForegroundColor Yellow
-Start-Process -FilePath "dism.exe" -ArgumentList "/Online","/Cleanup-Image","/ScanHealth" -Verb RunAs -Wait
+Start-Process -FilePath "dism.exe" -ArgumentList "/Online","/Cleanup-Image","/ScanHealth" -Verb RunAs -Wait -NoNewWindow
 
 # Run DISM /RestoreHealth
 Write-Host "`n--- Running DISM RestoreHealth ---`n" -ForegroundColor Yellow
-Start-Process -FilePath "dism.exe" -ArgumentList "/Online","/Cleanup-Image","/RestoreHealth" -Verb RunAs -Wait
+Start-Process -FilePath "dism.exe" -ArgumentList "/Online","/Cleanup-Image","/RestoreHealth" -Verb RunAs -Wait -NoNewWindow
 
 Write-Host "`n=== Operations completed. Please review the output above. ===`n" -ForegroundColor Green
 
