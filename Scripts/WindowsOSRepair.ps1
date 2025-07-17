@@ -32,7 +32,7 @@ Write-Host "✔ Registry updated to permanently enable strong crypto/TLS 1.2." -
 if ($env:SystemRoot -ne "C:\Windows") {
     Write-Warning "⚠ SystemRoot is not pointing to C:\Windows. Current value: $($env:SystemRoot)"
 } else {
-    Write-Host "✔ SystemRoot correctly points to C:\Windows"
+    Write-Host "✔ SystemRoot correctly points to C:\Windows" -ForegroundColor Green
 }
 
 # Validate that Windows folder exists
@@ -40,7 +40,7 @@ if (-not (Test-Path "C:\Windows\System32")) {
     Write-Error "❌ C:\Windows\System32 not found. This environment may not be valid."
     exit 1
 } else {
-    Write-Host "✔ Windows directory structure validated."
+    Write-Host "✔ Windows directory structure validated." -ForegroundColor Green
 }
 
 # Run SFC
@@ -70,4 +70,4 @@ if ($ssu) {
     Write-Warning "`n⚠ No Servicing Stack Update detected. You may need to manually install the latest SSU from Microsoft."
 }
 
-Write-Host "`n✅ Script execution finished."
+Write-Host "`n✅ Script execution finished." -ForegroundColor Green
