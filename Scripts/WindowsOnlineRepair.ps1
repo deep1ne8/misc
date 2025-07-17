@@ -102,7 +102,7 @@ function Get-DiskSpace {
 # Function to download Windows ISO using Fido
 function Download-WindowsISO {
     param(
-        [Parameter(Mandatory)][string] $DestinationDirectory,
+        [Parameter(Mandatory)][string] $DestinationDirectory = "C:\WindowsSetup",
         [Parameter(Mandatory)][ValidateSet("10","11")][string] $Win,
         [Parameter(Mandatory)][string] $Rel,
         [Parameter(Mandatory)][string] $Ed,
