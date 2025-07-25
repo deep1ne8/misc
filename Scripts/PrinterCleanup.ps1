@@ -1,7 +1,7 @@
 # ----------------------------------------------
 # CONFIG: GitHub raw URL to your PrinterCleanup.ps1
 # ----------------------------------------------
-$githubUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/script/PrinterCleanup.ps1"
+$githubUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/PrinterCleanup.ps1"
 $userProfilePath = "C:\Users\TMerchant"
 $localScript = Join-Path $userProfilePath "PrinterCleanup.ps1"
 
