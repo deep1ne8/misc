@@ -1,5 +1,5 @@
 # ----------------------------------------------
-# CONFIG: GitHub raw URL to your PrinterCleanup.ps1
+# CONFIG
 # ----------------------------------------------
 $githubUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/PrinterCleanup.ps1"
 $userProfilePath = "C:\Users\TMerchant"
@@ -15,31 +15,24 @@ try {
 }
 
 # ----------------------------------------------
-# Execute the cleanup script inside the user profile
+# Inject new printer names directly into the downloaded script
+# (Assuming the script expects a $printers array at the top)
 # ----------------------------------------------
-Write-Host "=== Executing PrinterCleanup.ps1 under $userProfilePath ===" -ForegroundColor Cyan
-
-# IMPORTANT: If you need to dynamically pass the new printers, modify PrinterCleanup.ps1 to use these names
-$printers = @(
+$newPrintersBlock = @"
+`$printers = @(
     "\\CVEFS02\S1_KM_C450i_Tammy's_Office_Color",
     "\\CVEFS02\S1_KM_C450i_Tammy's_Office_B&W"
 )
-
-# Create a temp wrapper script to inject new printer names if needed
-$wrapperScript = @"
-`$printers = @(
-    "`\\CVEFS02\S1_KM_C450i_Tammy's_Office_Color",
-    "`\\CVEFS02\S1_KM_C450i_Tammy's_Office_B&W"
-)
-. '$localScript'
 "@
 
-$wrapperPath = Join-Path $userProfilePath "PrinterCleanup.ps1"
-Set-Content -Path $wrapperPath -Value $wrapperScript -Force
+# Read existing script
+$original = Get-Content $localScript
+# Prepend new printers block
+Set-Content -Path $localScript -Value ($newPrintersBlock + "`r`n" + ($original -join "`r`n"))
 
-# Execute wrapper script
+Write-Host "=== Executing PrinterCleanup.ps1 under $userProfilePath ===" -ForegroundColor Cyan
 try {
-    powershell.exe -ExecutionPolicy Bypass -File $wrapperPath
+    powershell.exe -ExecutionPolicy Bypass -File $localScript
 } catch {
     Write-Host "Execution failed: $($_.Exception.Message)" -ForegroundColor Red
     exit 1
