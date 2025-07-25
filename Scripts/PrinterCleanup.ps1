@@ -28,6 +28,12 @@ $printers = @(
 
 Write-Host "=== Konica Minolta Printer Cleanup & Redeploy Script ===" -ForegroundColor Cyan
 
+$IsPrinterInstalled = Get-Printer | Where-Object {$_.Name -like "*Konica*"}
+
+If ($IsPrinterInstalled) {
+    Write-Host "No Konica Minolta printers found...."
+    Start-Sleep -Seconds 5
+    
 # ---------------------------
 # REMOVE PRINTER QUEUES
 # ---------------------------
@@ -67,6 +73,7 @@ foreach ($line in $pnpDriversRaw) {
         if ($block -match "$inf" -and $block -match "(?i)Konica") {
             Write-Host "Force removing package: $inf"
             Start-Process -FilePath "pnputil.exe" -ArgumentList "/delete-driver $inf /uninstall /force" -NoNewWindow -Wait
+            }
         }
     }
 }
@@ -85,4 +92,29 @@ foreach ($printer in $printers) {
 }
 
 Write-Host "`n=== Completed. Please test printing now. ===" -ForegroundColor Green
-Pause
+exit 0
+
+
+}else {
+    
+Write-Host "Adding printers now..."
+    Start-Sleep -Seconds 5
+
+# ---------------------------
+# REDEPLOY PRINTERS
+# ---------------------------
+Write-Host "`n[4/4] Redeploying printers from server..." -ForegroundColor Yellow
+foreach ($printer in $printers) {
+    try {
+        Write-Host "Adding printer: $printer"
+        Add-Printer -ConnectionName $printer -ErrorAction Stop
+    } catch {
+        Write-Warning "Failed to add printer: $printer - $($_.Exception.Message)"
+    }
+}
+
+Write-Host "`n=== Completed. Please test printing now. ===" -ForegroundColor Green
+exit 0
+}
+
+
