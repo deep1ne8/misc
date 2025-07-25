@@ -1,6 +1,8 @@
 # ----------------------------------------------
 # CONFIG: Printers to deploy
 # ----------------------------------------------
+
+
 $printers = @(
     "\\CVEFS02\S1_KM_C450i_Tammy's_Office_Color",
     "\\CVEFS02\S1_KM_C450i_Tammy's_Office_B&W"
