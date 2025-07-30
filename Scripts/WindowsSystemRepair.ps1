@@ -13,6 +13,25 @@ param(
     [switch]$SkipReboot
 )
 
+Write-Host "`n=== Configuring System for Secure TLS 1.2 Connections ===`n" -ForegroundColor Cyan
+
+# --- Permanent TLS 1.2 Fix ---
+# Apply at runtime:
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Write-Host "✔ TLS 1.2 enforced for this session." -ForegroundColor Green
+
+# Apply permanent fix in registry (for future .NET and PowerShell sessions):
+$regPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319",
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319"
+)
+foreach ($path in $regPaths) {
+    if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
+    New-ItemProperty -Path $path -Name "SchUseStrongCrypto" -Value 1 -PropertyType DWord -Force | Out-Null
+}
+Write-Host "✔ Registry updated to permanently enable strong crypto/TLS 1.2." -ForegroundColor Green
+
+
 # Ensure log directory exists
 $null = New-Item -Path (Split-Path $LogPath) -ItemType Directory -Force -ErrorAction SilentlyContinue
 

@@ -1,4 +1,4 @@
-# AutoByte - Easy Automate Your Workflow with PowerShell
+# AutoByte - Easy Automate Your Repetitive Troubleshooting Tasks with PowerShell
 
 ![AutoByte](https://github.com/deep1ne8/misc/blob/main/AutoByte_Main.png)
 
@@ -8,7 +8,9 @@ AutoByte is a **PowerShell automation tool** that simplifies system tasks, makin
 - Automates repetitive system tasks
 - Lightweight and fast execution
 - Seamless integration with PowerShell
-- Open-source and customizable
+
+## This is my personal project to improve my PowerShell skills and to automate repetitive troubleshooting tasks.
+## Tool in continious development. New features will be added soon!!!!
 
 ## 🚀 Installation
 You can install AutoByte using **PowerShell**:
@@ -22,6 +24,8 @@ Execute AutoByteGUI:
 ```powershell
 & python .\AutoByteGUI.py
 ```
+
+![AutoByteGUI](https://github.com/deep1ne8/misc/blob/main/AutoByteGUI.png)
 
 ## 📖 Documentation
 For detailed guides and usage instructions, visit the [AutoByte Wiki](https://github.com/deep1ne8/misc/wiki).
