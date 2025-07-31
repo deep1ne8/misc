@@ -5,17 +5,34 @@
 .DESCRIPTION
     Detects and removes 64-bit Microsoft Apps for Business, then installs 32-bit version
     with Access, Current Channel, English language
+.PARAMETER Force
+    Forces reinstallation even if 32-bit Office is already installed
+.PARAMETER Interactive
+    Prompts user for Force confirmation when 32-bit Office is detected
+.PARAMETER SkipRemoval
+    Skip removal of existing installations (for troubleshooting)
 .NOTES
-    Version: 1.0
+    Version: 1.1
     Requires: Administrator privileges
     Author: PowerShell Automation Script
+.EXAMPLE
+    .\OfficeDeployment.ps1
+    Standard deployment with interactive prompts
+.EXAMPLE
+    .\OfficeDeployment.ps1 -Force
+    Force reinstallation regardless of existing installations
+.EXAMPLE
+    .\OfficeDeployment.ps1 -Interactive
+    Prompt user when 32-bit Office is detected
 #>
 
 [CmdletBinding()]
 param(
     [string]$LogPath = "$env:TEMP\OfficeDeployment.log",
     [string]$WorkingDir = "$env:TEMP\OfficeDeployment",
-    [switch]$Force
+    [switch]$Force,
+    [switch]$Interactive,
+    [switch]$SkipRemoval
 )
 
 # Initialize logging
@@ -23,31 +40,88 @@ function Write-Log {
     param([string]$Message, [string]$Level = "INFO")
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logMessage = "[$timestamp] [$Level] $Message"
-    Write-Host $logMessage -ForegroundColor $(if($Level -eq "ERROR"){"Red"}elseif($Level -eq "WARN"){"Yellow"}else{"Green"})
+    $color = switch($Level) {
+        "ERROR" { "Red" }
+        "WARN" { "Yellow" }
+        "SUCCESS" { "Green" }
+        "INFO" { "Cyan" }
+        default { "White" }
+    }
+    Write-Host $logMessage -ForegroundColor $color
     Add-Content -Path $LogPath -Value $logMessage -Force
 }
 
-# Alternative: Get ODT from Microsoft directly
-function Get-LatestODT {
-    param([string]$DestinationPath)
+# Enhanced user prompt for Force option
+function Get-ForceDecision {
+    param(
+        [string]$ExistingVersion,
+        [string]$ExistingPlatform
+    )
     
-    Write-Log "Attempting to get latest ODT..."
-    try {
-        # Try direct Microsoft download page scraping
-        $downloadPage = Invoke-WebRequest -Uri "https://www.microsoft.com/en-us/download/details.aspx?id=49117" -UseBasicParsing
-        $downloadLink = ($downloadPage.Links | Where-Object { $_.href -match "officedeploymenttool.*\.exe" }).href | Select-Object -First 1
-        
-        if ($downloadLink) {
-            Write-Log "Found ODT download link: $downloadLink"
-            Invoke-WebRequest -Uri $downloadLink -OutFile "$DestinationPath\odt.exe" -UseBasicParsing -TimeoutSec 60
-            return $true
-        }
-    } catch {
-        Write-Log "Failed to get latest ODT: $($_.Exception.Message)" "WARN"
+    Write-Host "`n" -NoNewline
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+    Write-Host "                    EXISTING OFFICE DETECTED                    " -ForegroundColor Yellow
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+    Write-Host "Current Installation Details:" -ForegroundColor Cyan
+    Write-Host "  • Platform: $ExistingPlatform" -ForegroundColor White
+    Write-Host "  • Version: $ExistingVersion" -ForegroundColor White
+    
+    if ($ExistingPlatform -eq "x86") {
+        Write-Host "`n32-bit Office is already installed!" -ForegroundColor Green
+        Write-Host "Do you want to proceed with reinstallation?" -ForegroundColor Yellow
+    } else {
+        Write-Host "`n64-bit Office detected - recommending 32-bit installation" -ForegroundColor Yellow
+        Write-Host "Do you want to proceed with replacement?" -ForegroundColor Yellow
     }
     
-    return $false
+    Write-Host "`nOptions:" -ForegroundColor Cyan
+    Write-Host "  [Y] Yes - Continue with installation (Force)" -ForegroundColor Green
+    Write-Host "  [N] No  - Exit without changes" -ForegroundColor Red
+    Write-Host "  [S] Skip - Continue without removing existing Office" -ForegroundColor Yellow
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Yellow
+    
+    do {
+        $response = Read-Host "Please select an option [Y/N/S]"
+        $response = $response.ToUpper()
+        
+        switch ($response) {
+            "Y" { 
+                Write-Log "User selected: Force installation" "INFO"
+                return "FORCE" 
+            }
+            "N" { 
+                Write-Log "User selected: Exit without changes" "INFO"
+                return "EXIT" 
+            }
+            "S" { 
+                Write-Log "User selected: Skip removal" "INFO"
+                return "SKIP" 
+            }
+            default { 
+                Write-Host "Invalid selection. Please enter Y, N, or S." -ForegroundColor Red 
+            }
+        }
+    } while ($true)
 }
+
+# Display script banner with Force status
+function Show-ScriptBanner {
+    $forceStatus = if ($Force) { "ENABLED" } else { "DISABLED" }
+    $interactiveStatus = if ($Interactive) { "ENABLED" } else { "DISABLED" }
+    
+    Write-Host "`n" -NoNewline
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Blue
+    Write-Host "          MICROSOFT OFFICE 32-BIT DEPLOYMENT SCRIPT            " -ForegroundColor Blue
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Blue
+    Write-Host "Configuration:" -ForegroundColor Cyan
+    Write-Host "  • Force Mode: $forceStatus" -ForegroundColor $(if($Force){"Green"}else{"Yellow"})
+    Write-Host "  • Interactive Mode: $interactiveStatus" -ForegroundColor $(if($Interactive){"Green"}else{"Yellow"})
+    Write-Host "  • Skip Removal: $(if($SkipRemoval){"ENABLED"}else{"DISABLED"})" -ForegroundColor $(if($SkipRemoval){"Yellow"}else{"White"})
+    Write-Host "  • Log Path: $LogPath" -ForegroundColor White
+    Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Blue
+    Write-Host ""
+}
+
 try {
     if (Test-Path $WorkingDir) { Remove-Item $WorkingDir -Recurse -Force }
     New-Item -ItemType Directory -Path $WorkingDir -Force | Out-Null
@@ -88,52 +162,36 @@ function Get-OfficeInstallations {
             Name = $product.Name
             Version = $product.Version
             IdentifyingNumber = $product.IdentifyingNumber
+            Platform = "Unknown"
         }
     }
     
     return $installations
 }
 
-# Remove existing Office installations
+# Enhanced removal function with Force awareness
 function Remove-OfficeInstallations {
     param([array]$Installations)
+    
+    if ($SkipRemoval) {
+        Write-Log "Skipping removal as requested" "WARN"
+        return
+    }
     
     Write-Log "Removing existing Office installations..."
     
     foreach ($install in $Installations) {
         try {
             if ($install.Type -eq "Click-to-Run") {
-                Write-Log "Removing Click-to-Run installation..."
+                Write-Log "Removing Click-to-Run installation..." "INFO"
                 
-                # Download Office Deployment Tool if not exists
+                # Download ODT if needed
                 $odtPath = "$WorkingDir\setup.exe"
                 if (!(Test-Path $odtPath)) {
                     Write-Log "Downloading Office Deployment Tool..."
-                    $odtUrls = @(
-                        "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_17830-20162.exe",
-                        "https://www.microsoft.com/en-us/download/confirmation.aspx?id=49117"
-                    )
-                    
-                    $downloaded = $false
-                    foreach ($url in $odtUrls) {
-                        try {
-                            Write-Log "Attempting download from: $url"
-                            Invoke-WebRequest -Uri $url -OutFile "$WorkingDir\odt.exe" -UseBasicParsing -TimeoutSec 30
-                            if (Test-Path "$WorkingDir\odt.exe") {
-                                $downloaded = $true
-                                break
-                            }
-                        } catch {
-                            Write-Log "Download failed from $url : $($_.Exception.Message)" "WARN"
-                        }
+                    if (!(Get-ODTTool -DestinationPath $WorkingDir)) {
+                        throw "Failed to obtain Office Deployment Tool"
                     }
-                    
-                    if (!$downloaded) {
-                        Write-Log "All ODT download attempts failed. Please download manually from https://docs.microsoft.com/en-us/deployoffice/overview-office-deployment-tool" "ERROR"
-                        throw "Unable to download Office Deployment Tool"
-                    }
-                    
-                    Start-Process -FilePath "$WorkingDir\odt.exe" -ArgumentList "/quiet", "/extract:$WorkingDir" -Wait
                 }
                 
                 # Create removal configuration
@@ -145,24 +203,35 @@ function Remove-OfficeInstallations {
                 $removeConfig | Out-File "$WorkingDir\remove.xml" -Encoding UTF8
                 
                 # Execute removal
-                Start-Process -FilePath $odtPath -ArgumentList "/configure", "$WorkingDir\remove.xml" -Wait -NoNewWindow
-                Write-Log "Click-to-Run removal completed"
+                Write-Log "Executing Office removal..." "INFO"
+                $removeProcess = Start-Process -FilePath $odtPath -ArgumentList "/configure", "$WorkingDir\remove.xml" -Wait -PassThru -NoNewWindow
+                
+                if ($removeProcess.ExitCode -eq 0) {
+                    Write-Log "Click-to-Run removal completed successfully" "SUCCESS"
+                } else {
+                    Write-Log "Click-to-Run removal completed with warnings (Exit Code: $($removeProcess.ExitCode))" "WARN"
+                }
                 
             } elseif ($install.Type -eq "MSI") {
-                Write-Log "Removing MSI installation: $($install.Name)"
-                Start-Process -FilePath "msiexec.exe" -ArgumentList "/x", $install.IdentifyingNumber, "/quiet", "/norestart" -Wait
-                Write-Log "MSI removal completed: $($install.Name)"
+                Write-Log "Removing MSI installation: $($install.Name)" "INFO"
+                $msiProcess = Start-Process -FilePath "msiexec.exe" -ArgumentList "/x", $install.IdentifyingNumber, "/quiet", "/norestart" -Wait -PassThru
+                
+                if ($msiProcess.ExitCode -eq 0) {
+                    Write-Log "MSI removal completed successfully: $($install.Name)" "SUCCESS"
+                } else {
+                    Write-Log "MSI removal completed with warnings: $($install.Name) (Exit Code: $($msiProcess.ExitCode))" "WARN"
+                }
             }
         } catch {
             Write-Log "Failed to remove installation: $($_.Exception.Message)" "ERROR"
         }
     }
     
-    # Clean registry entries
-    Write-Log "Cleaning registry entries..."
+    # Enhanced registry cleanup
+    Write-Log "Performing registry cleanup..." "INFO"
     $regPaths = @(
         "HKLM:\SOFTWARE\Microsoft\Office",
-        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\O365*",
+        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Office",
         "HKCU:\SOFTWARE\Microsoft\Office"
     )
     
@@ -170,61 +239,71 @@ function Remove-OfficeInstallations {
         try {
             if (Test-Path $regPath) {
                 Remove-Item -Path $regPath -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Log "Cleaned registry path: $regPath" "INFO"
             }
         } catch {
-            Write-Log "Registry cleanup warning: $($_.Exception.Message)" "WARN"
+            Write-Log "Registry cleanup warning for $regPath : $($_.Exception.Message)" "WARN"
         }
     }
 }
 
-# Install 32-bit Microsoft Apps for Business
-function Install-Office32Bit {
-    Write-Log "Installing 32-bit Microsoft Apps for Business..."
+# Enhanced ODT download function
+function Get-ODTTool {
+    param([string]$DestinationPath)
     
-    try {
-        # Download Office Deployment Tool if not exists
-        $odtPath = "$WorkingDir\setup.exe"
-        if (!(Test-Path $odtPath)) {
-            Write-Log "Downloading Office Deployment Tool..."
-            $odtUrls = @(
-                "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_17830-20162.exe",
-                "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16626-20170.exe"
-            )
+    Write-Log "Obtaining Office Deployment Tool..." "INFO"
+    
+    # Multiple ODT download sources
+    $odtSources = @(
+        @{
+            Name = "Microsoft Direct Download"
+            Url = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_17830-20162.exe"
+        },
+        @{
+            Name = "Alternative Microsoft Link"
+            Url = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16626-20170.exe"
+        }
+    )
+    
+    foreach ($source in $odtSources) {
+        try {
+            Write-Log "Attempting download from: $($source.Name)" "INFO"
+            Invoke-WebRequest -Uri $source.Url -OutFile "$DestinationPath\odt.exe" -UseBasicParsing -TimeoutSec 60
             
-            $downloaded = $false
-            foreach ($url in $odtUrls) {
-                try {
-                    Write-Log "Attempting download from: $url"
-                    Invoke-WebRequest -Uri $url -OutFile "$WorkingDir\odt.exe" -UseBasicParsing -TimeoutSec 30
-                    if (Test-Path "$WorkingDir\odt.exe") {
-                        $downloaded = $true
-                        break
-                    }
-                } catch {
-                    Write-Log "Download failed from $url : $($_.Exception.Message)" "WARN"
+            if (Test-Path "$DestinationPath\odt.exe") {
+                Write-Log "ODT downloaded successfully from: $($source.Name)" "SUCCESS"
+                
+                # Extract ODT
+                Write-Log "Extracting Office Deployment Tool..." "INFO"
+                $extractProcess = Start-Process -FilePath "$DestinationPath\odt.exe" -ArgumentList "/quiet", "/extract:$DestinationPath" -Wait -PassThru
+                
+                if ($extractProcess.ExitCode -eq 0 -and (Test-Path "$DestinationPath\setup.exe")) {
+                    Write-Log "ODT extraction completed successfully" "SUCCESS"
+                    return $true
+                } else {
+                    Write-Log "ODT extraction failed" "ERROR"
                 }
             }
-            
-            if (!$downloaded) {
-                Write-Log "ODT download failed. Attempting alternative method..." "WARN"
-                
-                # Alternative: Use cached ODT if available
-                $cachedODT = "$env:ProgramFiles\Microsoft Office 15\ClientX64\OfficeClickToRun.exe"
-                if (Test-Path $cachedODT) {
-                    Write-Log "Using cached Office installation tool"
-                    Copy-Item $cachedODT "$WorkingDir\setup.exe"
-                } else {
-                    Write-Log "Please download ODT manually from: https://docs.microsoft.com/en-us/deployoffice/overview-office-deployment-tool" "ERROR"
-                    Write-Log "Place setup.exe in: $WorkingDir" "ERROR"
-                    
-                    # Wait for manual intervention
-                    do {
-                        Write-Log "Waiting for setup.exe to be placed in working directory..." "WARN"
-                        Start-Sleep -Seconds 10
-                    } while (!(Test-Path "$WorkingDir\setup.exe"))
-                }
-            } else {
-                Start-Process -FilePath "$WorkingDir\odt.exe" -ArgumentList "/quiet", "/extract:$WorkingDir" -Wait
+        } catch {
+            Write-Log "Download failed from $($source.Name): $($_.Exception.Message)" "WARN"
+        }
+    }
+    
+    Write-Log "All ODT download attempts failed" "ERROR"
+    Write-Log "Please download ODT manually from: https://docs.microsoft.com/en-us/deployoffice/overview-office-deployment-tool" "ERROR"
+    return $false
+}
+
+# Install 32-bit Microsoft Apps for Business
+function Install-Office32Bit {
+    Write-Log "Installing 32-bit Microsoft Apps for Business..." "INFO"
+    
+    try {
+        # Ensure ODT is available
+        $odtPath = "$WorkingDir\setup.exe"
+        if (!(Test-Path $odtPath)) {
+            if (!(Get-ODTTool -DestinationPath $WorkingDir)) {
+                throw "Office Deployment Tool not available"
             }
         }
         
@@ -257,20 +336,22 @@ function Install-Office32Bit {
 "@
         
         $installConfig | Out-File "$WorkingDir\install.xml" -Encoding UTF8
-        Write-Log "Installation configuration created"
+        Write-Log "Installation configuration created" "SUCCESS"
         
         # Execute installation
-        Write-Log "Starting Office installation... This may take several minutes."
-        $process = Start-Process -FilePath $odtPath -ArgumentList "/configure", "$WorkingDir\install.xml" -Wait -Force -PassThru -NoNewWindow
+        Write-Log "Starting Office installation... This may take several minutes." "INFO"
+        Write-Host "Please wait while Office is being installed..." -ForegroundColor Yellow
         
-        if ($process.ExitCode -eq 0) {
-            Write-Log "Office installation completed successfully"
+        $installProcess = Start-Process -FilePath $odtPath -ArgumentList "/configure", "$WorkingDir\install.xml" -Wait -PassThru -NoNewWindow
+        
+        if ($installProcess.ExitCode -eq 0) {
+            Write-Log "Office installation completed successfully" "SUCCESS"
+            return $true
         } else {
-            Write-Log "Office installation failed with exit code: $($process.ExitCode)" "ERROR"
+            Write-Log "Office installation failed with exit code: $($installProcess.ExitCode)" "ERROR"
             return $false
         }
         
-        return $true
     } catch {
         Write-Log "Installation failed: $($_.Exception.Message)" "ERROR"
         return $false
@@ -279,24 +360,27 @@ function Install-Office32Bit {
 
 # Verify installation
 function Test-OfficeInstallation {
-    Write-Log "Verifying Office installation..."
+    Write-Log "Verifying Office installation..." "INFO"
     
     $officeApps = @(
-        "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\WINWORD.EXE",
-        "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\EXCEL.EXE",
-        "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\POWERPNT.EXE",
-        "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\OUTLOOK.EXE",
-        "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\MSACCESS.EXE"
+        @{ Path = "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\WINWORD.EXE"; Name = "Word" },
+        @{ Path = "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\EXCEL.EXE"; Name = "Excel" },
+        @{ Path = "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\POWERPNT.EXE"; Name = "PowerPoint" },
+        @{ Path = "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\OUTLOOK.EXE"; Name = "Outlook" },
+        @{ Path = "$env:ProgramFiles (x86)\Microsoft Office\root\Office16\MSACCESS.EXE"; Name = "Access" }
     )
     
     $installed = $true
+    $installedApps = @()
+    $missingApps = @()
+    
     foreach ($app in $officeApps) {
-        if (Test-Path $app) {
-            $appName = Split-Path $app -Leaf
-            Write-Log "✓ $appName found"
+        if (Test-Path $app.Path) {
+            Write-Log "✓ $($app.Name) installed successfully" "SUCCESS"
+            $installedApps += $app.Name
         } else {
-            $appName = Split-Path $app -Leaf
-            Write-Log "✗ $appName missing" "WARN"
+            Write-Log "✗ $($app.Name) not found" "WARN"
+            $missingApps += $app.Name
             $installed = $false
         }
     }
@@ -306,11 +390,18 @@ function Test-OfficeInstallation {
     if (Test-Path $regPath) {
         $config = Get-ItemProperty -Path $regPath -ErrorAction SilentlyContinue
         if ($config.Platform -eq "x86") {
-            Write-Log "✓ Architecture: 32-bit confirmed"
+            Write-Log "✓ Architecture: 32-bit confirmed" "SUCCESS"
         } else {
-            Write-Log "✗ Architecture: $($config.Platform) detected" "WARN"
+            Write-Log "✗ Architecture: $($config.Platform) detected (Expected: x86)" "WARN"
             $installed = $false
         }
+    }
+    
+    # Summary
+    Write-Host "`nInstallation Summary:" -ForegroundColor Cyan
+    Write-Host "Installed Apps: $($installedApps -join ', ')" -ForegroundColor Green
+    if ($missingApps.Count -gt 0) {
+        Write-Host "Missing Apps: $($missingApps -join ', ')" -ForegroundColor Red
     }
     
     return $installed
@@ -321,7 +412,7 @@ function Remove-WorkingDirectory {
     try {
         if (Test-Path $WorkingDir) {
             Remove-Item $WorkingDir -Recurse -Force
-            Write-Log "Working directory cleaned up"
+            Write-Log "Working directory cleaned up" "INFO"
         }
     } catch {
         Write-Log "Cleanup warning: $($_.Exception.Message)" "WARN"
@@ -330,8 +421,9 @@ function Remove-WorkingDirectory {
 
 # Main execution
 try {
-    Write-Log "=== Microsoft Apps for Business 32-bit Deployment Started ==="
-    Write-Log "Script running with PowerShell version: $($PSVersionTable.PSVersion)"
+    Show-ScriptBanner
+    Write-Log "=== Microsoft Apps for Business 32-bit Deployment Started ===" "INFO"
+    Write-Log "Script running with PowerShell version: $($PSVersionTable.PSVersion)" "INFO"
     
     # Check admin privileges
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -341,12 +433,18 @@ try {
     if (-NOT $isAdmin) {
         Write-Log "Script requires administrator privileges. Attempting to restart as admin..." "ERROR"
         
-        # Attempt to restart as admin
+        # Prepare arguments for restart
         $scriptPath = $MyInvocation.MyCommand.Path
-        $arguments = $MyInvocation.BoundParameters.GetEnumerator() | ForEach-Object { "-$($_.Key) $($_.Value)" }
+        $argList = @()
+        if ($Force) { $argList += "-Force" }
+        if ($Interactive) { $argList += "-Interactive" }
+        if ($SkipRemoval) { $argList += "-SkipRemoval" }
+        if ($LogPath -ne "$env:TEMP\OfficeDeployment.log") { $argList += "-LogPath `"$LogPath`"" }
+        if ($WorkingDir -ne "$env:TEMP\OfficeDeployment") { $argList += "-WorkingDir `"$WorkingDir`"" }
         
         try {
-            Start-Process PowerShell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`" $arguments"
+            $argumentString = "-ExecutionPolicy Bypass -File `"$scriptPath`" " + ($argList -join " ")
+            Start-Process PowerShell -Verb RunAs -ArgumentList $argumentString
             exit 0
         } catch {
             Write-Log "Failed to restart as administrator. Please run PowerShell as Administrator." "ERROR"
@@ -355,65 +453,107 @@ try {
     }
     
     # Stop Office processes
-    Write-Log "Stopping Office processes..."
-    $officeProcesses = @("winword", "excel", "powerpnt", "outlook", "msaccess", "lync", "communicator")
+    Write-Log "Stopping Office processes..." "INFO"
+    $officeProcesses = @("winword", "excel", "powerpnt", "outlook", "msaccess", "lync", "communicator", "teams")
+    $stoppedProcesses = @()
+    
     foreach ($process in $officeProcesses) {
-        Get-Process -Name $process -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+        $runningProcess = Get-Process -Name $process -ErrorAction SilentlyContinue
+        if ($runningProcess) {
+            Stop-Process -Name $process -Force -ErrorAction SilentlyContinue
+            $stoppedProcesses += $process
+        }
+    }
+    
+    if ($stoppedProcesses.Count -gt 0) {
+        Write-Log "Stopped processes: $($stoppedProcesses -join ', ')" "INFO"
     }
     
     # Detect existing installations
     $existingInstalls = Get-OfficeInstallations
     
     if ($existingInstalls.Count -gt 0) {
-        Write-Log "Found $($existingInstalls.Count) existing Office installation(s)"
+        Write-Log "Found $($existingInstalls.Count) existing Office installation(s)" "INFO"
+        
+        $primaryInstall = $existingInstalls | Where-Object { $_.Type -eq "Click-to-Run" } | Select-Object -First 1
+        if (-not $primaryInstall) {
+            $primaryInstall = $existingInstalls | Select-Object -First 1
+        }
+        
         foreach ($install in $existingInstalls) {
-            Write-Log "- Type: $($install.Type), Platform: $($install.Platform)"
+            Write-Log "- Type: $($install.Type), Platform: $($install.Platform), Version: $($install.Version)" "INFO"
         }
         
-        # Check if 32-bit is already installed
+        # Check if 32-bit is already installed and handle Force logic
         $has32Bit = $existingInstalls | Where-Object { $_.Platform -eq "x86" }
-        if ($has32Bit -and !$Force) {
-            Write-Log "32-bit Office already detected. Use -Force to reinstall." "WARN"
-            exit 0
+        
+        if ($has32Bit -and -not $Force) {
+            if ($Interactive) {
+                $decision = Get-ForceDecision -ExistingVersion $primaryInstall.Version -ExistingPlatform $primaryInstall.Platform
+                
+                switch ($decision) {
+                    "FORCE" { 
+                        $Force = $true
+                        Write-Log "Force mode activated by user selection" "INFO"
+                    }
+                    "SKIP" { 
+                        $SkipRemoval = $true
+                        Write-Log "Skip removal activated by user selection" "INFO"
+                    }
+                    "EXIT" { 
+                        Write-Log "Deployment cancelled by user" "INFO"
+                        exit 0 
+                    }
+                }
+            } else {
+                Write-Log "32-bit Office already detected." "WARN"
+                Write-Log "Use -Force parameter to force reinstallation" "WARN"
+                Write-Log "Use -Interactive parameter for guided options" "WARN"
+                exit 0
+            }
         }
         
-        # Remove existing installations
-        Remove-OfficeInstallations -Installations $existingInstalls
-        
-        # Wait for removal to complete
-        Write-Log "Waiting for removal to complete..."
-        Start-Sleep -Seconds 30
+        # Remove existing installations if not skipping
+        if (-not $SkipRemoval) {
+            Remove-OfficeInstallations -Installations $existingInstalls
+            Write-Log "Waiting for removal to complete..." "INFO"
+            Start-Sleep -Seconds 30
+        }
     } else {
-        Write-Log "No existing Office installations detected"
+        Write-Log "No existing Office installations detected" "INFO"
     }
     
     # Install 32-bit Office
     $installSuccess = Install-Office32Bit
     
     if ($installSuccess) {
-        # Wait for installation to complete
-        Write-Log "Waiting for installation to stabilize..."
+        Write-Log "Waiting for installation to stabilize..." "INFO"
         Start-Sleep -Seconds 60
         
         # Verify installation
         if (Test-OfficeInstallation) {
-            Write-Log "=== Deployment completed successfully ===" "INFO"
-            Write-Log "Microsoft Apps for Business 32-bit with Access installed"
+            Write-Log "=== DEPLOYMENT COMPLETED SUCCESSFULLY ===" "SUCCESS"
+            Write-Log "Microsoft Apps for Business 32-bit with Access installed and verified" "SUCCESS"
+            Write-Host "`n🎉 Deployment completed successfully!" -ForegroundColor Green
         } else {
-            Write-Log "=== Deployment completed with warnings ===" "WARN"
-            Write-Log "Some components may not have installed correctly"
+            Write-Log "=== DEPLOYMENT COMPLETED WITH WARNINGS ===" "WARN"
+            Write-Log "Some components may not have installed correctly" "WARN"
+            Write-Host "`n⚠️  Deployment completed with warnings. Check log for details." -ForegroundColor Yellow
         }
     } else {
-        Write-Log "=== Deployment failed ===" "ERROR"
+        Write-Log "=== DEPLOYMENT FAILED ===" "ERROR"
+        Write-Host "`n❌ Deployment failed. Check log for details." -ForegroundColor Red
         exit 1
     }
     
 } catch {
     Write-Log "Critical error: $($_.Exception.Message)" "ERROR"
+    Write-Host "`n❌ Critical error occurred. Check log for details." -ForegroundColor Red
     exit 1
 } finally {
     Remove-WorkingDirectory
-    Write-Log "Log file saved to: $LogPath"
+    Write-Log "Log file saved to: $LogPath" "INFO"
+    Write-Host "`nLog file: $LogPath" -ForegroundColor Cyan
 }
 
-exit 1
+exit 0
