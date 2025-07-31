@@ -26,11 +26,11 @@ $GitHubScripts = @(
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WindowsSystemRepair.ps1"; Description = "WindowsSystemRepair" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/PrinterFix.ps1"; Description = "PrinterFix" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/M365_Office32bitRepair.ps1"; Description = "M365_DeployOffice32bit" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetSpeedTest.ps1"; Description = "InternetSpeedTest" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetLatencyTest.ps1"; Description = "InternetLatencyTest" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WorkPaperMonitorTroubleShooter.ps1"; Description = "WorkPaperMonitorTroubleShooter" }
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/M365_Office64bitRepair.ps1"; Description = "M365_DeployOffice64bit" }
 )
 
 function InitiateScriptFromUrl {
