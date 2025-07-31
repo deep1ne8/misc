@@ -106,8 +106,8 @@ function Get-ForceDecision {
 
 # Display script banner with Force status
 function Show-ScriptBanner {
-    $forceStatus = if (!$Force) { "ENABLED" } else { "DISABLED" }
-    $interactiveStatus = if (!$Interactive) { "ENABLED" } else { "DISABLED" }
+    $forceStatus = if ($Force) { "ENABLED" } else { "DISABLED" }
+    $interactiveStatus = if ($Interactive) { "ENABLED" } else { "DISABLED" }
     
     Write-Host "`n" -NoNewline
     Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Blue
@@ -487,8 +487,10 @@ try {
         # Check if 32-bit is already installed and handle Force logic
         $has32Bit = $existingInstalls | Where-Object { $_.Platform -eq "x86" }
         
-        if ($has32Bit -and -not $Force) {
-            if ($Interactive) {
+        if ($has32Bit) {
+            if ($Force) {
+                Write-Log "32-bit Office detected but Force mode is enabled - continuing with reinstallation" "INFO"
+            } elseif ($Interactive) {
                 $decision = Get-ForceDecision -ExistingVersion $primaryInstall.Version -ExistingPlatform $primaryInstall.Platform
                 
                 switch ($decision) {
@@ -506,10 +508,24 @@ try {
                     }
                 }
             } else {
-                Write-Log "32-bit Office already detected." "WARN"
-                Write-Log "Use -Force parameter to force reinstallation" "WARN"
-                Write-Log "Use -Interactive parameter for guided options" "WARN"
-                exit 0
+                # Default behavior: prompt user even without -Interactive flag
+                Write-Log "32-bit Office already detected" "WARN"
+                $decision = Get-ForceDecision -ExistingVersion $primaryInstall.Version -ExistingPlatform $primaryInstall.Platform
+                
+                switch ($decision) {
+                    "FORCE" { 
+                        $Force = $true
+                        Write-Log "Force mode activated by user selection" "INFO"
+                    }
+                    "SKIP" { 
+                        $SkipRemoval = $true
+                        Write-Log "Skip removal activated by user selection" "INFO"
+                    }
+                    "EXIT" { 
+                        Write-Log "Deployment cancelled by user" "INFO"
+                        exit 0 
+                    }
+                }
             }
         }
         
