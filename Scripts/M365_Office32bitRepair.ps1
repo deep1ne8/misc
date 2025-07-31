@@ -106,8 +106,8 @@ function Get-ForceDecision {
 
 # Display script banner with Force status
 function Show-ScriptBanner {
-    $forceStatus = if ($Force) { "ENABLED" } else { "DISABLED" }
-    $interactiveStatus = if ($Interactive) { "ENABLED" } else { "DISABLED" }
+    $forceStatus = if (!$Force) { "ENABLED" } else { "DISABLED" }
+    $interactiveStatus = if (!$Interactive) { "ENABLED" } else { "DISABLED" }
     
     Write-Host "`n" -NoNewline
     Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor Blue
