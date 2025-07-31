@@ -27,7 +27,27 @@ function Write-Log {
     Add-Content -Path $LogPath -Value $logMessage -Force
 }
 
-# Create working directory
+# Alternative: Get ODT from Microsoft directly
+function Get-LatestODT {
+    param([string]$DestinationPath)
+    
+    Write-Log "Attempting to get latest ODT..."
+    try {
+        # Try direct Microsoft download page scraping
+        $downloadPage = Invoke-WebRequest -Uri "https://www.microsoft.com/en-us/download/details.aspx?id=49117" -UseBasicParsing
+        $downloadLink = ($downloadPage.Links | Where-Object { $_.href -match "officedeploymenttool.*\.exe" }).href | Select-Object -First 1
+        
+        if ($downloadLink) {
+            Write-Log "Found ODT download link: $downloadLink"
+            Invoke-WebRequest -Uri $downloadLink -OutFile "$DestinationPath\odt.exe" -UseBasicParsing -TimeoutSec 60
+            return $true
+        }
+    } catch {
+        Write-Log "Failed to get latest ODT: $($_.Exception.Message)" "WARN"
+    }
+    
+    return $false
+}
 try {
     if (Test-Path $WorkingDir) { Remove-Item $WorkingDir -Recurse -Force }
     New-Item -ItemType Directory -Path $WorkingDir -Force | Out-Null
@@ -89,8 +109,30 @@ function Remove-OfficeInstallations {
                 $odtPath = "$WorkingDir\setup.exe"
                 if (!(Test-Path $odtPath)) {
                     Write-Log "Downloading Office Deployment Tool..."
-                    $odtUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16626-20170.exe"
-                    Invoke-WebRequest -Uri $odtUrl -OutFile "$WorkingDir\odt.exe" -UseBasicParsing
+                    $odtUrls = @(
+                        "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_17830-20162.exe",
+                        "https://www.microsoft.com/en-us/download/confirmation.aspx?id=49117"
+                    )
+                    
+                    $downloaded = $false
+                    foreach ($url in $odtUrls) {
+                        try {
+                            Write-Log "Attempting download from: $url"
+                            Invoke-WebRequest -Uri $url -OutFile "$WorkingDir\odt.exe" -UseBasicParsing -TimeoutSec 30
+                            if (Test-Path "$WorkingDir\odt.exe") {
+                                $downloaded = $true
+                                break
+                            }
+                        } catch {
+                            Write-Log "Download failed from $url : $($_.Exception.Message)" "WARN"
+                        }
+                    }
+                    
+                    if (!$downloaded) {
+                        Write-Log "All ODT download attempts failed. Please download manually from https://docs.microsoft.com/en-us/deployoffice/overview-office-deployment-tool" "ERROR"
+                        throw "Unable to download Office Deployment Tool"
+                    }
+                    
                     Start-Process -FilePath "$WorkingDir\odt.exe" -ArgumentList "/quiet", "/extract:$WorkingDir" -Wait
                 }
                 
@@ -144,9 +186,46 @@ function Install-Office32Bit {
         $odtPath = "$WorkingDir\setup.exe"
         if (!(Test-Path $odtPath)) {
             Write-Log "Downloading Office Deployment Tool..."
-            $odtUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16626-20170.exe"
-            Invoke-WebRequest -Uri $odtUrl -OutFile "$WorkingDir\odt.exe" -UseBasicParsing
-            Start-Process -FilePath "$WorkingDir\odt.exe" -ArgumentList "/quiet", "/extract:$WorkingDir" -Wait
+            $odtUrls = @(
+                "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_17830-20162.exe",
+                "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_16626-20170.exe"
+            )
+            
+            $downloaded = $false
+            foreach ($url in $odtUrls) {
+                try {
+                    Write-Log "Attempting download from: $url"
+                    Invoke-WebRequest -Uri $url -OutFile "$WorkingDir\odt.exe" -UseBasicParsing -TimeoutSec 30
+                    if (Test-Path "$WorkingDir\odt.exe") {
+                        $downloaded = $true
+                        break
+                    }
+                } catch {
+                    Write-Log "Download failed from $url : $($_.Exception.Message)" "WARN"
+                }
+            }
+            
+            if (!$downloaded) {
+                Write-Log "ODT download failed. Attempting alternative method..." "WARN"
+                
+                # Alternative: Use cached ODT if available
+                $cachedODT = "$env:ProgramFiles\Microsoft Office 15\ClientX64\OfficeClickToRun.exe"
+                if (Test-Path $cachedODT) {
+                    Write-Log "Using cached Office installation tool"
+                    Copy-Item $cachedODT "$WorkingDir\setup.exe"
+                } else {
+                    Write-Log "Please download ODT manually from: https://docs.microsoft.com/en-us/deployoffice/overview-office-deployment-tool" "ERROR"
+                    Write-Log "Place setup.exe in: $WorkingDir" "ERROR"
+                    
+                    # Wait for manual intervention
+                    do {
+                        Write-Log "Waiting for setup.exe to be placed in working directory..." "WARN"
+                        Start-Sleep -Seconds 10
+                    } while (!(Test-Path "$WorkingDir\setup.exe"))
+                }
+            } else {
+                Start-Process -FilePath "$WorkingDir\odt.exe" -ArgumentList "/quiet", "/extract:$WorkingDir" -Wait
+            }
         }
         
         # Create installation configuration
@@ -255,9 +334,24 @@ try {
     Write-Log "Script running with PowerShell version: $($PSVersionTable.PSVersion)"
     
     # Check admin privileges
-    if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-        Write-Log "Script requires administrator privileges" "ERROR"
-        exit 1
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    $isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    
+    if (-NOT $isAdmin) {
+        Write-Log "Script requires administrator privileges. Attempting to restart as admin..." "ERROR"
+        
+        # Attempt to restart as admin
+        $scriptPath = $MyInvocation.MyCommand.Path
+        $arguments = $MyInvocation.BoundParameters.GetEnumerator() | ForEach-Object { "-$($_.Key) $($_.Value)" }
+        
+        try {
+            Start-Process PowerShell -Verb RunAs -ArgumentList "-ExecutionPolicy Bypass -File `"$scriptPath`" $arguments"
+            exit 0
+        } catch {
+            Write-Log "Failed to restart as administrator. Please run PowerShell as Administrator." "ERROR"
+            exit 1
+        }
     }
     
     # Stop Office processes
@@ -322,4 +416,4 @@ try {
     Write-Log "Log file saved to: $LogPath"
 }
 
-exit 0
+exit 1
