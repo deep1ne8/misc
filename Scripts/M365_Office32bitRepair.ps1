@@ -261,7 +261,7 @@ function Install-Office32Bit {
         
         # Execute installation
         Write-Log "Starting Office installation... This may take several minutes."
-        $process = Start-Process -FilePath $odtPath -ArgumentList "/configure", "$WorkingDir\install.xml" -Wait -PassThru -NoNewWindow
+        $process = Start-Process -FilePath $odtPath -ArgumentList "/configure", "$WorkingDir\install.xml" -Wait -Force -PassThru -NoNewWindow
         
         if ($process.ExitCode -eq 0) {
             Write-Log "Office installation completed successfully"
