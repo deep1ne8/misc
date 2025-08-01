@@ -88,8 +88,8 @@ function Get-FilteredEvents {
     param(
         [string]$LogName,
         [int]$FilterOption,
-        [datetime]$StartTime = $null,
-        [datetime]$EndTime = $null,
+        [datetime]$StartTime,
+        [datetime]$EndTime,
         [int]$MaxEvents = 50
     )
     
@@ -99,9 +99,9 @@ function Get-FilteredEvents {
             MaxEvents = $MaxEvents
         }
         
-        # Add time filter if specified
-        if ($StartTime) { $FilterHashtable.StartTime = $StartTime }
-        if ($EndTime) { $FilterHashtable.EndTime = $EndTime }
+        # Add time filter if specified (check for actual datetime objects, not null)
+        if ($StartTime -ne [datetime]::MinValue) { $FilterHashtable.StartTime = $StartTime }
+        if ($EndTime -ne [datetime]::MinValue) { $FilterHashtable.EndTime = $EndTime }
         
         # Add level filter based on selection
         switch ($FilterOption) {
@@ -281,8 +281,8 @@ try {
                     exit 
                 }
                 { $_ -in '1','2','3','4','5','6' } {
-                    $StartTime = $null
-                    $EndTime = $null
+                    $StartTime = [datetime]::MinValue
+                    $EndTime = [datetime]::MinValue
                     
                     # Handle custom date range
                     if ($FilterChoice -eq '6') {
@@ -302,7 +302,7 @@ try {
                         do {
                             Clear-Host
                             Write-Host "Events from $LogName Log" -ForegroundColor Cyan
-                            if ($StartTime) {
+                            if ($StartTime -ne [datetime]::MinValue) {
                                 Write-Host "Date Range: $($StartTime.ToString('MM/dd/yyyy HH:mm')) to $($EndTime.ToString('MM/dd/yyyy HH:mm'))" -ForegroundColor Gray
                             }
                             Show-EventList -Events $Events
