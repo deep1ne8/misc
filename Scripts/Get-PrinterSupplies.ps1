@@ -27,20 +27,30 @@ function Test-PrinterConnectivity {
     Write-Host "[1] Testing network connectivity..." -ForegroundColor Green
     
     try {
-        $PingResult = Test-Connection -ComputerName $PrinterIP -Count 2 -Quiet
-        if ($PingResult) {
-            Write-Host "    ✓ Printer responds to ping" -ForegroundColor Green
+        # Use System.Net.NetworkInformation.Ping instead of Test-Connection
+        $Ping = New-Object System.Net.NetworkInformation.Ping
+        $PingOptions = New-Object System.Net.NetworkInformation.PingOptions
+        $PingOptions.DontFragment = $true
+        $Timeout = 3000  # 3 seconds
+        $Buffer = [System.Text.Encoding]::ASCII.GetBytes("test")
+        
+        $PingResult = $Ping.Send($PrinterIP, $Timeout, $Buffer, $PingOptions)
+        
+        if ($PingResult.Status -eq "Success") {
+            Write-Host "    ✓ Printer responds to ping ($($PingResult.RoundtripTime)ms)" -ForegroundColor Green
+            $Ping.Dispose()
+            return $true
         } else {
-            Write-Host "    ✗ Printer does not respond to ping" -ForegroundColor Red
+            Write-Host "    ✗ Printer ping failed: $($PingResult.Status)" -ForegroundColor Red
+            $Ping.Dispose()
             return $false
         }
     }
     catch {
         Write-Host "    ✗ Ping test failed: $($_.Exception.Message)" -ForegroundColor Red
+        if ($Ping) { $Ping.Dispose() }
         return $false
     }
-    
-    return $true
 }
 
 function Test-WebAccess {
