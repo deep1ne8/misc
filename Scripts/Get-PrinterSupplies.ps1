@@ -27,28 +27,47 @@ function Test-PrinterConnectivity {
     Write-Host "[1] Testing network connectivity..." -ForegroundColor Green
     
     try {
-        # Use System.Net.NetworkInformation.Ping instead of Test-Connection
-        $Ping = New-Object System.Net.NetworkInformation.Ping
-        $PingOptions = New-Object System.Net.NetworkInformation.PingOptions
-        $PingOptions.DontFragment = $true
-        $Timeout = 3000  # 3 seconds
-        $Buffer = [System.Text.Encoding]::ASCII.GetBytes("test")
+        # Simple TCP connection test to port 80 (web interface)
+        $TcpClient = New-Object System.Net.Sockets.TcpClient
+        $ConnectTask = $TcpClient.ConnectAsync($PrinterIP, 80)
+        $Timeout = 5000  # 5 seconds
         
-        $PingResult = $Ping.Send($PrinterIP, $Timeout, $Buffer, $PingOptions)
-        
-        if ($PingResult.Status -eq "Success") {
-            Write-Host "    ✓ Printer responds to ping ($($PingResult.RoundtripTime)ms)" -ForegroundColor Green
-            $Ping.Dispose()
-            return $true
+        if ($ConnectTask.Wait($Timeout)) {
+            if ($TcpClient.Connected) {
+                Write-Host "    ✓ Printer web interface is accessible on port 80" -ForegroundColor Green
+                $TcpClient.Close()
+                return $true
+            } else {
+                Write-Host "    ✗ Cannot connect to printer web interface on port 80" -ForegroundColor Yellow
+            }
         } else {
-            Write-Host "    ✗ Printer ping failed: $($PingResult.Status)" -ForegroundColor Red
-            $Ping.Dispose()
+            Write-Host "    ✗ Connection to printer timed out" -ForegroundColor Yellow
+        }
+        
+        $TcpClient.Close()
+        
+        # Fallback: Try a simple web request as connectivity test
+        Write-Host "    Trying web request as fallback test..." -ForegroundColor Gray
+        $WebClient = New-Object System.Net.WebClient
+        $WebClient.Headers.Add("User-Agent", "ConnectivityTest")
+        $WebClient.Timeout = 3000
+        
+        try {
+            $TestUrl = "http://$PrinterIP/"
+            $Response = $WebClient.DownloadString($TestUrl)
+            Write-Host "    ✓ Web interface responds" -ForegroundColor Green
+            $WebClient.Dispose()
+            return $true
+        }
+        catch {
+            Write-Host "    ✗ Web interface not accessible: $($_.Exception.Message.Split('.')[0])" -ForegroundColor Red
+            $WebClient.Dispose()
             return $false
         }
     }
     catch {
-        Write-Host "    ✗ Ping test failed: $($_.Exception.Message)" -ForegroundColor Red
-        if ($Ping) { $Ping.Dispose() }
+        Write-Host "    ✗ Connectivity test failed: $($_.Exception.Message.Split('.')[0])" -ForegroundColor Red
+        if ($TcpClient) { $TcpClient.Close() }
         return $false
     }
 }
@@ -309,8 +328,8 @@ try {
     # Test 1: Network connectivity
     if (-not (Test-PrinterConnectivity -PrinterIP $PrinterIP)) {
         Write-Host ""
-        Write-Host "❌ Cannot reach printer. Check IP address and network connectivity." -ForegroundColor Red
-        exit 1
+        Write-Host "⚠️ Cannot reach printer web interface, but continuing with web tests..." -ForegroundColor Yellow
+        # Don't exit here - continue with web tests anyway
     }
     
     Write-Host ""
@@ -344,5 +363,11 @@ try {
 catch {
     Write-Host ""
     Write-Host "❌ Test failed: $($_.Exception.Message)" -ForegroundColor Red
-    exit 1
+    Write-Host "Stack trace:" -ForegroundColor Gray
+    Write-Host $_.ScriptStackTrace -ForegroundColor Gray
+}
+finally {
+    Write-Host ""
+    Write-Host "Press any key to continue..." -ForegroundColor Gray
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 }
