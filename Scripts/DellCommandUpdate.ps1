@@ -7,18 +7,13 @@
     Author: Earl Daniels
     Date:   2025-08-11
     Tested on: Windows 10/11, Dell laptops/desktops
+
 #>
 
-
-<#
-.SYNOPSIS
-    Dell Command Update installer/updater and driver+firmware updater.
-.DESCRIPTION
-    Checks installed DCU version, compares with latest available version, downloads if newer, 
-    installs silently, then runs DCU-CLI to update drivers and BIOS only.
-.NOTES
-    Requires PowerShell 5.1+ and admin rights.
-#>
+if ((Get-CimInstance Win32_ComputerSystem).Manufacturer -notmatch 'Dell') { 
+Write-Host "Non-Dell system detected. Exiting..."; 
+exit 
+} else {
 
 Function DellCommandUpdate {
 $ErrorActionPreference = 'Stop'
@@ -246,6 +241,7 @@ catch {
 
 Write-Log "Script execution complete."
 
+    }
 }
 
 DellCommandUpdate
