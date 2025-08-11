@@ -1,7 +1,7 @@
 
 <#
 .SYNOPSIS
-    Automated Microsoft Apps for Business 64-bit Deployment Script (Reverse Action)
+    Automated Microsoft Apps for Business 64-bit Deployment Script
 .DESCRIPTION
     Detects and removes 32-bit Microsoft Apps for Business, then installs 64-bit version
     with Access, Current Channel, English language

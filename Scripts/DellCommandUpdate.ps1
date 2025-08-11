@@ -200,7 +200,7 @@ function Invoke-DCUCommand {
 function Test-RebootRequired {
     try {
         $dcuPath = Get-DCUExecutablePath
-        $process = Start-Process -FilePath $dcuPath -ArgumentList "/rebootRequired" -Wait -PassThru -NoNewWindow -RedirectStandardOutput "temp_reboot_check.txt" -RedirectStandardError "nul"
+        Start-Process -FilePath $dcuPath -ArgumentList "/rebootRequired" -Wait -PassThru -NoNewWindow -RedirectStandardOutput "temp_reboot_check.txt" -RedirectStandardError "nul"
         
         if (Test-Path "temp_reboot_check.txt") {
             $output = Get-Content "temp_reboot_check.txt" -Raw
