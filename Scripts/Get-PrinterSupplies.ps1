@@ -48,20 +48,22 @@ function Test-PrinterConnectivity {
         
         # Fallback: Try a simple web request as connectivity test
         Write-Host "    Trying web request as fallback test..." -ForegroundColor Gray
-        $WebClient = New-Object System.Net.WebClient
-        $WebClient.Headers.Add("User-Agent", "ConnectivityTest")
-        $WebClient.Timeout = 3000
         
         try {
             $TestUrl = "http://$PrinterIP/"
-            $Response = $WebClient.DownloadString($TestUrl)
+            $Request = [System.Net.HttpWebRequest]::Create($TestUrl)
+            $Request.Method = "GET"
+            $Request.Timeout = 5000  # 5 seconds
+            $Request.UserAgent = "ConnectivityTest"
+            
+            $Response = $Request.GetResponse()
+            $Response.Close()
+            
             Write-Host "    ✓ Web interface responds" -ForegroundColor Green
-            $WebClient.Dispose()
             return $true
         }
         catch {
             Write-Host "    ✗ Web interface not accessible: $($_.Exception.Message.Split('.')[0])" -ForegroundColor Red
-            $WebClient.Dispose()
             return $false
         }
     }
@@ -90,14 +92,25 @@ function Test-WebAccess {
     )
     
     $AccessiblePages = @()
-    $WebClient = New-Object System.Net.WebClient
-    $WebClient.Headers.Add("User-Agent", "PowerShell PrinterTest/1.0")
-    $WebClient.Timeout = 10000  # 10 second timeout
     
     foreach ($Page in $TestPages) {
         try {
             Write-Host "    Testing: $($Page.Name)" -NoNewline
-            $Content = $WebClient.DownloadString($Page.URL)
+            
+            # Use HttpWebRequest instead of WebClient for better timeout control
+            $Request = [System.Net.HttpWebRequest]::Create($Page.URL)
+            $Request.Method = "GET"
+            $Request.Timeout = 10000  # 10 seconds
+            $Request.UserAgent = "PowerShell PrinterTest/1.0"
+            
+            $Response = $Request.GetResponse()
+            $Stream = $Response.GetResponseStream()
+            $Reader = New-Object System.IO.StreamReader($Stream)
+            $Content = $Reader.ReadToEnd()
+            
+            $Reader.Close()
+            $Stream.Close()
+            $Response.Close()
             
             if ($Content.Length -gt 0) {
                 Write-Host " ✓" -ForegroundColor Green
@@ -122,7 +135,6 @@ function Test-WebAccess {
         }
     }
     
-    $WebClient.Dispose()
     Write-Host "    Found $($AccessiblePages.Count) accessible pages" -ForegroundColor Cyan
     return $AccessiblePages
 }
