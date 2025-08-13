@@ -394,8 +394,9 @@ $mailparams = @{
 
 try {
     # A UPN can also be used as -UserId.
-    $SmtpCred
-    $ForwardEmail = Send-MgaMailMessage -UserId $UserId -BodyParameter $mailparams
+    #$SmtpCred
+    $ForwardEmail = Send-MgaMailMessage -ToRecipients $To -Subject $subject -Body $body -From $From
+ 
     
     if ($ForwardEmail) {
     Write-Host "Email sent: $subject"
