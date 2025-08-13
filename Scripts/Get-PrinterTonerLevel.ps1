@@ -33,7 +33,10 @@ function Get-ColorHex {
 
 # -------------------- SNMP toner levels --------------------
 $snmpOid = "1.3.6.1.2.1.43.11.1.1.9"
-$snmpResult = Invoke-SnmpWalk -IP $PrinterIP -Version V2 -OIDStart $snmpOid -Community $Community -UDPport $SnmpPort -Verbose
+$snmpResult = Invoke-SnmpWalk -IP $PrinterIP -Version V2 -OIDStart $snmpOid -Community $Community -UDPport $SnmpPort
+
+Write-Output $snmpResult
+Write-Host ""
 
 if ($snmpResult.Count -eq 0) {
     Write-Warning "No SNMP data found for $PrinterIP."
