@@ -43,7 +43,7 @@ $UseAuth        = (Read-HostDefault 'Use SMTP auth? (Y/N)' 'N').ToUpper() -eq 'Y
 $FallbackUrl    = Read-HostDefault 'Fallback status page base URL (e.g., http://printer) [optional]' 'http://10.14.0.99/hp/device/info_suppliesStatus.html?tab=Home&amp;menu=SupplyStatus'
 
 if ($UseAuth) {
-  $SmtpCred = Connect-MgaGraph
+  $SmtpCred = Connect-MgGraph
 }
 
 # -------- Printer-MIB OIDs (RFC 3805) --------
