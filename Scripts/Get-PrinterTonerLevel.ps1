@@ -40,7 +40,8 @@ else {
 function Get-TonerLevel {
   param($Color, $Oid)
   try {
-    $out = snmpget -v2c -c $Community $PrinterIP $Oid 2>&1
+    #$out = snmpget -v2c -c $Community $PrinterIP $Oid 2>&1
+    $out = Invoke-SnmpWalk -IP $PrinterIP -Version V2 -OIDStart $Oid -Community $Community -UDPport 161 -Verbose
     if ($LASTEXITCODE -ne 0) { throw $out }
     if ($out -match 'INTEGER: (\d+)') {
       return [int]$Matches[1]
