@@ -60,14 +60,14 @@ $Oids = @{
 }
 
 # -------- Helpers: detect backends --------
-function Test-Command { param([string]$Name) return [bool](Get-Command -Name $Name -NoNewWindow -ErrorAction SilentlyContinue ) }
+function Test-Command { param([string]$Name) return [bool](Get-Command -Name $Name -ErrorAction SilentlyContinue ) }
 
 $HaveProxx   = Test-Command -Name 'Invoke-SnmpWalk'
 $HaveNetSnmp = (Test-Command -Name 'snmpwalk') -and (Test-Command -Name 'snmpget')
 
 if (-not $HaveProxx) {
   # Try import if module installed but not loaded
-  try { Import-Module Proxx.SNMP -ErrorAction SilentlyContinue; $HaveProxx = Test-Command -Name 'Invoke-SnmpWalk' } catch {}
+  try { Install-Module Proxx.SNMP -Force -ErrorAction SilentlyContinue; $HaveProxx = Test-Command -Name 'Invoke-SnmpWalk' } catch {}
 }
 
 if (-not ($HaveProxx -or $HaveNetSnmp)) {
