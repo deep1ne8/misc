@@ -251,7 +251,8 @@ if (($supplies | Where-Object { $_.Percent -ne $null }).Count -eq 0 -and -not [s
 
 if ($supplies.Count -eq 0) {
   Write-Error "No supply data retrieved via SNMP or HTTP. Verify SNMP v2 is enabled and accessible from this host (UDP $SnmpPort), or provide a working status URL."
-  exit 2
+  Invoke-Get -Oid $Oids.PrinterStatus
+  return
 }
 
 # Only toner-like items (type = toner/tonerCartridge/matteToner OR description contains 'toner')
