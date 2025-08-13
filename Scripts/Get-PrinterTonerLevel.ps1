@@ -3,7 +3,7 @@
   Toner monitor for SNMP-capable printers with HTML email via Microsoft Graph.
 
 .DESCRIPTION
-  Fetches toner levels via SNMP or HTTP and renders a styled HTML dashboard.
+  Uses SNMP first (working OID) and renders an HTML email with inline CSS.
 #>
 
 [CmdletBinding()]
@@ -13,163 +13,123 @@ param(
     [Parameter()][int]$SnmpPort = 161,
     [Parameter()][int]$ThresholdPct = 20,
     [Parameter(Mandatory)][string]$To = 'edaniels@openapproach.com',
-    [Parameter(Mandatory)][string]$From = 'cloudadmin@simonpearce.com',
-    [Parameter()][string]$BaseUrl = "http://10.14.0.99"
+    [Parameter(Mandatory)][string]$From = 'cloudadmin@simonpearce.com'
 )
-
-# -------------------- Utilities --------------------
-function Test-Command { param([string]$Name) [bool](Get-Command -Name $Name -ErrorAction SilentlyContinue) }
-
-function Get-ColorHex {
-    param([string]$Name)
-    switch -Regex ($Name) {
-        '(?i)black' { '#000000'; break }
-        '(?i)cyan' { '#00bcd4'; break }
-        '(?i)magenta' { '#e91e63'; break }
-        '(?i)yellow' { '#ffeb3b'; break }
-        default { '#777777' }
-    }
-}
 
 # -------------------- SNMP toner levels --------------------
 $snmpOid = "1.3.6.1.2.1.43.11.1.1.9"
 $snmpResult = Invoke-SnmpWalk -IP $PrinterIP -Version V2 -OIDStart $snmpOid -Community $Community -UDPport $SnmpPort
 
-Write-Output $snmpResult
-Write-Host ""
-
-if ($snmpResult.Count -eq 0) {
-    Write-Warning "No SNMP data found for $PrinterIP."
-} else {
-    # Map returned rows to colors
-    $colors = @('Black','Cyan','Magenta','Yellow')
-    $toners = @()
-    for ($i = 0; $i -lt $snmpResult.Count; $i++) {
-        $toners += [pscustomobject]@{
-            Source      = 'SNMP'
-            Color       = $colors[$i]
-            Description = "$($colors[$i]) Cartridge"
-            Percent     = [int]$snmpResult[$i].Data
-            LevelUnits  = [int]$snmpResult[$i].Data
-        }
-    }
-}
-
-
-# -------------------- HTTP fallback --------------------
-function Get-PrinterSuppliesFromWeb {
-    param([string]$Base)
-    if ([string]::IsNullOrWhiteSpace($Base)) { return @() }
-
-    $urls = @(
-        "$Base/hp/device/info_suppliesStatus.html?tab=Home&menu=SupplyStatus",
-        "$Base/DevMgmt/ConsumableConfigDyn.xml",
-        "$Base/DevMgmt/ProductUsageDyn.xml"
-    )
-
-    foreach ($u in $urls) {
-        try {
-            $resp = Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
-            $text = $resp.Content
-            if ($text) {
-                # Parse using your previous Convert-HPConsumablesHtml logic
-                $toners = Convert-HPConsumablesHtml -Html $text
-                if ($toners.Count -gt 0) { return $toners }
-            }
-        } catch { continue }
-    }
-    @()
-}
-
-function Convert-HPConsumablesHtml { param([string]$Html)
-    $results = New-Object System.Collections.Generic.List[object]
-    $colors = 'Black','Cyan','Magenta','Yellow'
-    foreach ($c in $colors) {
-        $m = [regex]::Match($Html, "(?is)($c)[^%]{0,200}?(\d{1,3})\s*%")
-        if ($m.Success) {
-            $results.Add([pscustomobject]@{
-                Source='HTTP'; Color=$m.Groups[1].Value; Description="$($m.Groups[1].Value) Cartridge"; LevelUnits=[int]$m.Groups[2].Value; Percent=[int]$m.Groups[2].Value
-            })
-        }
-    }
-    ,$results
-}
-
-# -------------------- Collect data --------------------
-$toners = @()
-$snmpRows = Get-PrinterSuppliesFromSnmp
-if ($snmpRows.Count -gt 0) { $toners = $snmpRows }
-
-if ($toners.Count -eq 0) { $toners = Get-PrinterSuppliesFromWeb -Base $BaseUrl }
-
-if ($toners.Count -eq 0) {
-    Write-Warning "No supply data via SNMP or HTTP. Skipping email."
+if (-not $snmpResult -or $snmpResult.Count -eq 0) {
+    Write-Error "No SNMP data retrieved from $PrinterIP"
     return
 }
 
-# -------------------- Render HTML --------------------
+Write-Output $snmpResult
+Write-Host ""
+
+# -------------------- Map SNMP results to toner objects --------------------
+$colors = @('Black','Cyan','Magenta','Yellow')
+$toners = @()
+for ($i = 0; $i -lt $snmpResult.Count; $i++) {
+    $percent = [int]$snmpResult[$i].Data
+    if ($percent -gt 100) { $percent = 100 }
+    $toners += [pscustomobject]@{
+        Source      = 'SNMP'
+        Color       = $colors[$i]
+        Description = "$($colors[$i]) Cartridge"
+        Percent     = $percent
+        LevelUnits  = $percent
+    }
+}
+
+# -------------------- Inline CSS helpers --------------------
+function Get-ColorHex($name) {
+    switch ($name.ToLower()) {
+        'black'   { '#000000' }
+        'cyan'    { '#00bcd4' }
+        'magenta' { '#e91e63' }
+        'yellow'  { '#ffeb3b' }
+        default   { '#777777' }
+    }
+}
+
+# -------------------- Build HTML --------------------
 $cards = ''
 foreach ($row in $toners) {
-    $colorClass = ($row.Color).ToLower()
     $pct = [int][math]::Max(0,[math]::Min(100,$row.Percent))
-    $summary = "$($row.Description) | Source: $($row.Source)"
+    $hex = Get-ColorHex $row.Color
+    $colorClass = $row.Color.ToLower()
     $cards += @"
-    <div class='toner-item $colorClass'>
-        <div class='toner-header'>
-            <div class='toner-name'>$($row.Color)</div>
-            <div class='toner-percentage'>$pct%</div>
+    <div style='margin-bottom:25px;padding:20px;border-radius:6px;background-color:#fafafa;border-left:4px solid $hex;'>
+        <div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;'>
+            <div style='font-size:18px;font-weight:600;color:#333;'>$($row.Color)</div>
+            <div style='font-size:20px;font-weight:bold;color:#333;'>$pct%</div>
         </div>
-        <div class='progress-container'>
-            <div class='progress-bar $colorClass' style='width:$pct%;'></div>
+        <div style='width:100%;height:24px;background:#e0e0e0;border-radius:12px;overflow:hidden;margin-bottom:8px;'>
+            <div style='height:100%;width:$pct%;background:$hex;'></div>
         </div>
-        <div class='cartridge-info'>$summary</div>
+        <div style='font-size:14px;color:#666;font-style:italic;'>$($row.Description) | Source: $($row.Source)</div>
     </div>
 "@
 }
 
+# -------------------- Threshold indicator --------------------
 $anyLow = $toners | Where-Object { $_.Percent -le $ThresholdPct }
-$statusText = if ($anyLow) { "Threshold met: ≤ $ThresholdPct%" } else { "All above threshold ($ThresholdPct%)" }
+$thresholdText = if ($anyLow) { "Threshold met: ≤ $ThresholdPct% ❌" } else { "All above threshold ($ThresholdPct%) ✓ GOOD" }
+$statusColor = if ($anyLow) { '#c0392b' } else { '#28a745' }
 
+# -------------------- HTML body --------------------
 $body = @"
-<!DOCTYPE html>
-<html lang='en'>
-<head><meta charset='UTF-8'><style>
-/* include your template CSS here */
-</style></head>
-<body>
-<div class='container'>
-    <div class='header'>
-        <div class='printer-ip'>Toner Status — $PrinterIP</div>
-        <div class='status-good'>$statusText</div>
+<html>
+  <body style='margin:0;padding:0;background:#f5f5f5;font-family:Segoe UI,Arial,sans-serif;'>
+    <div style='max-width:800px;margin:0 auto;padding:20px;'>
+        <div style='background:white;border-radius:8px;padding:30px;box-shadow:0 2px 10px rgba(0,0,0,0.1);'>
+            <div style='text-align:center;margin-bottom:30px;padding-bottom:20px;border-bottom:2px solid #eee;'>
+                <div style='font-size:24px;font-weight:bold;color:#333;margin-bottom:5px;'>Toner Status — $PrinterIP</div>
+                <div style='color:$statusColor;font-weight:600;font-size:16px;'>$thresholdText</div>
+            </div>
+            $cards
+            <div style='margin-top:30px;padding-top:20px;border-top:1px solid #eee;text-align:center;color:#888;font-size:12px;'>
+                Retrieved on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') via SNMP
+            </div>
+        </div>
     </div>
-    $cards
-    <div class='footer'>
-        Retrieved on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') via $(if ($snmpRows.Count -gt 0){'SNMP (Printer-MIB)'} else {'HTTP scrape'}).
-    </div>
-</div>
-</body>
+  </body>
 </html>
 "@
 
-# -------------------- Email via Graph --------------------
+# -------------------- Email via Microsoft Graph --------------------
 function Use-Graph {
-    if (-not (Get-Module -ListAvailable Microsoft.Graph)) { Install-Module Microsoft.Graph -Scope CurrentUser -Force }
+    if (-not (Get-Module -ListAvailable Microsoft.Graph)) {
+        Install-Module Microsoft.Graph -Scope CurrentUser -Force
+    }
     Import-Module Microsoft.Graph -ErrorAction Stop
     $ctx = Get-MgContext -ErrorAction SilentlyContinue
-    if (-not $ctx -or $ctx.Scopes -notcontains "Mail.Send") {
-        Connect-MgGraph -Scopes "Mail.Send" -ErrorAction Stop | Out-Null
+    if (-not $ctx) { Connect-MgGraph -Scopes "Mail.Send" | Out-Null }
+    elseif ($ctx.Scopes -notcontains "Mail.Send") {
+        Disconnect-MgGraph -ErrorAction SilentlyContinue
+        Connect-MgGraph -Scopes "Mail.Send" | Out-Null
     }
 }
 
 try {
     Use-Graph
-    $msg = @{
-        Subject = if ($anyLow) { "TONER LOW [$PrinterIP]" } else { "Toner status [$PrinterIP]" }
-        Body    = @{ ContentType="HTML"; Content=$body }
-        ToRecipients = @(@{ EmailAddress = @{ Address=$To } })
+    $subject = if ($anyLow) {
+        $summary = ($anyLow | ForEach-Object { "$($_.Color) $($_.Percent)%" }) -join ' | '
+        "TONER LOW [$PrinterIP]: $summary"
+    } else {
+        "Toner status [$PrinterIP]: All above $ThresholdPct%"
     }
+
+    $msg = @{
+        Subject = $subject
+        Body    = @{ ContentType = "HTML"; Content = $body }
+        ToRecipients = @(@{ EmailAddress = @{ Address = $To } })
+    }
+
     Send-MgUserMail -UserId $From -Message $msg -SaveToSentItems:$false
-    Write-Host "Email sent successfully."
+    Write-Host "Email sent successfully: $subject"
 } catch {
     Write-Warning "Graph send failed: $($_.Exception.Message)"
     Write-Output $body
