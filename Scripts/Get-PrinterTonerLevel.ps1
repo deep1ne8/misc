@@ -34,6 +34,7 @@ else {
     "Cyan"    = "1.3.6.1.2.1.43.11.1.1.9.1.2"
     "Magenta" = "1.3.6.1.2.1.43.11.1.1.9.1.3"
     "Yellow"  = "1.3.6.1.2.1.43.11.1.1.9.1.4"
+    
   }
 }
 
@@ -42,9 +43,9 @@ function Get-TonerLevel {
   try {
     #$out = snmpget -v2c -c $Community $PrinterIP $Oid 2>&1
     #Invoke-SnmpWalk -IP 10.14.0.99 -Version V2 -OIDStart "1.3.6.1.2.1.43.11.1.1.9" -Community public -UDPport 161 -Verbose
-    $out = Invoke-SnmpWalk -IP $PrinterIP -Version V2 -OIDStart "1.3.6.1.2.1.43.11.1.1.9" -Community $Community -UDPport 161 -Verbose
+    $out = Invoke-SnmpWalk -IP 10.14.0.99 -Version V2 -OIDStart "1.3.6.1.2.1.43.11.1.1.9" -Community public -UDPport 161 -Verbose
     $out
-    
+
     if ($LASTEXITCODE -ne 0) { throw $out }
     if ($out -match 'INTEGER: (\d+)') {
       return [int]$Matches[1]
