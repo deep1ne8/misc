@@ -364,7 +364,8 @@ $subject =
 }
 #>
 
-Import-Module Microsoft.Graph.Users.Actions
+# This module is required to send email
+# Install-Module Microsoft.Graph.Users.Actions
 
 $mailparams = @{
 	message = @{
@@ -403,6 +404,7 @@ try {
   Write-Warning "Failed to send email: $($_.Exception.Message)"
   # Still output to console for visibility
   Write-Host "------------------------------------------------"
+  Write-Host ""
   Write-Output $body
 
 
