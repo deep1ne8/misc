@@ -375,4 +375,6 @@ try {
   return
 }
 
+.\Get-PrinterTonerLevel.ps1 -PrinterIP 10.14.0.99 -Community public -To edaniels@openapproach.com -From cloudadmin@simonpearce.com -ThresholdPct 20 -BaseUrl "http://10.14.0.99"
+
 return
