@@ -43,7 +43,7 @@ $UseAuth        = (Read-HostDefault 'Use SMTP auth? (Y/N)' 'N').ToUpper() -eq 'Y
 $FallbackUrl    = Read-HostDefault 'Fallback status page base URL (e.g., http://printer) [optional]' 'http://10.14.0.99/hp/device/info_suppliesStatus.html?tab=Home&amp;menu=SupplyStatus'
 
 if ($UseAuth) {
-  $SmtpCred = Connect-MSGraph
+  $SmtpCred = Connect-MgaGraph
 }
 
 # -------- Printer-MIB OIDs (RFC 3805) --------
@@ -402,7 +402,10 @@ try {
 } catch {
   Write-Warning "Failed to send email: $($_.Exception.Message)"
   # Still output to console for visibility
+  Write-Host "------------------------------------------------"
   Write-Output $body
+
+
+  Write-Host "Done."
 }
 
-Write-Host "Done."
