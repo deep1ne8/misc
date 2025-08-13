@@ -32,16 +32,18 @@ $SnmpPort       = [int](Read-HostDefault 'SNMP UDP port' '161')
 $Community      = Read-HostDefault 'SNMP community (v2c)' 'public'
 $ThresholdPct   = [int](Read-HostDefault 'Alert threshold percentage' '20')
 
-$From           = Read-HostDefault 'Email From address'
+$Userid         = Read-HostDefault 'Email username' 'cloudadmin@simonpearce.com'
+#$From           = Read-HostDefault 'Email From address'
 $To             = Read-HostDefault 'Email To address'
-$SmtpServer     = Read-HostDefault 'SMTP server address'
-$SmtpPort       = [int](Read-HostDefault 'SMTP port' '25')
-$UseSsl         = (Read-HostDefault 'Use SSL for SMTP? (Y/N)' 'N').ToUpper() -eq 'Y'
+#$SmtpServer     = Read-HostDefault 'SMTP server address'
+#$SmtpClient     = Read-HostDefault 'SMTP Client' 'STARTTLS'
+#$SmtpPort       = [int](Read-HostDefault 'SMTP port' '25')
+#$UseSsl         = (Read-HostDefault 'Use SSL for SMTP? (Y/N)' 'N').ToUpper() -eq 'Y'
 $UseAuth        = (Read-HostDefault 'Use SMTP auth? (Y/N)' 'N').ToUpper() -eq 'Y'
-$FallbackUrl    = Read-HostDefault 'Fallback status page base URL (e.g., http://printer) [optional]' ''
+$FallbackUrl    = Read-HostDefault 'Fallback status page base URL (e.g., http://printer) [optional]' 'http://10.14.0.99/hp/device/info_suppliesStatus.html?tab=Home&amp;menu=SupplyStatus'
 
 if ($UseAuth) {
-  $SmtpCred = Get-Credential -Message 'Enter SMTP credentials'
+  $SmtpCred = Connect-MSGraph
 }
 
 # -------- Printer-MIB OIDs (RFC 3805) --------
@@ -339,7 +341,8 @@ $subject =
     "Toner status [$PrinterIP]: All above ${ThresholdPct}%"
   }
 
-try {
+
+<#
   $mailParams = @{
     From       = $From
     To         = $To
@@ -348,11 +351,54 @@ try {
     BodyAsHtml = $true
     SmtpServer = $SmtpServer
     Port       = $SmtpPort
+    SmtpClient = $SmtpClient
   }
   if ($UseSsl) { $mailParams['UseSsl'] = $true }
   if ($UseAuth) { $mailParams['Credential'] = $SmtpCred }
   Send-MailMessage @mailParams
   Write-Host "Email sent: $subject"
+} catch {
+  Write-Warning "Failed to send email: $($_.Exception.Message)"
+  # Still output to console for visibility
+  Write-Output $body
+}
+#>
+
+Import-Module Microsoft.Graph.Users.Actions
+
+$mailparams = @{
+	message = @{
+		subject = "$subject"
+		body = @{
+			contentType = "html"
+			content = "$body"
+		}
+		toRecipients = @(
+			@{
+				emailAddress = @{
+					address = "$To"
+				}
+			}
+		)
+		ccRecipients = @(
+			@{
+				emailAddress = @{
+					address = ""
+				}
+			}
+		)
+	}
+	saveToSentItems = "false"
+}
+
+try {
+    # A UPN can also be used as -UserId.
+    $SmtpCred
+    $ForwardEmail = Send-MgUserMail -UserId $UserId -BodyParameter $mailparams
+    
+    if ($ForwardEmail) {
+    Write-Host "Email sent: $subject"
+    }
 } catch {
   Write-Warning "Failed to send email: $($_.Exception.Message)"
   # Still output to console for visibility
