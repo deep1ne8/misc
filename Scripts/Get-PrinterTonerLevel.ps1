@@ -82,7 +82,7 @@ function Invoke-Walk {
   if ($HaveProxx) {
     # Proxx.SNMP
     # Example: Invoke-SnmpWalk -IpAddress 192.0.2.10 -Community public -Version 2 -OID 1.3.6.1.2.1.43.11.1.1
-    $res = Invoke-SnmpWalk -IpAddress $PrinterIP -Community $Community -Version 2 -UdpPort $SnmpPort -OID $BaseOid -Timeout 5000 -Retries 1
+    $res = Invoke-SnmpWalk -IP $PrinterIP -Community $Community -Version 2 -UdpPort $SnmpPort -OID $BaseOid -Timeout 5000 -Retries 1
     # Normalize to [pscustomobject] with Oid/Value
     return $res | ForEach-Object {
       [pscustomobject]@{ Oid = $_.OID; Value = $_.Value }
@@ -110,7 +110,7 @@ function Invoke-Walk {
 function Invoke-Get {
   param([Parameter(Mandatory)][string]$Oid)
   if ($HaveProxx) {
-    $r = Invoke-SnmpWalk -IpAddress $PrinterIP -Community $Community -Version 2 -UdpPort $SnmpPort -OID $Oid -Timeout 5000 -Retries 1
+    $r = Invoke-SnmpWalk -IP $PrinterIP -Community $Community -Version 2 -UdpPort $SnmpPort -OID $Oid -Timeout 5000 -Retries 1
     $obj = $r | Select-Object -First 1
     if ($obj) { return $obj.Value } else { return $null }
   }
