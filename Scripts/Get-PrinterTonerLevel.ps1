@@ -32,7 +32,7 @@ $SnmpPort       = [int](Read-HostDefault 'SNMP UDP port' '161')
 $Community      = Read-HostDefault 'SNMP community (v2c)' 'public'
 $ThresholdPct   = [int](Read-HostDefault 'Alert threshold percentage' '20')
 
-$Userid         = Read-HostDefault 'Email username' 'cloudadmin@simonpearce.com'
+$From           = Read-HostDefault 'Email username' 'cloudadmin@simonpearce.com'
 #$From           = Read-HostDefault 'Email From address'
 $To             = Read-HostDefault 'Email To address'
 #$SmtpServer     = Read-HostDefault 'SMTP server address'
