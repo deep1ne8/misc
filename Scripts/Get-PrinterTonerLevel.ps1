@@ -41,13 +41,13 @@
 
 [CmdletBinding()]
 param(
-  [Parameter(Mandatory)][string]$PrinterIP,
+  [Parameter(Mandatory)][string]$PrinterIP = '10.14.0.99',
   [Parameter()][string]$Community = 'public',
   [Parameter()][int]$SnmpPort = 161,
   [Parameter()][int]$ThresholdPct = 20,
-  [Parameter(Mandatory)][string]$To,
-  [Parameter(Mandatory)][string]$From,
-  [Parameter()][string]$BaseUrl = ""
+  [Parameter(Mandatory)][string]$To = 'edaniels@openapproach.com',
+  [Parameter(Mandatory)][string]$From = 'cloudadmin@simonpearce.com',
+  [Parameter()][string]$BaseUrl = "http://10.14.0.99/hp/device/info_suppliesStatus.html?tab=Home&amp;menu=SupplyStatus"
 )
 
 # -------------------- Utility --------------------
@@ -375,6 +375,6 @@ try {
   return
 }
 
-.\Get-PrinterTonerLevel.ps1 -PrinterIP 10.14.0.99 -Community public -To edaniels@openapproach.com -From cloudadmin@simonpearce.com -ThresholdPct 20 -BaseUrl "http://10.14.0.99"
+## .\Get-PrinterTonerLevel.ps1 -PrinterIP 10.14.0.99 -Community public -To edaniels@openapproach.com -From cloudadmin@simonpearce.com -ThresholdPct 20 -BaseUrl "http://10.14.0.99"
 
 return
