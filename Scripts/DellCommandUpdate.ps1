@@ -32,7 +32,7 @@ $Script:Config = @{
     DCUPath = "C:\Program Files\Dell\CommandUpdate\dcu-cli.exe"
     DCUPathAlt = "C:\Program Files (x86)\Dell\CommandUpdate\dcu-cli.exe"
     DCUVersion = "5.5.0"
-    DCUUrl = "https://dl.dell.com/FOLDER13309588M/2/Dell-Command-Update-Windows-Universal-Application_C8JXV_WIN64_5.5.0_A00_01.EXE"
+    DCUUrl = "https://github.com/deep1ne8/misc/blob/main/Assets/Dell-Command-Update-Application_6VFWW_WIN_5.4.0_A00.EXE"
     TempPath = "$env:TEMP\DellCommandUpdate.exe"
     LogPath = $LogPath
     UpdateTypes = "driver,firmware,BIOS"
@@ -255,7 +255,7 @@ try {
     
     # Validate Dell system
     if (-not (Test-DellSystem)) {
-        exit 1
+        return
     }
     
     # Check current DCU installation
@@ -279,10 +279,10 @@ try {
     
     if ($updateSuccess) {
         Write-Log "=== Dell update process completed successfully ===" -Level "SUCCESS"
-        exit 0
+        return
     } else {
         Write-Log "=== Dell update process completed with errors ===" -Level "ERROR"
-        exit 1
+        return
     }
 }
 catch {
