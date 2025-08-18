@@ -452,6 +452,9 @@ try {
     }
     
     # Execute health check
+    Write-Host '$dnsResult' -ForegroundColor Green
+    Write-Host ''
+    Start-Sleep 5
     $results = Start-GWSHealthCheck -Domain $Domain -OutputPath $OutputPath -DetailedReport $Detailed.IsPresent
     
     # Display critical issues
