@@ -1,4 +1,3 @@
-#Requires -Version 5.1
 <#
 .SYNOPSIS
     Google Workspace Health & Diagnostic Tool
@@ -21,7 +20,7 @@ param(
     [string]$Domain,
     
     [Parameter(Mandatory = $false)]
-    [string]$OutputPath = ".",
+    [string]$OutputPath = "$env:TEMP\",
     
     [Parameter(Mandatory = $false)]
     [switch]$Detailed
