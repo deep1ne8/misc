@@ -21,6 +21,12 @@ param(
     
     [Parameter(Mandatory = $false)]
     [string]$OutputPath = "$env:TEMP\",
+
+    [Parameter(Mandatory = $false)]
+    [string]$RecordType = "MX",
+
+    [Parameter(Mandatory = $false)]
+    [string]$ExpectedValue = "smtp.google.com",
     
     [Parameter(Mandatory = $false)]
     [switch]$Detailed
@@ -44,8 +50,6 @@ function Write-LogMessage {
 }
 
 function Test-DNSRecord {
-    param([string]$Domain, [string]$RecordType, [string]$ExpectedValue = $null)
-    
     try {
         Write-Host "Checking $RecordType record for $Domain..." -ForegroundColor Cyan
         $dnsResult = Resolve-DnsName -Name $Domain -Type $RecordType -ErrorAction Stop
