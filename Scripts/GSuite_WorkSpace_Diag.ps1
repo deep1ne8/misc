@@ -17,7 +17,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Domain = 'Read-Host -Prompt "Please enter the domain name..."',
+    [string]$Domain,
     
     [Parameter(Mandatory = $false)]
     [string]$OutputPath = "$env:TEMP\",
@@ -442,7 +442,8 @@ try {
     
     # Validate parameters
     if (-not $Domain -or $Domain -eq "") {
-        throw "Domain parameter is required"
+    $Domain = Read-Host -Prompt "Please enter the domain name..."
+    Write-LogMessage "Domain to check: $Domain"
     }
     
     if (-not (Test-Path $OutputPath)) {
