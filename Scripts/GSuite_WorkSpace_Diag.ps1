@@ -136,7 +136,8 @@ function Test-EmailRouting {
     Write-Host ""
     
     # Verify Google MX Records
-    $googleMXPatterns = @("aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com")
+    #$googleMXPatterns = @("aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com")
+    $googleMXPatterns = @("smtp.google.com")
     $hasGoogleMX = $false
     if ($mxTest.Found) {
         foreach ($mx in $mxTest.Values) {
@@ -178,7 +179,7 @@ function Test-SPFRecord {
     $spfRecord = $null
     
     if ($spfTest.Found) {
-        $spfRecord = $spfTest.Values | Where-Object { $_ -like "v=spf1*" } | Select-Object -First 1
+        $spfRecord = $spfTest.Values | Where-Object { $_ -like "v=_spf*" } | Select-Object -First 1
         Write-Host "TXT records found, searching for SPF..." -ForegroundColor Cyan
         if ($spfRecord) {
             Write-Host "SPF Record Found: " -NoNewline -ForegroundColor Green
@@ -198,7 +199,8 @@ function Test-SPFRecord {
     
     if ($spfRecord) {
         # Check for Google include
-        if ($spfRecord -notmatch "include:_spf\.google\.com") {
+        $SPFGoogle = "include:_spf.google.com"
+        if ($spfRecord -notmatch "$SPFGoogle") {
             $result.Status = "WARNING"
             $result.Recommendation = "Add 'include:_spf.google.com' to SPF record"
             $result.Priority = "MEDIUM"
@@ -340,8 +342,9 @@ function Test-GoogleSiteVerification {
     $txtTest = Test-DNSRecord -Domain $Domain -RecordType "TXT"
     
     $googleVerification = $false
+    $SiteVerification = "google-site-verification=LxjqBolwQOR9osBq3FrtOe1qVdsPAyUeg8nK_SAJyGY"
     if ($txtTest.Found) {
-        $googleVerification = $txtTest.Values | Where-Object { $_ -like "google-site-verification=*" } | Select-Object -First 1
+        $googleVerification = $txtTest.Values | Where-Object { $_ -like "$SiteVerification" } | Select-Object -First 1
     }
     
     return [PSCustomObject]@{
