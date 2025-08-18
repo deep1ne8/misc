@@ -44,7 +44,7 @@ function Write-LogMessage {
 }
 
 function Test-DNSRecord {
-    param([string]$Domain, [string]$RecordType = MX, [string]$ExpectedValue = "smtp.google.com")
+    param([string]$Domain, [string]$RecordType = "MX", [string]$ExpectedValue = "smtp.google.com")
     
     try {
         Write-Host "Checking $RecordType record for $Domain..." -ForegroundColor Cyan
