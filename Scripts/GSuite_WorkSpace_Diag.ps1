@@ -278,6 +278,12 @@ function Start-GWSHealthCheck {
 }
 
 # === Main ===
+Write-Host "GWSHealth Check is starting ...."
+Write-Host ""
+Start-Sleep 5
+
+$Domain = Read-Host -Prompt "Please enter domain name...."
+
 try {
     if (-not (Test-Path $OutputPath)) {
         New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
