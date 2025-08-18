@@ -62,7 +62,7 @@ function Test-DNSRecord {
             }
         }
         
-        Write-Host '$result' -ForegroundColor Green
+        $result
         Start-Sleep 5
         Write-Host ""
         if ($ExpectedValue -and $result.Values -notcontains $ExpectedValue) {
