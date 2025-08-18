@@ -1,3 +1,4 @@
+#Requires -Version 5.1
 <#
 .SYNOPSIS
     Google Workspace Health & Diagnostic Tool
@@ -20,7 +21,7 @@ param(
     [string]$Domain,
     
     [Parameter(Mandatory = $false)]
-    [string]$OutputPath = "$env:TEMP\",
+    [string]$OutputPath = ".",
     
     [Parameter(Mandatory = $false)]
     [switch]$Detailed
@@ -47,6 +48,7 @@ function Test-DNSRecord {
     param([string]$Domain, [string]$RecordType, [string]$ExpectedValue = $null)
     
     try {
+        Write-Host "Checking $RecordType record for $Domain..." -ForegroundColor Cyan
         $dnsResult = Resolve-DnsName -Name $Domain -Type $RecordType -ErrorAction Stop
         $result = @{
             Domain = $Domain
@@ -62,18 +64,43 @@ function Test-DNSRecord {
             }
         }
         
-        $result
-        Start-Sleep 5
-        Write-Host ""
         if ($ExpectedValue -and $result.Values -notcontains $ExpectedValue) {
             $result.Match = $false
         } else {
             $result.Match = $true
         }
         
+        # Output results to terminal
+        Write-Host "  Domain: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($result.Domain)" -ForegroundColor White
+        Write-Host "  Record Type: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($result.RecordType)" -ForegroundColor White
+        Write-Host "  Found: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($result.Found)" -ForegroundColor Green
+        Write-Host "  Values: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($result.Values -join ', ')" -ForegroundColor Yellow
+        
+        if ($ExpectedValue) {
+            Write-Host "  Match: " -NoNewline -ForegroundColor Gray
+            Write-Host "$($result.Match)" -ForegroundColor $(if ($result.Match) { "Green" } else { "Red" })
+        }
+        
+        Write-Host ""
+        Start-Sleep -Milliseconds 1500
+        
         return $result
     }
     catch {
+        Write-Host "  Domain: " -NoNewline -ForegroundColor Gray
+        Write-Host "$Domain" -ForegroundColor White
+        Write-Host "  Record Type: " -NoNewline -ForegroundColor Gray
+        Write-Host "$RecordType" -ForegroundColor White
+        Write-Host "  Found: " -NoNewline -ForegroundColor Gray
+        Write-Host "False" -ForegroundColor Red
+        Write-Host "  Error: " -NoNewline -ForegroundColor Gray
+        Write-Host "$($_.Exception.Message)" -ForegroundColor Red
+        Write-Host ""
+        
         return @{
             Domain = $Domain
             RecordType = $RecordType
@@ -88,17 +115,26 @@ function Test-EmailRouting {
     param([string]$Domain)
     
     Write-LogMessage "Testing email routing configuration for $Domain"
+    Write-Host "`n=== EMAIL ROUTING TESTS ===" -ForegroundColor Magenta
     $results = @()
     
     # Test MX Records
     $mxTest = Test-DNSRecord -Domain $Domain -RecordType "MX"
-    $results += [PSCustomObject]@{
+    $mxResult = [PSCustomObject]@{
         Check = "MX Records"
         Status = if ($mxTest.Found) { "PASS" } else { "FAIL" }
         Details = if ($mxTest.Found) { $mxTest.Values -join ", " } else { "No MX records found" }
         Recommendation = if (-not $mxTest.Found) { "Configure MX records pointing to Google's mail servers" } else { "" }
         Priority = if (-not $mxTest.Found) { "HIGH" } else { "NONE" }
     }
+    $results += $mxResult
+    
+    Write-Host "MX Records Test: " -NoNewline -ForegroundColor White
+    Write-Host "$($mxResult.Status)" -ForegroundColor $(if ($mxResult.Status -eq "PASS") { "Green" } else { "Red" })
+    if ($mxResult.Recommendation) {
+        Write-Host "  Recommendation: $($mxResult.Recommendation)" -ForegroundColor Yellow
+    }
+    Write-Host ""
     
     # Verify Google MX Records
     $googleMXPatterns = @("aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com")
@@ -114,13 +150,21 @@ function Test-EmailRouting {
         }
     }
     
-    $results += [PSCustomObject]@{
+    $googleMXResult = [PSCustomObject]@{
         Check = "Google MX Configuration"
         Status = if ($hasGoogleMX) { "PASS" } else { "FAIL" }
         Details = if ($hasGoogleMX) { "Google MX records detected" } else { "No Google MX records found" }
         Recommendation = if (-not $hasGoogleMX) { "Update MX records to use Google's mail servers" } else { "" }
         Priority = if (-not $hasGoogleMX) { "HIGH" } else { "NONE" }
     }
+    $results += $googleMXResult
+    
+    Write-Host "Google MX Configuration: " -NoNewline -ForegroundColor White
+    Write-Host "$($googleMXResult.Status)" -ForegroundColor $(if ($googleMXResult.Status -eq "PASS") { "Green" } else { "Red" })
+    if ($googleMXResult.Recommendation) {
+        Write-Host "  Recommendation: $($googleMXResult.Recommendation)" -ForegroundColor Yellow
+    }
+    Write-Host ""
     
     return $results
 }
@@ -129,11 +173,20 @@ function Test-SPFRecord {
     param([string]$Domain)
     
     Write-LogMessage "Checking SPF record for $Domain"
+    Write-Host "`n=== SPF RECORD TEST ===" -ForegroundColor Magenta
+    
     $spfTest = Test-DNSRecord -Domain $Domain -RecordType "TXT"
     $spfRecord = $null
     
     if ($spfTest.Found) {
         $spfRecord = $spfTest.Values | Where-Object { $_ -like "v=spf1*" } | Select-Object -First 1
+        Write-Host "TXT records found, searching for SPF..." -ForegroundColor Cyan
+        if ($spfRecord) {
+            Write-Host "SPF Record Found: " -NoNewline -ForegroundColor Green
+            Write-Host "$spfRecord" -ForegroundColor Yellow
+        } else {
+            Write-Host "No SPF record found in TXT records" -ForegroundColor Red
+        }
     }
     
     $result = [PSCustomObject]@{
@@ -150,6 +203,9 @@ function Test-SPFRecord {
             $result.Status = "WARNING"
             $result.Recommendation = "Add 'include:_spf.google.com' to SPF record"
             $result.Priority = "MEDIUM"
+            Write-Host "WARNING: Missing Google SPF include" -ForegroundColor Yellow
+        } else {
+            Write-Host "Google SPF include found: PASS" -ForegroundColor Green
         }
         
         # Check for proper termination
@@ -157,11 +213,29 @@ function Test-SPFRecord {
             $result.Status = "WARNING"
             $result.Recommendation += " | Ensure SPF record ends with proper 'all' mechanism"
             $result.Priority = "MEDIUM"
+            Write-Host "WARNING: SPF record should end with 'all' mechanism" -ForegroundColor Yellow
+        } else {
+            Write-Host "SPF termination mechanism found: PASS" -ForegroundColor Green
         }
     } else {
         $result.Recommendation = "Create SPF record: 'v=spf1 include:_spf.google.com ~all'"
         $result.Priority = "HIGH"
+        Write-Host "CRITICAL: No SPF record found" -ForegroundColor Red
     }
+    
+    Write-Host "SPF Test Result: " -NoNewline -ForegroundColor White
+    Write-Host "$($result.Status)" -ForegroundColor $(
+        switch ($result.Status) {
+            "PASS" { "Green" }
+            "WARNING" { "Yellow" }
+            "FAIL" { "Red" }
+        }
+    )
+    
+    if ($result.Recommendation) {
+        Write-Host "  Recommendation: $($result.Recommendation)" -ForegroundColor Yellow
+    }
+    Write-Host ""
     
     return $result
 }
@@ -170,8 +244,12 @@ function Test-DKIMRecord {
     param([string]$Domain)
     
     Write-LogMessage "Checking DKIM record for $Domain"
+    Write-Host "`n=== DKIM RECORD TEST ===" -ForegroundColor Magenta
+    
     $dkimSelector = "google"
     $dkimDomain = "$dkimSelector._domainkey.$Domain"
+    Write-Host "Checking DKIM at: $dkimDomain" -ForegroundColor Cyan
+    
     $dkimTest = Test-DNSRecord -Domain $dkimDomain -RecordType "TXT"
     
     $result = [PSCustomObject]@{
@@ -182,6 +260,14 @@ function Test-DKIMRecord {
         Priority = if (-not $dkimTest.Found) { "MEDIUM" } else { "NONE" }
     }
     
+    Write-Host "DKIM Test Result: " -NoNewline -ForegroundColor White
+    Write-Host "$($result.Status)" -ForegroundColor $(if ($result.Status -eq "PASS") { "Green" } else { "Red" })
+    
+    if ($result.Recommendation) {
+        Write-Host "  Recommendation: $($result.Recommendation)" -ForegroundColor Yellow
+    }
+    Write-Host ""
+    
     return $result
 }
 
@@ -189,12 +275,22 @@ function Test-DMARCRecord {
     param([string]$Domain)
     
     Write-LogMessage "Checking DMARC record for $Domain"
+    Write-Host "`n=== DMARC RECORD TEST ===" -ForegroundColor Magenta
+    
     $dmarcDomain = "_dmarc.$Domain"
+    Write-Host "Checking DMARC at: $dmarcDomain" -ForegroundColor Cyan
+    
     $dmarcTest = Test-DNSRecord -Domain $dmarcDomain -RecordType "TXT"
     
     $dmarcRecord = $null
     if ($dmarcTest.Found) {
         $dmarcRecord = $dmarcTest.Values | Where-Object { $_ -like "v=DMARC1*" } | Select-Object -First 1
+        if ($dmarcRecord) {
+            Write-Host "DMARC Record Found: " -NoNewline -ForegroundColor Green
+            Write-Host "$dmarcRecord" -ForegroundColor Yellow
+        } else {
+            Write-Host "TXT records found but no DMARC record" -ForegroundColor Red
+        }
     }
     
     $result = [PSCustomObject]@{
@@ -208,14 +304,32 @@ function Test-DMARCRecord {
     if (-not $dmarcRecord) {
         $result.Recommendation = "Create DMARC record: 'v=DMARC1; p=quarantine; rua=mailto:dmarc@$Domain'"
         $result.Priority = "MEDIUM"
+        Write-Host "MISSING: No DMARC record found" -ForegroundColor Red
     } else {
         # Check DMARC policy
         if ($dmarcRecord -match "p=none") {
             $result.Status = "WARNING"
             $result.Recommendation = "Consider upgrading DMARC policy from 'none' to 'quarantine' or 'reject'"
             $result.Priority = "LOW"
+            Write-Host "WARNING: DMARC policy set to 'none' - consider strengthening" -ForegroundColor Yellow
+        } else {
+            Write-Host "DMARC policy looks good" -ForegroundColor Green
         }
     }
+    
+    Write-Host "DMARC Test Result: " -NoNewline -ForegroundColor White
+    Write-Host "$($result.Status)" -ForegroundColor $(
+        switch ($result.Status) {
+            "PASS" { "Green" }
+            "WARNING" { "Yellow" }
+            "FAIL" { "Red" }
+        }
+    )
+    
+    if ($result.Recommendation) {
+        Write-Host "  Recommendation: $($result.Recommendation)" -ForegroundColor Yellow
+    }
+    Write-Host ""
     
     return $result
 }
@@ -406,6 +520,14 @@ function Generate-HTMLReport {
 function Start-GWSHealthCheck {
     param([string]$Domain, [string]$OutputPath, [bool]$DetailedReport)
     
+    Write-Host "`n" -ForegroundColor White
+    Write-Host "╔══════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
+    Write-Host "║               GOOGLE WORKSPACE HEALTH CHECKER                   ║" -ForegroundColor Green  
+    Write-Host "║                      Domain: $($Domain.PadRight(30))       ║" -ForegroundColor Green
+    Write-Host "║                   $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')                    ║" -ForegroundColor Green
+    Write-Host "╚══════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+    Write-Host "`n" -ForegroundColor White
+    
     Write-LogMessage "Starting Google Workspace Health Check for domain: $Domain" -Level "SUCCESS"
     
     $allResults = @()
@@ -419,16 +541,42 @@ function Start-GWSHealthCheck {
     
     # Additional checks if detailed report requested
     if ($DetailedReport) {
+        Write-Host "`n=== ADDITIONAL DETAILED CHECKS ===" -ForegroundColor Magenta
         $allResults += Test-SubdomainDelegation -Domain $Domain
         $allResults += Test-SecurityHeaders -Domain $Domain
     }
     
-    # Generate reports
-    Generate-HTMLReport -Results $allResults -Domain $Domain -OutputFile $ReportFile
+    # Display summary in terminal
+    Write-Host "`n" -ForegroundColor White
+    Write-Host "╔══════════════════════════════════════════════════════════════════╗" -ForegroundColor Blue
+    Write-Host "║                           SUMMARY                                ║" -ForegroundColor Blue
+    Write-Host "╠══════════════════════════════════════════════════════════════════╣" -ForegroundColor Blue
     
-    # Summary output
     $criticalCount = ($allResults | Where-Object { $_.Priority -eq "HIGH" }).Count
     $warningCount = ($allResults | Where-Object { $_.Priority -eq "MEDIUM" }).Count
+    $suggestionCount = ($allResults | Where-Object { $_.Priority -eq "LOW" }).Count
+    $passCount = ($allResults | Where-Object { $_.Status -eq "PASS" }).Count
+    
+    Write-Host "║  Critical Issues:    " -NoNewline -ForegroundColor Blue
+    Write-Host "$($criticalCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor $(if ($criticalCount -gt 0) { "Red" } else { "Green" })
+    Write-Host "                                        ║" -ForegroundColor Blue
+    
+    Write-Host "║  Warnings:           " -NoNewline -ForegroundColor Blue  
+    Write-Host "$($warningCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor $(if ($warningCount -gt 0) { "Yellow" } else { "Green" })
+    Write-Host "                                        ║" -ForegroundColor Blue
+    
+    Write-Host "║  Suggestions:        " -NoNewline -ForegroundColor Blue
+    Write-Host "$($suggestionCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor "Cyan"
+    Write-Host "                                        ║" -ForegroundColor Blue
+    
+    Write-Host "║  Passed Checks:      " -NoNewline -ForegroundColor Blue
+    Write-Host "$($passCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor "Green"
+    Write-Host "                                        ║" -ForegroundColor Blue
+    
+    Write-Host "╚══════════════════════════════════════════════════════════════════╝" -ForegroundColor Blue
+    
+    # Generate reports
+    Generate-HTMLReport -Results $allResults -Domain $Domain -OutputFile $ReportFile
     
     Write-LogMessage "Health check completed!" -Level "SUCCESS"
     Write-LogMessage "Critical issues found: $criticalCount" -Level $(if ($criticalCount -gt 0) { "ERROR" } else { "SUCCESS" })
@@ -455,7 +603,6 @@ try {
     }
     
     # Execute health check
-    Start-Sleep 5
     $results = Start-GWSHealthCheck -Domain $Domain -OutputPath $OutputPath -DetailedReport $Detailed.IsPresent
     
     # Display critical issues
@@ -473,3 +620,4 @@ try {
     Write-LogMessage "Error during health check: $($_.Exception.Message)" -Level "ERROR"
     return
 }
+
