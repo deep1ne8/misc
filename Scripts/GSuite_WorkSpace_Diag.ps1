@@ -1,4 +1,3 @@
-#Requires -Version 5.1
 <#
 .SYNOPSIS
     Google Workspace Health & Diagnostic Tool
@@ -18,7 +17,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Domain = Read-Host -Prompt "Please enter the domain name...",
+    [string]$Domain = 'Read-Host -Prompt "Please enter the domain name..."',
     
     [Parameter(Mandatory = $false)]
     [string]$OutputPath = "$env:TEMP\",
