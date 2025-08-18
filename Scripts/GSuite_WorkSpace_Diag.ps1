@@ -57,11 +57,14 @@ function Test-DNSRecord {
                     "MX" { "$($_.Preference) $($_.NameExchange)" }
                     "TXT" { $_.Strings -join " " }
                     "CNAME" { $_.NameHost }
-                    "A" { $_.IPAddress }
+                    "A" { $_.IPAddress }                   
                 }
             }
         }
         
+        Write-Host '$result' -ForegroundColor Green
+        Start-Sleep 5
+        Write-Host ""
         if ($ExpectedValue -and $result.Values -notcontains $ExpectedValue) {
             $result.Match = $false
         } else {
@@ -452,8 +455,6 @@ try {
     }
     
     # Execute health check
-    Write-Host '$dnsResult' -ForegroundColor Green
-    Write-Host ''
     Start-Sleep 5
     $results = Start-GWSHealthCheck -Domain $Domain -OutputPath $OutputPath -DetailedReport $Detailed.IsPresent
     
