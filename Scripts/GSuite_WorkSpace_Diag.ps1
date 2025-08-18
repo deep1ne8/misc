@@ -46,10 +46,21 @@ function Write-LogMessage {
         "SUCCESS" { "Green" }
         default { "White" }
     })
-    Add-Content -Path $LogFile -Value $logEntry
+    Add-Content -Path $LogFile -Value $logEntry -ErrorAction SilentlyContinue
 }
 
 function Test-DNSRecord {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Domain,
+        
+        [Parameter(Mandatory = $true)]
+        [string]$RecordType,
+        
+        [Parameter(Mandatory = $false)]
+        [string]$ExpectedValue = ""
+    )
+    
     try {
         Write-Host "Checking $RecordType record for $Domain..." -ForegroundColor Cyan
         $dnsResult = Resolve-DnsName -Name $Domain -Type $RecordType -ErrorAction Stop
@@ -59,13 +70,15 @@ function Test-DNSRecord {
             Found = $true
             Values = $dnsResult | ForEach-Object { 
                 switch ($RecordType) {
-                    "MX" { $_.NameExchange }  # Only return the mail server name
+                    "MX" { $_.NameExchange }
                     "TXT" { $_.Strings -join " " }
                     "CNAME" { $_.NameHost }
-                    "A" { $_.IPAddress }                   
+                    "A" { $_.IPAddress }
+                    "CAA" { "$($_.Tag) $($_.Value)" }
+                    default { $_.ToString() }
                 }
             }
-            Preferences = if ($RecordType -eq "MX") { $dnsResult.Preference } else { $null }  # Store MX preferences separately
+            Preferences = if ($RecordType -eq "MX") { $dnsResult.Preference } else { $null }
         }
         
         if ($ExpectedValue -and $result.Values -notcontains $ExpectedValue) {
@@ -73,23 +86,6 @@ function Test-DNSRecord {
         } else {
             $result.Match = $true
         }
-        
-        return $result
-    }
-    catch {
-        return @{
-            Domain = $Domain
-            RecordType = $RecordType
-            Found = $false
-            Values = @()
-            Match = $false
-            Error = $_.Exception.Message
-        }
-    }
-}
-
-# Example usage:
-# Test-DNSRecord -Domain "google.com" -RecordType "MX" -ExpectedValue "smtp.google.com"
         
         # Output results to terminal
         Write-Host "  Domain: " -NoNewline -ForegroundColor Gray
@@ -128,6 +124,7 @@ function Test-DNSRecord {
             Found = $false
             Error = $_.Exception.Message
             Match = $false
+            Values = @()
         }
     }
 }
@@ -157,9 +154,8 @@ function Test-EmailRouting {
     }
     Write-Host ""
     
-    # Verify Google MX Records
-    #$googleMXPatterns = @("aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com", "alt\d\.aspmx\.l\.google\.com")
-    $googleMXPatterns = @("smtp.google.com")
+    # Verify Google MX Records - Updated patterns for actual Google MX records
+    $googleMXPatterns = @("smtp\.google\.com")
     $hasGoogleMX = $false
     if ($mxTest.Found) {
         foreach ($mx in $mxTest.Values) {
@@ -169,6 +165,7 @@ function Test-EmailRouting {
                     break
                 }
             }
+            if ($hasGoogleMX) { break }
         }
     }
     
@@ -201,7 +198,7 @@ function Test-SPFRecord {
     $spfRecord = $null
     
     if ($spfTest.Found) {
-        $spfRecord = $spfTest.Values | Where-Object { $_ -like "v=_spf*" } | Select-Object -First 1
+        $spfRecord = $spfTest.Values | Where-Object { $_ -like "v=spf1*" } | Select-Object -First 1
         Write-Host "TXT records found, searching for SPF..." -ForegroundColor Cyan
         if ($spfRecord) {
             Write-Host "SPF Record Found: " -NoNewline -ForegroundColor Green
@@ -221,8 +218,8 @@ function Test-SPFRecord {
     
     if ($spfRecord) {
         # Check for Google include
-        $SPFGoogle = "include:_spf.google.com"
-        if ($spfRecord -notmatch "$SPFGoogle") {
+        $spfGoogle = "include:_spf\.google\.com"
+        if ($spfRecord -notmatch $spfGoogle) {
             $result.Status = "WARNING"
             $result.Recommendation = "Add 'include:_spf.google.com' to SPF record"
             $result.Priority = "MEDIUM"
@@ -232,7 +229,7 @@ function Test-SPFRecord {
         }
         
         # Check for proper termination
-        if ($spfRecord -notmatch "~all$|all$|-all$") {
+        if ($spfRecord -notmatch "~all$|\+all$|-all$") {
             $result.Status = "WARNING"
             $result.Recommendation += " | Ensure SPF record ends with proper 'all' mechanism"
             $result.Priority = "MEDIUM"
@@ -361,12 +358,13 @@ function Test-GoogleSiteVerification {
     param([string]$Domain)
     
     Write-LogMessage "Checking Google Site Verification for $Domain"
+    Write-Host "`n=== GOOGLE SITE VERIFICATION TEST ===" -ForegroundColor Magenta
+    
     $txtTest = Test-DNSRecord -Domain $Domain -RecordType "TXT"
     
     $googleVerification = $false
-    $SiteVerification = "google-site-verification=LxjqBolwQOR9osBq3FrtOe1qVdsPAyUeg8nK_SAJyGY"
     if ($txtTest.Found) {
-        $googleVerification = $txtTest.Values | Where-Object { $_ -like "$SiteVerification" } | Select-Object -First 1
+        $googleVerification = $txtTest.Values | Where-Object { $_ -like "google-site-verification=*" } | Select-Object -First 1
     }
     
     return [PSCustomObject]@{
@@ -382,6 +380,8 @@ function Test-SubdomainDelegation {
     param([string]$Domain)
     
     Write-LogMessage "Testing common Google Workspace subdomains for $Domain"
+    Write-Host "`n=== SUBDOMAIN DELEGATION TESTS ===" -ForegroundColor Magenta
+    
     $results = @()
     $subdomains = @("mail", "calendar", "drive", "docs", "sites")
     
@@ -405,17 +405,29 @@ function Test-SecurityHeaders {
     param([string]$Domain)
     
     Write-LogMessage "Checking security-related DNS records for $Domain"
+    Write-Host "`n=== SECURITY HEADERS TEST ===" -ForegroundColor Magenta
+    
     $results = @()
     
     # Check for CAA records
     try {
-        $caaTest = Resolve-DnsName -Name $Domain -Type "CAA" -ErrorAction Stop
-        $results += [PSCustomObject]@{
-            Check = "CAA Records"
-            Status = "CONFIGURED"
-            Details = ($caaTest | ForEach-Object { "$($_.Tag) $($_.Value)" }) -join ", "
-            Recommendation = ""
-            Priority = "NONE"
+        $caaTest = Test-DNSRecord -Domain $Domain -RecordType "CAA"
+        if ($caaTest.Found) {
+            $results += [PSCustomObject]@{
+                Check = "CAA Records"
+                Status = "CONFIGURED"
+                Details = ($caaTest.Values -join ", ")
+                Recommendation = ""
+                Priority = "NONE"
+            }
+        } else {
+            $results += [PSCustomObject]@{
+                Check = "CAA Records"
+                Status = "NOT_CONFIGURED"
+                Details = "No CAA records found"
+                Recommendation = "Consider adding CAA records to control certificate issuance"
+                Priority = "LOW"
+            }
         }
     }
     catch {
@@ -459,189 +471,3 @@ function Generate-HTMLReport {
         th, td { text-align: left; padding: 12px; border-bottom: 1px solid #dee2e6; }
         th { background-color: #f8f9fa; font-weight: 600; }
         .status-PASS { color: #198754; font-weight: bold; }
-        .status-FAIL { color: #dc3545; font-weight: bold; }
-        .status-WARNING { color: #fd7e14; font-weight: bold; }
-        .status-CONFIGURED { color: #198754; }
-        .status-NOT_CONFIGURED { color: #6c757d; }
-        .priority-HIGH { background-color: #f8d7da; }
-        .priority-MEDIUM { background-color: #fff3cd; }
-        .priority-LOW { background-color: #d1ecf1; }
-        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; text-align: center; }
-        .recommendation { font-style: italic; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Google Workspace Health Report</h1>
-            <p><strong>Domain:</strong> $Domain | <strong>Generated:</strong> $timestamp</p>
-        </div>
-        
-        <div class="summary">
-            <div class="summary-card">
-                <h3 class="critical">$criticalIssues</h3>
-                <p>Critical Issues</p>
-            </div>
-            <div class="summary-card">
-                <h3 class="warning">$warnings</h3>
-                <p>Warnings</p>
-            </div>
-            <div class="summary-card">
-                <h3 class="suggestion">$suggestions</h3>
-                <p>Suggestions</p>
-            </div>
-            <div class="summary-card">
-                <h3 class="success">$(($Results | Where-Object { $_.Status -eq "PASS" }).Count)</h3>
-                <p>Passed Checks</p>
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>Check</th>
-                    <th>Status</th>
-                    <th>Details</th>
-                    <th>Recommendations</th>
-                    <th>Priority</th>
-                </tr>
-            </thead>
-            <tbody>
-"@
-
-    foreach ($result in $Results) {
-        $priorityClass = if ($result.Priority -ne "NONE") { "priority-$($result.Priority)" } else { "" }
-        $statusClass = "status-$($result.Status)"
-        
-        $html += @"
-                <tr class="$priorityClass">
-                    <td>$($result.Check)</td>
-                    <td class="$statusClass">$($result.Status)</td>
-                    <td>$($result.Details)</td>
-                    <td class="recommendation">$($result.Recommendation)</td>
-                    <td>$($result.Priority)</td>
-                </tr>
-"@
-    }
-
-    $html += @"
-            </tbody>
-        </table>
-        
-        <div class="footer">
-            <p>Google Workspace Health & Diagnostic Tool | Generated on $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")</p>
-            <p>This report provides recommendations based on best practices. Please consult Google Workspace documentation for specific implementation details.</p>
-        </div>
-    </div>
-</body>
-</html>
-"@
-
-    $html | Out-File -FilePath $OutputFile -Encoding UTF8
-    Write-LogMessage "HTML report generated: $OutputFile" -Level "SUCCESS"
-}
-
-function Start-GWSHealthCheck {
-    param([string]$Domain, [string]$OutputPath, [bool]$DetailedReport)
-    
-    Write-Host "`n" -ForegroundColor White
-    Write-Host "╔══════════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-    Write-Host "║               GOOGLE WORKSPACE HEALTH CHECKER                   ║" -ForegroundColor Green  
-    Write-Host "║                      Domain: $($Domain.PadRight(30))       ║" -ForegroundColor Green
-    Write-Host "║                   $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')                    ║" -ForegroundColor Green
-    Write-Host "╚══════════════════════════════════════════════════════════════════╝" -ForegroundColor Green
-    Write-Host "`n" -ForegroundColor White
-    
-    Write-LogMessage "Starting Google Workspace Health Check for domain: $Domain" -Level "SUCCESS"
-    
-    $allResults = @()
-    
-    # Core email routing tests
-    $allResults += Test-EmailRouting -Domain $Domain
-    $allResults += Test-SPFRecord -Domain $Domain
-    $allResults += Test-DKIMRecord -Domain $Domain  
-    $allResults += Test-DMARCRecord -Domain $Domain
-    $allResults += Test-GoogleSiteVerification -Domain $Domain
-    
-    # Additional checks if detailed report requested
-    if ($DetailedReport) {
-        Write-Host "`n=== ADDITIONAL DETAILED CHECKS ===" -ForegroundColor Magenta
-        $allResults += Test-SubdomainDelegation -Domain $Domain
-        $allResults += Test-SecurityHeaders -Domain $Domain
-    }
-    
-    # Display summary in terminal
-    Write-Host "`n" -ForegroundColor White
-    Write-Host "╔══════════════════════════════════════════════════════════════════╗" -ForegroundColor Blue
-    Write-Host "║                           SUMMARY                                ║" -ForegroundColor Blue
-    Write-Host "╠══════════════════════════════════════════════════════════════════╣" -ForegroundColor Blue
-    
-    $criticalCount = ($allResults | Where-Object { $_.Priority -eq "HIGH" }).Count
-    $warningCount = ($allResults | Where-Object { $_.Priority -eq "MEDIUM" }).Count
-    $suggestionCount = ($allResults | Where-Object { $_.Priority -eq "LOW" }).Count
-    $passCount = ($allResults | Where-Object { $_.Status -eq "PASS" }).Count
-    
-    Write-Host "║  Critical Issues:    " -NoNewline -ForegroundColor Blue
-    Write-Host "$($criticalCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor $(if ($criticalCount -gt 0) { "Red" } else { "Green" })
-    Write-Host "                                        ║" -ForegroundColor Blue
-    
-    Write-Host "║  Warnings:           " -NoNewline -ForegroundColor Blue  
-    Write-Host "$($warningCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor $(if ($warningCount -gt 0) { "Yellow" } else { "Green" })
-    Write-Host "                                        ║" -ForegroundColor Blue
-    
-    Write-Host "║  Suggestions:        " -NoNewline -ForegroundColor Blue
-    Write-Host "$($suggestionCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor "Cyan"
-    Write-Host "                                        ║" -ForegroundColor Blue
-    
-    Write-Host "║  Passed Checks:      " -NoNewline -ForegroundColor Blue
-    Write-Host "$($passCount.ToString().PadLeft(2))" -NoNewline -ForegroundColor "Green"
-    Write-Host "                                        ║" -ForegroundColor Blue
-    
-    Write-Host "╚══════════════════════════════════════════════════════════════════╝" -ForegroundColor Blue
-    
-    # Generate reports
-    Generate-HTMLReport -Results $allResults -Domain $Domain -OutputFile $ReportFile
-    
-    Write-LogMessage "Health check completed!" -Level "SUCCESS"
-    Write-LogMessage "Critical issues found: $criticalCount" -Level $(if ($criticalCount -gt 0) { "ERROR" } else { "SUCCESS" })
-    Write-LogMessage "Warnings found: $warningCount" -Level $(if ($warningCount -gt 0) { "WARNING" } else { "SUCCESS" })
-    Write-LogMessage "Full report saved to: $ReportFile" -Level "SUCCESS"
-    Write-LogMessage "Log file saved to: $LogFile" -Level "SUCCESS"
-    
-    return $allResults
-}
-
-# Main execution
-try {
-    Write-LogMessage "Initializing Google Workspace Health & Diagnostic Tool" -Level "SUCCESS"
-    
-    # Validate parameters
-    if (-not $Domain -or $Domain -eq "") {
-    $Domain = Read-Host -Prompt "Please enter the domain name..."
-    Write-LogMessage "Domain to check: $Domain"
-    }
-    
-    if (-not (Test-Path $OutputPath)) {
-        New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
-        Write-LogMessage "Created output directory: $OutputPath"
-    }
-    
-    # Execute health check
-    $results = Start-GWSHealthCheck -Domain $Domain -OutputPath $OutputPath -DetailedReport $Detailed.IsPresent
-    
-    # Display critical issues
-    $criticalIssues = $results | Where-Object { $_.Priority -eq "HIGH" }
-    if ($criticalIssues) {
-        Write-LogMessage "CRITICAL ISSUES DETECTED:" -Level "ERROR"
-        foreach ($issue in $criticalIssues) {
-            Write-LogMessage "  - $($issue.Check): $($issue.Recommendation)" -Level "ERROR"
-        }
-    }
-    
-    Write-LogMessage "Google Workspace Health Check completed successfully!" -Level "SUCCESS"
-    
-} catch {
-    Write-LogMessage "Error during health check: $($_.Exception.Message)" -Level "ERROR"
-    return
-}
-
