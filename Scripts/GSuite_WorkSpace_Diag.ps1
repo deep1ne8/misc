@@ -44,7 +44,7 @@ function Write-LogMessage {
 }
 
 function Test-DNSRecord {
-    param([string]$Domain, [string]$RecordType, [string]$ExpectedValue = $null)
+    param([string]$Domain, [string]$RecordType = MX, [string]$ExpectedValue = "smtp.google.com")
     
     try {
         Write-Host "Checking $RecordType record for $Domain..." -ForegroundColor Cyan
@@ -55,12 +55,13 @@ function Test-DNSRecord {
             Found = $true
             Values = $dnsResult | ForEach-Object { 
                 switch ($RecordType) {
-                    "MX" { "$($_.Preference) $($_.NameExchange)" }
+                    "MX" { $_.NameExchange }  # Only return the mail server name
                     "TXT" { $_.Strings -join " " }
                     "CNAME" { $_.NameHost }
                     "A" { $_.IPAddress }                   
                 }
             }
+            Preferences = if ($RecordType -eq "MX") { $dnsResult.Preference } else { $null }  # Store MX preferences separately
         }
         
         if ($ExpectedValue -and $result.Values -notcontains $ExpectedValue) {
@@ -68,6 +69,23 @@ function Test-DNSRecord {
         } else {
             $result.Match = $true
         }
+        
+        return $result
+    }
+    catch {
+        return @{
+            Domain = $Domain
+            RecordType = $RecordType
+            Found = $false
+            Values = @()
+            Match = $false
+            Error = $_.Exception.Message
+        }
+    }
+}
+
+# Example usage:
+# Test-DNSRecord -Domain "google.com" -RecordType "MX" -ExpectedValue "smtp.google.com"
         
         # Output results to terminal
         Write-Host "  Domain: " -NoNewline -ForegroundColor Gray
