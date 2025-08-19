@@ -30,24 +30,32 @@ if ($disk.Free -lt 5GB) {
     Write-Log "WARNING: Less than 5GB free on C: drive. Cleanup may be required."
 }
 
-# Step 2: Rename ALL pending.xml* files if they exist
+# Step 2: Rename ALL pending.xml* files if they exist (with ownership fix)
 $PendingFiles = Get-ChildItem "C:\Windows\WinSxS\" -Filter "pending.xml*" -ErrorAction SilentlyContinue
 
 if ($PendingFiles) {
     foreach ($file in $PendingFiles) {
         try {
             $newName = "$($file.FullName).$((Get-Date).ToString('yyyyMMddHHmmss')).old"
-            takeown /f $file.FullName | Out-Null
-            icacls $file.FullName /grant Administrators:F | Out-Null
+
+            Write-Log "Taking ownership of $($file.FullName)"
+            & takeown.exe /f $file.FullName /A | Out-Null
+
+            Write-Log "Granting Administrators full access to $($file.FullName)"
+            & icacls.exe $file.FullName /grant Administrators:F /T /C | Out-Null
+
+            Write-Log "Renaming $($file.FullName) to $newName"
             Rename-Item -Path $file.FullName -NewName $newName -Force
-            Write-Log "Renamed $($file.Name) to $newName"
+
+            Write-Log "Successfully renamed $($file.Name) to $newName"
         } catch {
-            Write-Log "ERROR: Failed to rename $($file.Name) - $_"
+            Write-Log "ERROR: Failed to rename $($file.FullName) - $_"
         }
     }
 } else {
     Write-Log "No pending.xml* files found. Skipping."
 }
+
 
 
 # Step 3: Run DISM commands inline with correct argument splitting
