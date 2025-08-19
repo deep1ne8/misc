@@ -2,10 +2,8 @@
 .SYNOPSIS
     Automated CBS Repair Script for Windows Server 2016
 .DESCRIPTION
-    Handles common CBS errors:
-    - 0x800705aa (ERROR_NO_SYSTEM_RESOURCES)
-    - 0x80070002 (ERROR_FILE_NOT_FOUND)
-    Renames corrupted pending.xml files, runs DISM and SFC, and logs output.
+    Fixes CBS errors by renaming corrupted pending.xml, running DISM and SFC,
+    and logging output. All runs in the same terminal session.
 #>
 
 $LogFile = "C:\Windows\Temp\CBS_Repair.log"
@@ -40,8 +38,8 @@ foreach ($file in @($PendingPath, $PendingBad)) {
     if (Test-Path $file) {
         try {
             $newName = "$file.$((Get-Date).ToString('yyyyMMddHHmmss')).old"
-            Takeown /f $file | Out-Null
-            Icacls $file /grant Administrators:F | Out-Null
+            takeown /f $file | Out-Null
+            icacls $file /grant Administrators:F | Out-Null
             Rename-Item -Path $file -NewName $newName -Force
             Write-Log "Renamed $file to $newName"
         } catch {
@@ -52,7 +50,7 @@ foreach ($file in @($PendingPath, $PendingBad)) {
     }
 }
 
-# Step 3: Run DISM
+# Step 3: Run DISM commands inline
 $DismCmds = @(
     "/Online /Cleanup-Image /CheckHealth",
     "/Online /Cleanup-Image /ScanHealth",
@@ -61,11 +59,11 @@ $DismCmds = @(
 
 foreach ($cmd in $DismCmds) {
     Write-Log "Running: DISM $cmd"
-    Start-Process -FilePath "dism.exe" -ArgumentList $cmd -Wait -NoNewWindow -RedirectStandardOutput $LogFile -Append
+    & dism.exe $cmd 2>&1 | Tee-Object -FilePath $LogFile -Append
 }
 
-# Step 4: Run SFC
+# Step 4: Run SFC inline
 Write-Log "Running: sfc /scannow"
-Start-Process -FilePath "sfc.exe" -ArgumentList "/scannow" -Wait -NoNewWindow -RedirectStandardOutput $LogFile -Append
+& sfc.exe /scannow 2>&1 | Tee-Object -FilePath $LogFile -Append
 
 Write-Log "===== CBS Repair Script Completed ====="
