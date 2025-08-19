@@ -2,8 +2,9 @@
 .SYNOPSIS
     Automated CBS Repair Script for Windows Server 2016
 .DESCRIPTION
-    Fixes CBS errors by renaming corrupted pending.xml,
-    running DISM and SFC, and logging output.
+    Fixes CBS errors by stopping Windows Update related services,
+    renaming corrupted pending.xml, running DISM and SFC,
+    and logging output.
     Ensures elevation and prevents Access Denied errors.
 #>
 
@@ -28,6 +29,25 @@ Function Write-Log {
     Add-Content -Path $LogFile -Value $Entry
 }
 Write-Log "= Starting CBS Repair Script ="
+
+# =============================
+# Step 0: Stop Windows Update and Dependencies
+# =============================
+$ServicesToStop = @("wuauserv","cryptsvc","bits","trustedinstaller")
+foreach ($service in $ServicesToStop) {
+    try {
+        $svc = Get-Service -Name $service -ErrorAction SilentlyContinue
+        if ($svc -and $svc.Status -ne 'Stopped') {
+            Write-Log "Stopping service $service..."
+            Stop-Service -Name $service -Force -ErrorAction Stop
+            Write-Log "Service $service stopped."
+        } else {
+            Write-Log "Service $service already stopped or not found."
+        }
+    } catch {
+        Write-Log "ERROR: Could not stop service $service - $_"
+    }
+}
 
 # =============================
 # Step 1: System Resource Check
