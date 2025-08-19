@@ -1,42 +1,91 @@
-# PowerShell script to split a file into smaller chunks
+<#
+.SYNOPSIS
+    Log File Splitter
+.DESCRIPTION
+    Splits a large log file into smaller parts based on user-defined size.
+#>
 
-# Prompt for input file path
-$InputFile = Read-Host "Enter the full path of the file to split"
+param()
 
-# Prompt for chunk size (in lines or MB)
-$Choice = Read-Host "Do you want to split by (1) number of lines per chunk OR (2) size in MB? Enter 1 or 2"
+# Prompt user for inputs
+$LogFilePath = Read-Host "Enter full path of the log file"
+$Destination = Read-Host "Enter destination folder path"
+$Unit = Read-Host "Enter size unit (MB, KB, Lines)"
+$Size = Read-Host "Enter maximum size per split (integer only)"
 
-if ($Choice -eq 1) {
-    $LinesPerChunk = Read-Host "Enter the number of lines per chunk"
-    $LinesPerChunk = [int]$LinesPerChunk
-
-    $Counter = 1
-    Get-Content $InputFile -ReadCount $LinesPerChunk | ForEach-Object {
-        $OutputFile = "{0}_part{1}.txt" -f $InputFile, $Counter
-        $_ | Set-Content $OutputFile
-        Write-Host "Created $OutputFile"
-        $Counter++
-    }
-
-} elseif ($Choice -eq 2) {
-    $SizeMB = Read-Host "Enter chunk size in MB"
-    $SizeBytes = $SizeMB * 1MB
-
-    $InputStream = [System.IO.File]::OpenRead($InputFile)
-    $Buffer = New-Object byte[] $SizeBytes
-    $Counter = 1
-
-    while (($BytesRead = $InputStream.Read($Buffer, 0, $Buffer.Length)) -gt 0) {
-        $OutputFile = "{0}_part{1}.bin" -f $InputFile, $Counter
-        $OutputStream = [System.IO.File]::Create($OutputFile)
-        $OutputStream.Write($Buffer, 0, $BytesRead)
-        $OutputStream.Close()
-        Write-Host "Created $OutputFile"
-        $Counter++
-    }
-    $InputStream.Close()
-} else {
-    Write-Host "Invalid choice. Please run again and choose 1 or 2."
+# Validate file
+if (-not (Test-Path $LogFilePath)) {
+    Write-Error "Log file not found at: $LogFilePath"
+    exit
 }
 
- 
+# Validate destination
+if (-not (Test-Path $Destination)) {
+    try {
+        New-Item -ItemType Directory -Path $Destination -Force | Out-Null
+    } catch {
+        Write-Error "Destination not writable: $Destination"
+        exit
+    }
+}
+
+# Convert size input
+switch ($Unit.ToUpper()) {
+    "MB"    { $Bytes = [int64]$Size * 1MB }
+    "KB"    { $Bytes = [int64]$Size * 1KB }
+    "LINES" { $Bytes = $null } # handled separately
+    default { Write-Error "Invalid unit. Use MB, KB, or Lines"; exit }
+}
+
+$BaseName = [System.IO.Path]::GetFileNameWithoutExtension($LogFilePath)
+$Extension = [System.IO.Path]::GetExtension($LogFilePath)
+$Counter = 1
+
+if ($Unit.ToUpper() -eq "LINES") {
+    # Split by lines
+    $LineBuffer = @()
+    $LineCount = 0
+
+    Get-Content $LogFilePath | ForEach-Object {
+        $LineBuffer += $_
+        $LineCount++
+
+        if ($LineCount -ge $Size) {
+            $OutFile = Join-Path $Destination ("{0}_part{1}{2}" -f $BaseName, $Counter, $Extension)
+            $LineBuffer | Out-File -FilePath $OutFile -Encoding utf8
+            Write-Host "Created $OutFile"
+            $Counter++
+            $LineBuffer = @()
+            $LineCount = 0
+        }
+    }
+
+    # Write remaining lines
+    if ($LineBuffer.Count -gt 0) {
+        $OutFile = Join-Path $Destination ("{0}_part{1}{2}" -f $BaseName, $Counter, $Extension)
+        $LineBuffer | Out-File -FilePath $OutFile -Encoding utf8
+        Write-Host "Created $OutFile"
+    }
+
+} else {
+    # Split by size
+    $reader = [System.IO.File]::OpenRead($LogFilePath)
+    $buffer = New-Object byte[] $Bytes
+
+    while ($true) {
+        $bytesRead = $reader.Read($buffer, 0, $Bytes)
+        if ($bytesRead -le 0) { break }
+
+        $OutFile = Join-Path $Destination ("{0}_part{1}{2}" -f $BaseName, $Counter, $Extension)
+        $fs = [System.IO.File]::Create($OutFile)
+        $fs.Write($buffer, 0, $bytesRead)
+        $fs.Close()
+
+        Write-Host "Created $OutFile"
+        $Counter++
+    }
+
+    $reader.Close()
+}
+
+Write-Host "Splitting complete."
