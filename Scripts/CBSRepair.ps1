@@ -31,7 +31,7 @@ if ($disk.Free -lt 5GB) {
 }
 
 # Step 2: Rename pending.xml if exists
-$PendingPath = "C:\Windows\WinSxS\pending.xml"
+$PendingPath = "C:\Windows\WinSxS\pending.xml*"
 $PendingBad = "C:\Windows\WinSxS\pending.xml.bad"
 
 foreach ($file in @($PendingPath, $PendingBad)) {
