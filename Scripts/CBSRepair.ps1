@@ -30,36 +30,36 @@ if ($disk.Free -lt 5GB) {
     Write-Log "WARNING: Less than 5GB free on C: drive. Cleanup may be required."
 }
 
-# Step 2: Rename pending.xml if exists
-$PendingPath = "C:\Windows\WinSxS\pending.xml*"
-$PendingBad = "C:\Windows\WinSxS\pending.xml.bad"
+# Step 2: Rename ALL pending.xml* files if they exist
+$PendingFiles = Get-ChildItem "C:\Windows\WinSxS\" -Filter "pending.xml*" -ErrorAction SilentlyContinue
 
-foreach ($file in @($PendingPath, $PendingBad)) {
-    if (Test-Path $file) {
+if ($PendingFiles) {
+    foreach ($file in $PendingFiles) {
         try {
-            $newName = "$file.$((Get-Date).ToString('yyyyMMddHHmmss')).old"
-            takeown /f $file | Out-Null
-            icacls $file /grant Administrators:F | Out-Null
-            Rename-Item -Path $file -NewName $newName -Force
-            Write-Log "Renamed $file to $newName"
+            $newName = "$($file.FullName).$((Get-Date).ToString('yyyyMMddHHmmss')).old"
+            takeown /f $file.FullName | Out-Null
+            icacls $file.FullName /grant Administrators:F | Out-Null
+            Rename-Item -Path $file.FullName -NewName $newName -Force
+            Write-Log "Renamed $($file.Name) to $newName"
         } catch {
-            Write-Log "ERROR: Failed to rename $file - $_"
+            Write-Log "ERROR: Failed to rename $($file.Name) - $_"
         }
-    } else {
-        Write-Log "$file not found. Skipping."
     }
+} else {
+    Write-Log "No pending.xml* files found. Skipping."
 }
 
-# Step 3: Run DISM commands inline
+
+# Step 3: Run DISM commands inline with correct argument splitting
 $DismCmds = @(
-    "/Online /Cleanup-Image /CheckHealth",
-    "/Online /Cleanup-Image /ScanHealth",
-    "/Online /Cleanup-Image /RestoreHealth"
+    @("/Online","/Cleanup-Image","/CheckHealth"),
+    @("/Online","/Cleanup-Image","/ScanHealth"),
+    @("/Online","/Cleanup-Image","/RestoreHealth")
 )
 
-foreach ($cmd in $DismCmds) {
-    Write-Log "Running: DISM $cmd"
-    & dism.exe $cmd 2>&1 | Tee-Object -FilePath $LogFile -Append
+foreach ($args in $DismCmds) {
+    Write-Log "Running: DISM $($args -join ' ')"
+    & dism.exe @args 2>&1 | Tee-Object -FilePath $LogFile -Append
 }
 
 # Step 4: Run SFC inline
