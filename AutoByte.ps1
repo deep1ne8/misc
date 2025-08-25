@@ -19,7 +19,7 @@ Write-Host "✔ Registry updated to permanently enable strong crypto/TLS 1.2." -
 
 $GitHubScripts = @(
 
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/IntuneRemediate.ps1"; Description = "Intune Remediate" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/QBDiag.ps1"; Description = "QuickBooks Diagnostics" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/GSuite_WorkSpace_Diag.ps1"; Description = "GWS HealthCheck" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/Get-PrinterSupplies.ps1"; Description = "Get Printer Supplies" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/WindowsOnlineRepair.ps1"; Description = "WindowsOnlineRepair" },
