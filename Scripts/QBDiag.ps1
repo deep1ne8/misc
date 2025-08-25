@@ -13,7 +13,7 @@
 [CmdletBinding()]
 param()
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $now = Get-Date
 $hostName = $env:COMPUTERNAME
 
