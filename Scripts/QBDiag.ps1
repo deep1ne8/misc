@@ -70,7 +70,6 @@ $reportPath = Join-Path $outDir ("QBDiag_{0}_{1:yyyyMMdd_HHmmss}.html" -f $hostN
 
 # Initialize issue tracking
 $issuesFound = @()
-$recommendedFixes = @()
 
 function New-Section { param([string]$Title,[object]$Data) [PSCustomObject]@{Section=$Title;Data=$Data} }
 function SizeMB { param([long]$b) if ($b -is [long]) {[math]::Round($b/1MB,2)} else {$null} }
@@ -133,7 +132,7 @@ function Resolve-CompanyPath {
     return $null
 }
 
-function Parse-ServerFromUNC([string]$UNC){
+function Get-ServerFromUNC([string]$UNC){
     if ($UNC -and $UNC.StartsWith('\\')) { return $UNC.TrimStart('\').Split('\')[0] } else { return $null }
 }
 
@@ -143,7 +142,6 @@ Write-Host "Running diagnostics for role: $Role" -ForegroundColor Cyan
 
 # --- System snapshot
 $os  = Get-CimInstance Win32_OperatingSystem
-$cs  = Get-CimInstance Win32_ComputerSystem
 $cpu = Get-CimInstance Win32_Processor | Select-Object Name,NumberOfCores,NumberOfLogicalProcessors,MaxClockSpeed
 $uptime = (Get-Date) - $os.LastBootUpTime
 $mem = [PSCustomObject]@{
@@ -272,7 +270,7 @@ if ($CompanyFilePath) {
     $companyObj.Exists   = Test-Path -LiteralPath $CompanyFilePath
     $companyObj.PathType = ($CompanyFilePath -like '\\*') ? 'UNC' : 'Local/Drive'
     $parent = Split-Path $CompanyFilePath -Parent
-    $serverName = Parse-ServerFromUNC $CompanyFilePath
+    $serverName = Get-ServerFromUNC $CompanyFilePath
     $companyObj.ParentDir = $parent
 
     if ($companyObj.Exists) {
@@ -489,7 +487,6 @@ if ($Role -eq 'Client') {
     Write-Host "`nRunning Client-specific diagnostics..." -ForegroundColor Cyan
     
     # Check for antivirus exclusions
-    $avExclusions = @()
     try {
         $defenderExclusions = Get-MpPreference -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ExclusionPath
         if ($CompanyFilePath) {
@@ -1438,7 +1435,7 @@ if ($issuesFound.Count -gt 0) {
 }
 
 Write-Host "`n=== Script Complete ===" -ForegroundColor Green
-Write-Host "Thank you for using QuickBooks Freeze Diagnostic!" -ForegroundColor Cyan.Issue)" -ForegroundColor Yellow
+Write-Host "Thank you for using QuickBooks Freeze Diagnostic!" -ForegroundColor Cyan" -ForegroundColor Yellow
 try {
     $($issue.RecommendedFix)
     Write-Host "  ✓ Fixed successfully" -ForegroundColor Green
@@ -1449,9 +1446,7 @@ try {
 }
 
 "@
-        }
-    }
-    
+    # Group fixes by severity
     if ($highFixes) {
         $fixScript += @"
 Write-Host '--- HIGH PRIORITY FIXES ---' -ForegroundColor DarkRed
@@ -1504,21 +1499,19 @@ Write-Host '--- LOW PRIORITY FIXES ---' -ForegroundColor Yellow
         foreach ($issue in $lowFixes) {
             $fixScript += @"
 # [$($issue.Category)] $($issue.Issue)
-Write-Host "Fixing: $($issue else {
-    $htmlReport += @"
-            <div class="alert-box success-box">
-                <h3>✅ Diagnostic Results: All Clear</h3>
-                <p>No issues were detected during the diagnostic scan. Your QuickBooks environment appears to be properly configured.</p>
-            </div>
-            
-            <div class="summary-stats">
-                <div class="stat-box success">
-                    <div class="stat-number" style="color: #27ae60;">0</div>
-                    <div class="stat-label">Issues Found</div>
-                </div>
-            </div>
-"@
+Write-Host "Fixing: $($issue.Issue)" -ForegroundColor Yellow
+try {
+    $($issue.RecommendedFix)
+    Write-Host "  ✓ Fixed successfully" -ForegroundColor Green
+    `$fixCount++
+} catch {
+    Write-Host "  ✗ Failed to fix: `$_" -ForegroundColor Red
+    `$errorCount++
 }
+
+"@
+        }
+    }
 
 $null = $sb.AppendLine("<h1>QuickBooks Freeze Diagnostic Report</h1>")
 $null = $sb.AppendLine("<div class='info-box'>")
