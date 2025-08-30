@@ -11,9 +11,6 @@
     - Handles reboot requirements automatically
 
 .NOTES
-    Author: Earl Daniels
-    Date: 2025-08-11
-    Version: 2.1
     Requires: PowerShell 5.1+, Administrator privileges
     Tested: Windows 10/11, Dell systems
 #>
