@@ -1,11 +1,3 @@
-
-<#
-Get-NetNeighbor -AddressFamily IPv4 `
-    | Where-Object {$_.State -ne 'Unreachable' -and $_.State -ne 'Permanent'} `
-    | Sort-Object LinkLayerAddress -Unique `
-    | Format-Table -AutoSize IPAddress, LinkLayerAddress, State
-#>
-
 <#
 .SYNOPSIS
     Performs a network scan to discover active hosts and their MAC addresses.
@@ -39,8 +31,8 @@ Get-NetNeighbor -AddressFamily IPv4 `
 .NOTES
     File Name      : NetworkScanner.ps1
     Prerequisite   : PowerShell 1.0 or later
-    Version        : 1.1
-    Change History : Fixed bitwise operation compatibility with PS 1.0/2.0
+    Version        : 1.2
+    Change History : Fixed variable scope issues and improved error handling
 #>
 
 [CmdletBinding()]
@@ -87,7 +79,6 @@ function Write-LogMessage {
 function Get-BitwiseAnd {
     param([UInt32]$Left, [UInt32]$Right)
     
-    # Manual bitwise AND implementation that works on all PS versions
     $result = 0
     for ($i = 0; $i -lt 32; $i++) {
         $leftBit = [Math]::Floor($Left / [Math]::Pow(2, $i)) % 2
@@ -102,7 +93,6 @@ function Get-BitwiseAnd {
 function Get-BitwiseShiftLeft {
     param([UInt32]$Value, [int]$Shift)
     
-    # Manual bitwise shift left implementation that works on all PS versions
     if ($Shift -le 0) { return $Value }
     if ($Shift -ge 32) { return 0 }
     
@@ -112,25 +102,10 @@ function Get-BitwiseShiftLeft {
 function Get-BitwiseShiftRight {
     param([UInt32]$Value, [int]$Shift)
     
-    # Manual bitwise shift right implementation that works on all PS versions
     if ($Shift -le 0) { return $Value }
     if ($Shift -ge 32) { return 0 }
     
     return [UInt32]([Math]::Floor($Value / [Math]::Pow(2, $Shift)))
-}
-
-function Get-BitwiseComplement {
-    param([UInt32]$Value)
-    
-    # Manual bitwise complement (~) implementation for all PS versions
-    $result = 0
-    for ($i = 0; $i -lt 32; $i++) {
-        $bit = [Math]::Floor($Value / [Math]::Pow(2, $i)) % 2
-        $complementBit = 1 - $bit
-        $result += $complementBit * [Math]::Pow(2, $i)
-    }
-    
-    return [UInt32]$result
 }
 
 function Get-ParsedCIDR {
@@ -139,6 +114,7 @@ function Get-ParsedCIDR {
         [Parameter(Mandatory = $true)]
         [string]$CIDRNotation
     )
+    
     try {
         # Ensure we have a single, trimmed string
         if ($CIDRNotation -is [array]) {
@@ -152,13 +128,13 @@ function Get-ParsedCIDR {
             $baseIP = $matches[1]
             $cidrBits = [int]$matches[2]
 
-            # Split the base IP on period and ensure exactly 4 octets
+            # Split the base IP and validate
             $octets = $baseIP -split '\.'
             if ($octets.Count -ne 4) {
                 throw "Invalid IP address format: $baseIP"
             }
 
-            # Validate each octet is between 0 and 255
+            # Validate each octet
             foreach ($octet in $octets) {
                 $octetValue = [int]$octet
                 if ($octetValue -lt 0 -or $octetValue -gt 255) {
@@ -170,14 +146,14 @@ function Get-ParsedCIDR {
                 throw "Invalid CIDR bits: $cidrBits. Must be between 0 and 32."
             }
 
-            # Calculate the subnet size and mask value
+            # Calculate subnet size and mask
             $subnetSize = [UInt32][Math]::Pow(2, (32 - $cidrBits))
             $maskValue = [UInt32]0
             if ($cidrBits -gt 0) {
                 $maskValue = [UInt32]([Math]::Pow(2, 32) - [Math]::Pow(2, (32 - $cidrBits)))
             }
 
-            # Convert IP to UInt32 using proper shifting
+            # Convert IP to UInt32
             $ipUint32 = [UInt32]0
             for ($i = 0; $i -lt 4; $i++) {
                 $octetValue = [UInt32]([int]$octets[$i])
@@ -188,29 +164,29 @@ function Get-ParsedCIDR {
             # Calculate network address
             $networkUint32 = Get-BitwiseAnd -Left $ipUint32 -Right $maskValue
 
-            # Determine first and last usable addresses (if applicable)
+            # Determine first and last usable addresses
             $firstUsableUint32 = $networkUint32 + 1
             $lastUsableUint32 = $networkUint32 + $subnetSize - 2
 
-            # Convert the first and last IP addresses to dotted-quad strings
+            # Convert to IP strings
             $firstIP = @(
-                (Get-BitwiseShiftRight -Value $firstUsableUint32 -Shift 24) % 256,
-                (Get-BitwiseShiftRight -Value $firstUsableUint32 -Shift 16) % 256,
-                (Get-BitwiseShiftRight -Value $firstUsableUint32 -Shift 8) % 256,
-                $firstUsableUint32 % 256
+                (Get-BitwiseShiftRight -Value $firstUsableUint32 -Shift 24) -band 255,
+                (Get-BitwiseShiftRight -Value $firstUsableUint32 -Shift 16) -band 255,
+                (Get-BitwiseShiftRight -Value $firstUsableUint32 -Shift 8) -band 255,
+                $firstUsableUint32 -band 255
             ) -join '.'
 
             $lastIP = @(
-                (Get-BitwiseShiftRight -Value $lastUsableUint32 -Shift 24) % 256,
-                (Get-BitwiseShiftRight -Value $lastUsableUint32 -Shift 16) % 256,
-                (Get-BitwiseShiftRight -Value $lastUsableUint32 -Shift 8) % 256,
-                $lastUsableUint32 % 256
+                (Get-BitwiseShiftRight -Value $lastUsableUint32 -Shift 24) -band 255,
+                (Get-BitwiseShiftRight -Value $lastUsableUint32 -Shift 16) -band 255,
+                (Get-BitwiseShiftRight -Value $lastUsableUint32 -Shift 8) -band 255,
+                $lastUsableUint32 -band 255
             ) -join '.'
 
             return @{
                 FirstIP       = $firstIP
                 LastIP        = $lastIP
-                TotalHosts    = $subnetSize - 2  # Exclude network and broadcast addresses
+                TotalHosts    = $subnetSize - 2
                 NetworkAddress = $baseIP
                 CIDRBits      = $cidrBits
             }
@@ -236,16 +212,13 @@ function Get-IPRange {
     )
     
     try {
-        # Convert IP addresses to integers for comparison using a compatible method
         $startIPInt = ConvertTo-IPInt -IPAddress $StartIP
         $endIPInt = ConvertTo-IPInt -IPAddress $EndIP
         
-        # Validate range
         if ($endIPInt -lt $startIPInt) {
             throw "End IP address must be greater than or equal to start IP address."
         }
         
-        # Generate IP addresses in the range
         $ipRange = @()
         for ($i = $startIPInt; $i -le $endIPInt; $i++) {
             $ipRange += ConvertFrom-IPInt -IPInt $i
@@ -259,37 +232,40 @@ function Get-IPRange {
     }
 }
 
-# Convert IP address to integer - compatible with all PS versions
 function ConvertTo-IPInt {
     param(
         [Parameter(Mandatory = $true)]
         [string]$IPAddress
     )
+    
     $IPAddress = $IPAddress.Trim()
     $octets = $IPAddress -split '\.'
     if ($octets.Count -ne 4) {
         throw "Invalid IP address format: $IPAddress"
     }
-    $ipInt = [UInt32]0
+    
+    [UInt32]$ipInt = 0
     for ($i = 0; $i -lt 4; $i++) {
         $ipInt += [UInt32]([int]$octets[$i]) * [Math]::Pow(256, (3 - $i))
     }
     return $ipInt
 }
-# Convert integer to IP address - compatible with all PS versions
+
 function ConvertFrom-IPInt {
     param(
         [Parameter(Mandatory = $true)]
         [UInt32]$IPInt
     )
+    
     $octets = @(
-        [Math]::Floor($IPInt / [Math]::Pow(256, 3)) % 256,
-        [Math]::Floor($IPInt / [Math]::Pow(256, 2)) % 256,
-        [Math]::Floor($IPInt / [Math]::Pow(256, 1)) % 256,
-        [Math]::Floor($IPInt / [Math]::Pow(256, 0)) % 256
+        [int]([Math]::Floor($IPInt / 16777216) % 256),
+        [int]([Math]::Floor($IPInt / 65536) % 256),
+        [int]([Math]::Floor($IPInt / 256) % 256),
+        [int]($IPInt % 256)
     )
     return $octets -join '.'
 }
+
 function Test-HostOnline {
     [CmdletBinding()]
     param(
@@ -301,16 +277,17 @@ function Test-HostOnline {
     )
     
     try {
-        # First try using System.Net.NetworkInformation.Ping - available on PS 2.0+
+        # Try System.Net.NetworkInformation.Ping first
         try {
             $ping = New-Object System.Net.NetworkInformation.Ping
             $result = $ping.Send($IPAddress, $Timeout)
-            return ($null -ne $result -and $result.Status -eq 'Success')
+            $ping.Dispose()
+            return ($null -ne $result -and $result.Status.ToString() -eq 'Success')
         }
-        catch [System.Management.Automation.MethodInvocationException] {
+        catch {
             # Fallback to legacy ping command
             Write-Verbose "Falling back to legacy ping command for $IPAddress"
-            $pingResult = ping -n 1 -w $Timeout $IPAddress 2>$null
+            $pingResult = & ping -n 1 -w $Timeout $IPAddress 2>$null
             return ($pingResult -match 'Reply from')
         }
     }
@@ -328,28 +305,29 @@ function Get-MACAddress {
     )
     
     try {
-        # Try multiple methods to get MAC address
-        
-        # Method 1: Get-NetNeighbor (PowerShell 3.0+ on Windows 8/Server 2012+)
+        # Try Get-NetNeighbor first (PowerShell 3.0+)
         if (Get-Command -Name Get-NetNeighbor -ErrorAction SilentlyContinue) {
-            $neighbor = Get-NetNeighbor -IPAddress $IPAddress -ErrorAction SilentlyContinue | 
-                       Select-Object -First 1
-            if ($neighbor -and $neighbor.LinkLayerAddress) {
-                return $neighbor.LinkLayerAddress, "Reachable"
+            try {
+                $neighbor = Get-NetNeighbor -IPAddress $IPAddress -ErrorAction SilentlyContinue | 
+                           Select-Object -First 1
+                if ($neighbor -and $neighbor.LinkLayerAddress -and $neighbor.LinkLayerAddress -ne '00-00-00-00-00-00') {
+                    return $neighbor.LinkLayerAddress, $neighbor.State
+                }
+            }
+            catch {
+                Write-Verbose "Get-NetNeighbor failed for $IPAddress`: $_"
             }
         }
         
-        # Method 2: Parse ARP table
+        # Parse ARP table as fallback
         $arpResult = & arp -a $IPAddress 2>$null
         
         if ($arpResult -match '(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+(([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2}))') {
             $macAddress = $matches[2]
-            # Standardize MAC address format
             $macAddress = ($macAddress -replace '-', ':').ToUpper()
             return $macAddress, "Reachable"
         }
         
-        # If we're here, we can ping the host but couldn't get MAC
         return "Unknown", "Reachable"
     }
     catch {
@@ -362,26 +340,18 @@ function Get-MACAddress {
 
 #region Main Execution
 
-# Validate PowerShell version and load required assemblies
+# Initialize variables
+$useRunspaces = $false
+$results = @()
+
+# Determine PowerShell capabilities
 try {
-    # PowerShell 2.0+ has access to runspace functionality out of the box
-    $useRunspaces = $false
-    
-    try {
-        $psVersion = $PSVersionTable.PSVersion.Major
-        
-        if ($psVersion -ge 2) {
-            Write-LogMessage -Level Verbose -Message "PowerShell version $psVersion detected. Using built-in threading capabilities."
-            $useRunspaces = $true
-        }
-        else {
-            Write-LogMessage -Level Warning -Message "PowerShell version 1.0 detected. Using sequential scanning (slower)."
-            $useRunspaces = $false
-        }
+    if ($PSVersionTable -and $PSVersionTable.PSVersion.Major -ge 2) {
+        Write-LogMessage -Level Verbose -Message "PowerShell version $($PSVersionTable.PSVersion.Major) detected. Using parallel processing."
+        $useRunspaces = $true
     }
-    catch {
-        # On very old PowerShell versions, PSVersionTable might not exist
-        Write-LogMessage -Level Warning -Message "PowerShell version detection failed. Using sequential scanning."
+    else {
+        Write-LogMessage -Level Warning -Message "PowerShell version 1.0 detected. Using sequential scanning."
         $useRunspaces = $false
     }
 }
@@ -404,25 +374,61 @@ catch {
     exit 1
 }
 
-# Initialize results array
-$results = @()
-
 # Display scan parameters
 Write-LogMessage -Level Info -Message "Starting network scan with timeout of ${Timeout}ms and $Threads max concurrent operations"
 $startTime = Get-Date
 
-# Scan IP addresses
+# Main scanning logic
 if ($useRunspaces) {
-    # Test if runspaces are available
     try {
-        # Create runspace pool for parallel processing
+        # Create runspace pool
         $runspacePool = [runspacefactory]::CreateRunspacePool(1, $Threads)
         $runspacePool.Open()
         
-        $runspaces = @()
+        # Define the script block with all required functions
         $scriptBlock = {
             param($ip, $timeout)
             
+            # Embed required functions in scriptblock
+            function Test-HostOnline {
+                param([string]$IPAddress, [int]$Timeout = 500)
+                try {
+                    $ping = New-Object System.Net.NetworkInformation.Ping
+                    $result = $ping.Send($IPAddress, $Timeout)
+                    $ping.Dispose()
+                    return ($null -ne $result -and $result.Status.ToString() -eq 'Success')
+                }
+                catch {
+                    $pingResult = & ping -n 1 -w $Timeout $IPAddress 2>$null
+                    return ($pingResult -match 'Reply from')
+                }
+            }
+            
+            function Get-MACAddress {
+                param([string]$IPAddress)
+                try {
+                    if (Get-Command -Name Get-NetNeighbor -ErrorAction SilentlyContinue) {
+                        $neighbor = Get-NetNeighbor -IPAddress $IPAddress -ErrorAction SilentlyContinue | Select-Object -First 1
+                        if ($neighbor -and $neighbor.LinkLayerAddress -and $neighbor.LinkLayerAddress -ne '00-00-00-00-00-00') {
+                            return $neighbor.LinkLayerAddress, $neighbor.State
+                        }
+                    }
+                    
+                    $arpResult = & arp -a $IPAddress 2>$null
+                    if ($arpResult -match '(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\s+(([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2}))') {
+                        $macAddress = $matches[2]
+                        $macAddress = ($macAddress -replace '-', ':').ToUpper()
+                        return $macAddress, "Reachable"
+                    }
+                    
+                    return "Unknown", "Reachable"
+                }
+                catch {
+                    return "Unknown", "Unknown"
+                }
+            }
+            
+            # Main logic
             if (Test-HostOnline -IPAddress $ip -Timeout $timeout) {
                 $macInfo = Get-MACAddress -IPAddress $ip
                 
@@ -433,17 +439,11 @@ if ($useRunspaces) {
                     IsOnline = $true
                 }
             }
-            else {
-                [PSCustomObject]@{
-                    IPAddress = $ip
-                    LinkLayerAddress = $null
-                    State = "Unreachable"
-                    IsOnline = $false
-                }
-            }
         }
         
-        # Create and start runspaces for each IP
+        $runspaces = @()
+        
+        # Create runspaces for each IP
         foreach ($ip in $allIPs) {
             $powerShell = [powershell]::Create().AddScript($scriptBlock).AddParameter("ip", $ip).AddParameter("timeout", $Timeout)
             $powerShell.RunspacePool = $runspacePool
@@ -455,30 +455,30 @@ if ($useRunspaces) {
             }
         }
         
-        # Poll for completion and collect results
+        # Collect results
         $completed = 0
         $total = $allIPs.Count
         
         do {
             $stillRunning = $false
             
-            foreach ($runspace in $runspaces | Where-Object { $null -ne $_.Runspace }) {
-                if ($runspace.Runspace.IsCompleted) {
-                    $result = $runspace.PowerShell.EndInvoke($runspace.Runspace)
+            for ($i = 0; $i -lt $runspaces.Count; $i++) {
+                if ($null -ne $runspaces[$i].Runspace -and $runspaces[$i].Runspace.IsCompleted) {
+                    $result = $runspaces[$i].PowerShell.EndInvoke($runspaces[$i].Runspace)
                     if ($result -and $result.IsOnline) {
                         $results += $result
                     }
                     
-                    $runspace.PowerShell.Dispose()
-                    $runspace.Runspace = $null
-                    $runspace.PowerShell = $null
+                    $runspaces[$i].PowerShell.Dispose()
+                    $runspaces[$i].Runspace = $null
+                    $runspaces[$i].PowerShell = $null
                     
                     $completed++
                     if ($completed % 10 -eq 0 -or $completed -eq $total) {
                         Write-Progress -Activity "Scanning Network" -Status "Scanning IPs" -PercentComplete (($completed / $total) * 100) -CurrentOperation "Completed $completed of $total"
                     }
                 }
-                else {
+                elseif ($null -ne $runspaces[$i].Runspace) {
                     $stillRunning = $true
                 }
             }
@@ -488,19 +488,17 @@ if ($useRunspaces) {
             }
         } while ($stillRunning)
         
-        # Cleanup
         $runspacePool.Close()
         $runspacePool.Dispose()
     }
     catch {
         Write-LogMessage -Level Warning -Message "Parallel processing failed: $_. Falling back to sequential scanning."
         $useRunspaces = $false
-        
-        # If we failed to use runspaces, we'll fall through to the sequential scanning code below
+        $results = @()  # Reset results array
     }
 }
 
-# Sequential scanning for PowerShell 1.0 or if parallel processing failed
+# Sequential scanning fallback
 if (-not $useRunspaces) {
     $total = $allIPs.Count
     $completed = 0
@@ -523,16 +521,21 @@ if (-not $useRunspaces) {
     }
 }
 
-# Calculate scan duration
+# Calculate scan duration and display results
 $endTime = Get-Date
 $duration = $endTime - $startTime
 $formattedDuration = "{0:00}:{1:00}:{2:00}" -f $duration.Hours, $duration.Minutes, $duration.Seconds
 
-# Filter out unreachable hosts and format results
 $finalResults = $results | Where-Object { $_.IsOnline } | Select-Object IPAddress, LinkLayerAddress, State
 
-# Display results
+Write-Progress -Activity "Scanning Network" -Completed
 Write-LogMessage -Level Success -Message "Scan completed in $formattedDuration. Found $($finalResults.Count) active hosts."
-$finalResults | Format-Table -AutoSize
+
+if ($finalResults.Count -gt 0) {
+    $finalResults | Format-Table -AutoSize
+}
+else {
+    Write-LogMessage -Level Warning -Message "No active hosts found in the specified range."
+}
 
 #endregion
