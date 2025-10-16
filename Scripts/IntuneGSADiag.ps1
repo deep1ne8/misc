@@ -9,7 +9,7 @@ Tier-0 GSA/Intune Deep-Diag
 param(
     [switch]$CollectLogs,                   # Include raw logs in ZIP
     [int]$EventHours = 24,                  # How many hours of logs to pull
-    [string]$OutDir = "C:\ProgramData\Tier0\GSA_Diag"
+    [string]$OutDir = "C:\Windows\Temp\GSA_Diag"
 )
 
 #region Setup
