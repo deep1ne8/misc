@@ -63,8 +63,8 @@ try {
 
     # Known good URLs
     $testUrls = @(
-        "https://aka.ms/newteems",
-        "https://statics.teams.cdn.office.net/production-windows-x64/teamsbootstrapper.exe"
+        "https://statics.teams.cdn.office.net/production-windows-x86/lkg/MSTeamsSetup.exe",
+        "https://statics.teams.cdn.office.net/production-teamsprovision/lkg/teamsbootstrapper.exe"
     )
 
     foreach ($url in $testUrls) {
