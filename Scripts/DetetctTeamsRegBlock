@@ -1,0 +1,74 @@
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Detects registry keys blocking Microsoft Teams MSIX (New Teams) installation.
+.DESCRIPTION
+    Checks for restrictive Appx-related registry policies that prevent New Teams installation.
+.NOTES
+    Author: Escalation Script - Tier-0
+    Date: 2025-10-22
+#>
+
+$ErrorActionPreference = 'Stop'
+
+try {
+    $issuesFound = $false
+    $registryPaths = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock',
+        'HKLM:\SOFTWARE\Policies\Microsoft\Windows\Appx'
+    )
+
+    function Test-RegistryValue {
+        param(
+            [string]$Path,
+            [string]$Name
+        )
+        try {
+            if (Test-Path $Path) {
+                $item = Get-ItemProperty -Path $Path -ErrorAction Stop
+                if ($item.PSObject.Properties.Name -contains $Name) {
+                    return $item.$Name
+                }
+            }
+        } catch {
+            return $null
+        }
+        return $null
+    }
+
+    foreach ($path in $registryPaths) {
+
+        # 1. BlockNonAdminUserInstall (should be 0 or not exist)
+        $block = Test-RegistryValue -Path $path -Name 'BlockNonAdminUserInstall'
+        if ($null -ne $block -and [int]$block -eq 1) {
+            Write-Output "❌ BlockNonAdminUserInstall=1 at $path (should be 0 or not exist)"
+            $issuesFound = $true
+        }
+
+        # 2. AllowAllTrustedApps (should be 1)
+        $allow = Test-RegistryValue -Path $path -Name 'AllowAllTrustedApps'
+        if ($null -ne $allow -and [int]$allow -ne 1) {
+            Write-Output "⚠️ AllowAllTrustedApps=$allow at $path (should be 1)"
+            $issuesFound = $true
+        }
+
+        # 3. AllowDevelopmentWithoutDevLicense (should be 1 or not exist)
+        $dev = Test-RegistryValue -Path $path -Name 'AllowDevelopmentWithoutDevLicense'
+        if ($null -ne $dev -and [int]$dev -ne 1) {
+            Write-Output "⚠️ AllowDevelopmentWithoutDevLicense=$dev at $path (should be 1 or not exist)"
+            $issuesFound = $true
+        }
+    }
+
+    if ($issuesFound) {
+        Write-Output "RESULT: Teams installation blocking issues detected."
+        exit 1
+    } else {
+        Write-Output "RESULT: No Teams installation blocking issues found."
+        exit 0
+    }
+
+} catch {
+    Write-Error "Detection script failed: $($_.Exception.Message)"
+    exit 1
+}
