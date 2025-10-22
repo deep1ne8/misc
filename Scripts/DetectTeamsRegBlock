@@ -9,7 +9,7 @@
     Date: 2025-10-22
 #>
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 
 try {
     $issuesFound = $false
