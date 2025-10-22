@@ -1,4 +1,3 @@
-#Requires -Version 5.1
 <#
 .SYNOPSIS
     Detects registry keys blocking Microsoft Teams (New Teams) MSIX installation and validates installer URL.
@@ -9,7 +8,7 @@
     Date: 2025-10-22
 #>
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $issuesFound = $false
 
 try {
