@@ -1,0 +1,62 @@
+#Requires -Version 5.1
+<#
+.SYNOPSIS
+    Detects registry keys blocking Microsoft Teams MSIX installation
+.DESCRIPTION
+    Checks for restrictive registry policies that prevent New Teams installation
+.NOTES
+    Author: Generated for Intune Remediation
+    Date: 2025-10-22
+#>
+
+try {
+    $issuesFound = $false
+    $registryPaths = @(
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock",
+        "HKLM:\SOFTWARE\Policies\Microsoft\Windows\Appx"
+    )
+
+    # Check BlockNonAdminUserInstall (should be 0 or not exist)
+    foreach ($path in $registryPaths) {
+        if (Test-Path $path) {
+            $blockValue = Get-ItemProperty -Path $path -Name "BlockNonAdminUserInstall" -ErrorAction SilentlyContinue
+            if ($null -ne $blockValue -and $blockValue.BlockNonAdminUserInstall -eq 1) {
+                Write-Output "BlockNonAdminUserInstall is set to 1 at $path"
+                $issuesFound = $true
+            }
+        }
+    }
+
+    # Check AllowAllTrustedApps (should be 1)
+    foreach ($path in $registryPaths) {
+        if (Test-Path $path) {
+            $allowValue = Get-ItemProperty -Path $path -Name "AllowAllTrustedApps" -ErrorAction SilentlyContinue
+            if ($null -ne $allowValue -and $allowValue.AllowAllTrustedApps -ne 1) {
+                Write-Output "AllowAllTrustedApps is not set to 1 at $path"
+                $issuesFound = $true
+            }
+        }
+    }
+
+    # Check AllowDevelopmentWithoutDevLicense (should be 1 or not exist)
+    foreach ($path in $registryPaths) {
+        if (Test-Path $path) {
+            $devValue = Get-ItemProperty -Path $path -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
+            if ($null -ne $devValue -and $devValue.AllowDevelopmentWithoutDevLicense -ne 1) {
+                Write-Output "AllowDevelopmentWithoutDevLicense is not set to 1 at $path"
+                $issuesFound = $true
+            }
+        }
+    }
+
+    if ($issuesFound) {
+        Write-Output "Teams installation blocking issues detected"
+        exit 1  # Issue detected, remediation needed
+    } else {
+        Write-Output "No Teams installation blocking issues found"
+        exit 0  # Compliant
+    }
+} catch {
+    Write-Error "Detection script failed: $_"
+    exit 1
+}
