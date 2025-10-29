@@ -1,296 +1,441 @@
-<# 
+<#
 .SYNOPSIS
-    Silent installer for ShareX 18.0.1 - Intune Compatible
+    ShareX 18.0.1 - Complete Intune Platform Script Deployment
 .DESCRIPTION
-    - Intune Win32 app compatible with proper exit codes and console output
-    - Works on PowerShell 5.1+ and PowerShell 7+
-    - Checks if already installed (skips if current version exists)
-    - Downloads and installs silently with comprehensive logging
-    - Outputs status to console for Intune capture
-.NOTES
-    Requires: PowerShell 5.1+ | Runs in SYSTEM context via Intune
-    Exit Codes:
-        0   = Success (installation completed or already installed)
-        1   = Download failed
-        2   = Installation failed
-        3   = Post-validation failed
+    All-in-one script for deploying ShareX via Intune Platform Scripts (Proactive Remediations/Scripts).
+    Automatically detects if installation is needed and installs if missing or outdated.
+    
+    Features:
+    - Auto-detection of installed version
+    - Silent installation with retry logic
+    - PowerShell 5.1 and 7 compatible
+    - Comprehensive logging for troubleshooting
+    - SYSTEM context compatible
+    - Proper exit codes for Intune reporting
+    
+.PARAMETER Mode
+    Operation mode:
+    - 'Auto' (default): Detect and install if needed
+    - 'DetectOnly': Only check installation status
+    - 'ForceInstall': Install regardless of current state
+    
 .EXAMPLE
-    powershell.exe -ExecutionPolicy Bypass -File Deploy-ShareX.ps1
+    .\Deploy-ShareX-Complete.ps1
+    Default behavior: Checks if installed, installs if needed
+    
+.EXAMPLE
+    .\Deploy-ShareX-Complete.ps1 -Mode DetectOnly
+    Only checks if ShareX 18.0.1 is installed
+    
+.EXAMPLE
+    .\Deploy-ShareX-Complete.ps1 -Mode ForceInstall
+    Forces installation even if already present
+    
+.NOTES
+    Author: IT Department
+    Version: 1.0
+    Compatible: PowerShell 5.1+, Windows 10/11
+    Deployment: Intune Platform Scripts, RMM tools, Manual execution
+    
+    Exit Codes:
+        0 = Success (installed or already present)
+        1 = Download failure
+        2 = Installation failure
+        3 = Validation failure
+        10 = Not installed (DetectOnly mode)
 #>
 
 #Requires -Version 5.1
 
+[CmdletBinding()]
+param(
+    [Parameter()]
+    [ValidateSet('Auto','DetectOnly','ForceInstall')]
+    [string]$Mode = 'Auto'
+)
+
 #region Configuration
 $ErrorActionPreference = 'Stop'
-$ProgressPreference    = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
 
+# Application Configuration
 $Config = @{
-    AppName       = "ShareX"
-    AppVersion    = "18.0.1"
-    DownloadUrl   = "https://github.com/ShareX/ShareX/releases/download/v18.0.1/ShareX-18.0.1-setup.exe"
-    WorkRoot      = "$env:ProgramData\ShareXDeploy"
-    RetryAttempts = 3
-    RetryDelay    = 5
+    AppName         = "ShareX"
+    AppVersion      = "18.0.1"
+    Publisher       = "ShareX Team"
+    DownloadUrl     = "https://github.com/ShareX/ShareX/releases/download/v18.0.1/ShareX-18.0.1-setup.exe"
+    
+    # Paths
+    WorkRoot        = "$env:ProgramData\ShareXDeploy"
+    LogDir          = "$env:ProgramData\ShareXDeploy\Logs"
+    
+    # Installation Settings
+    RetryAttempts   = 3
+    RetryDelay      = 5
+    MinFileSize     = 1048576  # 1 MB minimum expected download size
+    
+    # Expected Installation Paths
+    ExePaths        = @(
+        "$env:ProgramFiles\ShareX\ShareX.exe"
+        "${env:ProgramFiles(x86)}\ShareX\ShareX.exe"
+    )
+    
+    # Registry Paths
+    RegPaths        = @(
+        "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall"
+        "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
+    )
 }
 
+# Generate dynamic paths
+$timestamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $Config.InstallerPath = Join-Path $Config.WorkRoot "ShareX-$($Config.AppVersion)-setup.exe"
-$Config.LogPath       = Join-Path $Config.WorkRoot "install-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
+$Config.LogPath = Join-Path $Config.LogDir "deployment-$timestamp.log"
+$Config.LastRunPath = Join-Path $Config.WorkRoot "last-run.txt"
+
 #endregion Configuration
 
 #region Functions
-function Write-Log {
-    param(
-        [string]$Message,
-        [ValidateSet('Info','Warning','Error','Success')]$Level = 'Info'
-    )
-    
-    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    $logEntry = "[$timestamp] [$Level] $Message"
-    
-    # Write to log file
-    Add-Content -Path $Config.LogPath -Value $logEntry -ErrorAction SilentlyContinue
-    
-    # Write to console (Intune captures this)
-    Write-Host $logEntry
-    
-    # Also write to appropriate stream for Intune
-    switch ($Level) {
-        'Error'   { Write-Error $Message -ErrorAction Continue }
-        'Warning' { Write-Warning $Message }
-        'Success' { Write-Host "SUCCESS: $Message" -ForegroundColor Green }
-    }
-}
 
 function Initialize-Environment {
+    <#
+    .SYNOPSIS
+        Prepares the deployment environment
+    #>
     try {
-        # Create working directory
-        if (!(Test-Path $Config.WorkRoot)) {
-            $null = New-Item -Path $Config.WorkRoot -ItemType Directory -Force
-            Write-Log "Created working directory: $($Config.WorkRoot)"
+        # Create directories
+        @($Config.WorkRoot, $Config.LogDir) | ForEach-Object {
+            if (!(Test-Path $_)) {
+                $null = New-Item -Path $_ -ItemType Directory -Force
+            }
         }
         
-        # Ensure TLS 1.2+ for secure downloads (PS 5.1 and 7 compatible)
-        $securityProtocol = [Net.ServicePointManager]::SecurityProtocol
-        if ($securityProtocol -notmatch 'Tls12') {
+        # Configure TLS for secure downloads (PS 5.1 and 7 compatible)
+        $currentProtocol = [Net.ServicePointManager]::SecurityProtocol
+        if ($currentProtocol -notmatch 'Tls12') {
             try {
+                # Try to set TLS 1.2
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-                Write-Log "Enabled TLS 1.2 for secure downloads"
             }
             catch {
-                # Fallback for older systems
+                # Fallback for older .NET versions
                 [Net.ServicePointManager]::SecurityProtocol = 3072
-                Write-Log "Enabled TLS 1.2 (compatibility mode)"
             }
         }
         
         return $true
     }
     catch {
-        Write-Log "Environment initialization failed: $_" -Level Error
+        Write-Output "ERROR: Failed to initialize environment: $_"
         return $false
     }
 }
 
-function Test-AlreadyInstalled {
-    try {
-        # Check registry for installed version (PS 5/7 compatible method)
-        $regPaths = @(
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
-            "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-        )
+function Write-Log {
+    <#
+    .SYNOPSIS
+        Writes log entries to both file and console
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$Message,
         
-        foreach ($regPath in $regPaths) {
+        [Parameter()]
+        [ValidateSet('Info','Success','Warning','Error')]
+        [string]$Level = 'Info'
+    )
+    
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    $logEntry = "[$timestamp] [$Level] $Message"
+    
+    # Write to console for Intune capture
+    switch ($Level) {
+        'Success' { Write-Output "SUCCESS: $Message" }
+        'Warning' { Write-Output "WARNING: $Message" }
+        'Error'   { Write-Output "ERROR: $Message" }
+        default   { Write-Output $Message }
+    }
+    
+    # Write to log file
+    try {
+        Add-Content -Path $Config.LogPath -Value $logEntry -ErrorAction SilentlyContinue
+    }
+    catch {
+        # Silently continue if logging fails
+    }
+}
+
+function Test-ShareXInstalled {
+    <#
+    .SYNOPSIS
+        Checks if ShareX is installed and returns version info
+    #>
+    try {
+        Write-Log "Checking for existing ShareX installation..."
+        
+        # Check registry
+        foreach ($regPath in $Config.RegPaths) {
             if (Test-Path $regPath) {
                 $apps = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue
+                
                 foreach ($app in $apps) {
                     $appInfo = Get-ItemProperty -Path $app.PSPath -ErrorAction SilentlyContinue
+                    
                     if ($appInfo.DisplayName -eq $Config.AppName) {
                         $installedVersion = $appInfo.DisplayVersion
-                        Write-Log "Found existing installation: $($Config.AppName) v$installedVersion"
+                        Write-Log "Found $($Config.AppName) version $installedVersion in registry"
                         
-                        if ($installedVersion -eq $Config.AppVersion) {
-                            Write-Log "Target version $($Config.AppVersion) already installed" -Level Success
-                            return $true
+                        # Verify executable exists
+                        $exeFound = $false
+                        foreach ($exePath in $Config.ExePaths) {
+                            if (Test-Path $exePath) {
+                                Write-Log "Verified executable at: $exePath"
+                                $exeFound = $true
+                                break
+                            }
                         }
-                        Write-Log "Upgrading from v$installedVersion to v$($Config.AppVersion)" -Level Info
+                        
+                        if ($exeFound) {
+                            return @{
+                                Installed = $true
+                                Version = $installedVersion
+                                IsTargetVersion = ($installedVersion -eq $Config.AppVersion)
+                            }
+                        }
+                        else {
+                            Write-Log "Registry entry found but executable missing" -Level Warning
+                        }
                     }
                 }
             }
         }
-        return $false
+        
+        Write-Log "ShareX is not installed"
+        return @{
+            Installed = $false
+            Version = $null
+            IsTargetVersion = $false
+        }
     }
     catch {
-        Write-Log "Error checking installation status: $_" -Level Warning
-        return $false
+        Write-Log "Error checking installation status: $_" -Level Error
+        return @{
+            Installed = $false
+            Version = $null
+            IsTargetVersion = $false
+        }
     }
 }
 
-function Get-Installer {
-    Write-Log "Downloading installer from $($Config.DownloadUrl)"
+function Get-ShareXInstaller {
+    <#
+    .SYNOPSIS
+        Downloads the ShareX installer with retry logic
+    #>
+    param(
+        [int]$MaxAttempts = $Config.RetryAttempts
+    )
     
-    $attempt = 0
-    $downloaded = $false
+    Write-Log "Downloading ShareX installer from GitHub..."
+    Write-Log "URL: $($Config.DownloadUrl)"
     
-    while ($attempt -lt $Config.RetryAttempts -and !$downloaded) {
-        $attempt++
+    for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
         try {
             if ($attempt -gt 1) {
-                Write-Log "Retry attempt $attempt of $($Config.RetryAttempts)" -Level Warning
+                Write-Log "Retry attempt $attempt of $MaxAttempts" -Level Warning
                 Start-Sleep -Seconds $Config.RetryDelay
             }
             
-            # PS 5/7 compatible download method
+            # Download using .NET WebClient (PS 5.1 and 7 compatible)
             $webClient = New-Object System.Net.WebClient
             $webClient.DownloadFile($Config.DownloadUrl, $Config.InstallerPath)
             $webClient.Dispose()
             
-            # Verify file exists and has content
+            # Verify download
             if (Test-Path $Config.InstallerPath) {
                 $fileInfo = Get-Item $Config.InstallerPath
-                if ($fileInfo.Length -lt 1MB) {
-                    throw "Downloaded file is too small ($($fileInfo.Length) bytes)"
+                $fileSizeMB = [math]::Round($fileInfo.Length / 1MB, 2)
+                
+                if ($fileInfo.Length -lt $Config.MinFileSize) {
+                    throw "Downloaded file is too small ($fileSizeMB MB). Possible corruption."
                 }
                 
-                $sizeMB = [math]::Round($fileInfo.Length/1MB, 2)
-                Write-Log "Download complete. Size: $sizeMB MB" -Level Success
-                $downloaded = $true
+                Write-Log "Download successful: $fileSizeMB MB" -Level Success
+                return $true
             }
             else {
                 throw "Installer file not found after download"
             }
         }
         catch {
-            Write-Log "Download failed: $_" -Level Error
-            if ($attempt -eq $Config.RetryAttempts) {
-                throw "Failed to download after $($Config.RetryAttempts) attempts"
+            Write-Log "Download attempt $attempt failed: $_" -Level Error
+            
+            if ($attempt -eq $MaxAttempts) {
+                Write-Log "All download attempts exhausted" -Level Error
+                return $false
             }
         }
     }
     
-    return $downloaded
+    return $false
 }
 
-function Install-Application {
-    # Inno Setup silent switches
-    $installArgs = @(
-        "/VERYSILENT"
-        "/SUPPRESSMSGBOXES"
-        "/NORESTART"
-        "/SP-"
-        "/NOCANCEL"
-    )
-    
-    $installArgsString = $installArgs -join " "
-    Write-Log "Starting installation with arguments: $installArgsString"
-    
+function Install-ShareX {
+    <#
+    .SYNOPSIS
+        Performs silent installation of ShareX
+    #>
     try {
-        # PS 5/7 compatible process start
+        Write-Log "Starting ShareX installation..."
+        
+        # Inno Setup silent installation arguments
+        $installArgs = @(
+            '/VERYSILENT'
+            '/SUPPRESSMSGBOXES'
+            '/NORESTART'
+            '/SP-'
+            '/NOCANCEL'
+        ) -join ' '
+        
+        Write-Log "Install arguments: $installArgs"
+        
+        # Start installation process (PS 5.1 and 7 compatible method)
         $processInfo = New-Object System.Diagnostics.ProcessStartInfo
         $processInfo.FileName = $Config.InstallerPath
-        $processInfo.Arguments = $installArgsString
+        $processInfo.Arguments = $installArgs
         $processInfo.UseShellExecute = $false
         $processInfo.CreateNoWindow = $true
+        $processInfo.RedirectStandardOutput = $false
+        $processInfo.RedirectStandardError = $false
         
         $process = New-Object System.Diagnostics.Process
         $process.StartInfo = $processInfo
+        
+        Write-Log "Launching installer..."
         $null = $process.Start()
         $process.WaitForExit()
         
         $exitCode = $process.ExitCode
-        Write-Log "Installer exited with code: $exitCode"
+        Write-Log "Installer exit code: $exitCode"
         
-        # Inno Setup exit codes
-        if ($exitCode -ne 0) {
-            $errorMsg = switch ($exitCode) {
+        # Interpret Inno Setup exit codes
+        if ($exitCode -eq 0) {
+            Write-Log "Installation completed successfully" -Level Success
+            return $true
+        }
+        else {
+            $errorMessage = switch ($exitCode) {
                 1 { "Setup initialization error" }
-                2 { "User cancelled installation" }
+                2 { "User cancelled (shouldn't happen in silent mode)" }
                 3 { "Fatal error during installation" }
-                4 { "Fatal error before installation started" }
+                4 { "Fatal error before installation" }
                 5 { "User chose not to proceed" }
                 6 { "Setup initialization error (variant)" }
                 7 { "Installation aborted" }
-                8 { "Disk space error" }
-                default { "Unknown error code $exitCode" }
+                8 { "Insufficient disk space" }
+                default { "Unknown error (code: $exitCode)" }
             }
-            throw "Installation failed: $errorMsg (Exit Code: $exitCode)"
+            
+            Write-Log "Installation failed: $errorMessage" -Level Error
+            return $false
         }
-        
-        Write-Log "Installation completed successfully" -Level Success
-        return $true
     }
     catch {
         Write-Log "Installation exception: $_" -Level Error
-        throw
+        return $false
     }
 }
 
-function Test-Installation {
-    Write-Log "Validating installation..."
-    
-    # Check for ShareX.exe in standard locations
-    $exePaths = @(
-        "$env:ProgramFiles\ShareX\ShareX.exe",
-        "${env:ProgramFiles(x86)}\ShareX\ShareX.exe"
-    )
-    
-    $foundPath = $null
-    foreach ($path in $exePaths) {
-        if (Test-Path $path) {
-            $foundPath = $path
-            break
-        }
-    }
-    
-    if (!$foundPath) {
-        Write-Log "ShareX.exe not found in expected locations" -Level Error
-        return $false
-    }
-    
-    # Get file version
-    $fileVersionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($foundPath)
-    $exeVersion = $fileVersionInfo.FileVersion
-    Write-Log "ShareX validated at: $foundPath (Version: $exeVersion)" -Level Success
-    
-    # Capture uninstall information
+function Test-ShareXValidation {
+    <#
+    .SYNOPSIS
+        Validates ShareX installation post-deployment
+    #>
     try {
-        $uninstallInfoPath = Join-Path $Config.WorkRoot "uninstall-info.txt"
-        $uninstallInfo = @()
+        Write-Log "Validating installation..."
         
-        $regPaths = @(
-            "HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall",
-            "HKLM:\Software\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-        )
+        # Wait briefly for registry to update
+        Start-Sleep -Seconds 2
         
-        foreach ($regPath in $regPaths) {
+        # Check for executable
+        $exeFound = $false
+        $exePath = $null
+        
+        foreach ($path in $Config.ExePaths) {
+            if (Test-Path $path) {
+                $exeFound = $true
+                $exePath = $path
+                break
+            }
+        }
+        
+        if (!$exeFound) {
+            Write-Log "Validation failed: ShareX.exe not found" -Level Error
+            return $false
+        }
+        
+        # Get file version
+        try {
+            $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($exePath)
+            $fileVersion = $versionInfo.FileVersion
+            Write-Log "Validated: ShareX.exe found at $exePath (v$fileVersion)" -Level Success
+        }
+        catch {
+            Write-Log "Validated: ShareX.exe found at $exePath (version unknown)" -Level Success
+        }
+        
+        # Check registry
+        $regFound = $false
+        foreach ($regPath in $Config.RegPaths) {
             if (Test-Path $regPath) {
                 $apps = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue
                 foreach ($app in $apps) {
                     $appInfo = Get-ItemProperty -Path $app.PSPath -ErrorAction SilentlyContinue
                     if ($appInfo.DisplayName -eq $Config.AppName) {
-                        $uninstallInfo += "DisplayName: $($appInfo.DisplayName)"
-                        $uninstallInfo += "DisplayVersion: $($appInfo.DisplayVersion)"
-                        $uninstallInfo += "Publisher: $($appInfo.Publisher)"
-                        $uninstallInfo += "InstallLocation: $($appInfo.InstallLocation)"
-                        $uninstallInfo += "UninstallString: $($appInfo.UninstallString)"
-                        $uninstallInfo += "InstallDate: $($appInfo.InstallDate)"
+                        Write-Log "Registry entry confirmed: $($appInfo.DisplayName) v$($appInfo.DisplayVersion)"
+                        $regFound = $true
+                        
+                        # Save uninstall info
+                        try {
+                            $uninstallInfo = @"
+Application: $($appInfo.DisplayName)
+Version: $($appInfo.DisplayVersion)
+Publisher: $($appInfo.Publisher)
+Install Date: $($appInfo.InstallDate)
+Install Location: $($appInfo.InstallLocation)
+Uninstall String: $($appInfo.UninstallString)
+"@
+                            $uninstallInfoPath = Join-Path $Config.WorkRoot "uninstall-info.txt"
+                            $uninstallInfo | Out-File -FilePath $uninstallInfoPath -Force
+                        }
+                        catch {
+                            # Non-critical failure
+                        }
+                        
+                        break
                     }
                 }
             }
+            if ($regFound) { break }
         }
         
-        if ($uninstallInfo.Count -gt 0) {
-            $uninstallInfo | Out-File -FilePath $uninstallInfoPath -Force
-            Write-Log "Uninstall information saved"
+        if (!$regFound) {
+            Write-Log "Warning: Registry entry not found (may update on next system scan)" -Level Warning
         }
+        
+        return $true
     }
     catch {
-        Write-Log "Warning: Could not capture uninstall info: $_" -Level Warning
+        Write-Log "Validation exception: $_" -Level Error
+        return $false
     }
-    
-    return $true
 }
 
-function Remove-InstallerFile {
+function Remove-InstallerFiles {
+    <#
+    .SYNOPSIS
+        Cleans up installer files after deployment
+    #>
     try {
         if (Test-Path $Config.InstallerPath) {
             Remove-Item -Path $Config.InstallerPath -Force -ErrorAction Stop
@@ -298,85 +443,152 @@ function Remove-InstallerFile {
         }
     }
     catch {
-        Write-Log "Could not remove installer file: $_" -Level Warning
+        Write-Log "Failed to remove installer: $_" -Level Warning
     }
 }
+
+function Save-DeploymentStatus {
+    <#
+    .SYNOPSIS
+        Saves deployment status for tracking
+    #>
+    param(
+        [string]$Status,
+        [string]$Version
+    )
+    
+    try {
+        $statusInfo = @"
+Last Run: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')
+Status: $Status
+Version: $Version
+Computer: $env:COMPUTERNAME
+User Context: $env:USERNAME
+PowerShell: $($PSVersionTable.PSVersion)
+Mode: $Mode
+"@
+        $statusInfo | Out-File -FilePath $Config.LastRunPath -Force
+    }
+    catch {
+        # Non-critical failure
+    }
+}
+
 #endregion Functions
 
 #region Main Execution
-$exitCode = 0
 
 try {
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Host "ShareX $($Config.AppVersion) Deployment" -ForegroundColor Cyan
-    Write-Host "========================================" -ForegroundColor Cyan
-    Write-Log "Deployment started"
+    # Header
+    Write-Output "=========================================="
+    Write-Output "ShareX $($Config.AppVersion) Deployment"
+    Write-Output "=========================================="
+    Write-Log "Script started in $Mode mode"
     Write-Log "PowerShell Version: $($PSVersionTable.PSVersion)"
-    Write-Log "Running as: $env:USERNAME on $env:COMPUTERNAME"
+    Write-Log "Computer: $env:COMPUTERNAME"
+    Write-Log "User Context: $env:USERNAME"
+    Write-Log "Script Path: $PSCommandPath"
     
-    # Step 1: Initialize environment
+    # Initialize environment
     if (!(Initialize-Environment)) {
-        throw "Environment initialization failed"
+        Write-Log "Failed to initialize environment" -Level Error
+        exit 99
     }
     
-    # Step 2: Check if already installed
-    if (Test-AlreadyInstalled) {
-        Write-Log "Deployment skipped - application already installed at target version" -Level Success
-        Write-Host "INTUNE_STATUS: SUCCESS - Already Installed" -ForegroundColor Green
+    # Check current installation status
+    $installStatus = Test-ShareXInstalled
+    
+    #region DetectOnly Mode
+    if ($Mode -eq 'DetectOnly') {
+        Write-Output "------------------------------------------"
+        Write-Log "Running in detection-only mode"
+        
+        if ($installStatus.IsTargetVersion) {
+            Write-Log "DETECTED: ShareX $($Config.AppVersion) is installed" -Level Success
+            Save-DeploymentStatus -Status "Detected" -Version $installStatus.Version
+            exit 0
+        }
+        elseif ($installStatus.Installed) {
+            Write-Log "Found ShareX version $($installStatus.Version), but target is $($Config.AppVersion)" -Level Warning
+            Save-DeploymentStatus -Status "Wrong Version" -Version $installStatus.Version
+            exit 10
+        }
+        else {
+            Write-Log "NOT DETECTED: ShareX is not installed" -Level Warning
+            Save-DeploymentStatus -Status "Not Installed" -Version "None"
+            exit 10
+        }
+    }
+    #endregion DetectOnly Mode
+    
+    #region Auto and ForceInstall Modes
+    Write-Output "------------------------------------------"
+    
+    # Check if installation is needed
+    if ($installStatus.IsTargetVersion -and $Mode -ne 'ForceInstall') {
+        Write-Log "ShareX $($Config.AppVersion) is already installed" -Level Success
+        Write-Log "No action required"
+        Save-DeploymentStatus -Status "Already Installed" -Version $installStatus.Version
         exit 0
     }
     
-    # Step 3: Download installer
-    if (!(Get-Installer)) {
-        throw "Download failed"
+    if ($installStatus.Installed -and $Mode -ne 'ForceInstall') {
+        Write-Log "Upgrading from version $($installStatus.Version) to $($Config.AppVersion)" -Level Info
     }
-    
-    # Step 4: Install application
-    if (!(Install-Application)) {
-        throw "Installation failed"
-    }
-    
-    # Step 5: Validate installation
-    if (!(Test-Installation)) {
-        Write-Log "Post-installation validation failed" -Level Error
-        Write-Host "INTUNE_STATUS: FAILED - Validation Error" -ForegroundColor Red
-        $exitCode = 3
+    elseif ($Mode -eq 'ForceInstall') {
+        Write-Log "Force install requested - proceeding with installation" -Level Warning
     }
     else {
-        # Step 6: Cleanup
-        Remove-InstallerFile
-        
-        Write-Log "Deployment completed successfully" -Level Success
-        Write-Host "INTUNE_STATUS: SUCCESS - Installation Complete" -ForegroundColor Green
-        Write-Host "========================================" -ForegroundColor Cyan
-        $exitCode = 0
+        Write-Log "ShareX not detected - proceeding with installation"
     }
+    
+    # Download installer
+    Write-Output "------------------------------------------"
+    if (!(Get-ShareXInstaller)) {
+        Write-Log "Deployment failed: Unable to download installer" -Level Error
+        Save-DeploymentStatus -Status "Download Failed" -Version "N/A"
+        exit 1
+    }
+    
+    # Install ShareX
+    Write-Output "------------------------------------------"
+    if (!(Install-ShareX)) {
+        Write-Log "Deployment failed: Installation error" -Level Error
+        Save-DeploymentStatus -Status "Installation Failed" -Version "N/A"
+        exit 2
+    }
+    
+    # Validate installation
+    Write-Output "------------------------------------------"
+    if (!(Test-ShareXValidation)) {
+        Write-Log "Deployment failed: Post-installation validation failed" -Level Error
+        Save-DeploymentStatus -Status "Validation Failed" -Version "N/A"
+        exit 3
+    }
+    
+    # Cleanup
+    Remove-InstallerFiles
+    
+    # Success
+    Write-Output "------------------------------------------"
+    Write-Log "ShareX $($Config.AppVersion) deployment completed successfully" -Level Success
+    Write-Output "=========================================="
+    Save-DeploymentStatus -Status "Success" -Version $Config.AppVersion
+    exit 0
+    
+    #endregion Auto and ForceInstall Modes
 }
 catch {
-    $errorDetails = $_.Exception.Message
-    Write-Log "DEPLOYMENT FAILED: $errorDetails" -Level Error
-    Write-Host "INTUNE_STATUS: FAILED - $errorDetails" -ForegroundColor Red
-    Write-Host "========================================" -ForegroundColor Cyan
-    
-    # Return appropriate exit code based on error context
-    if ($errorDetails -match "download|Download") { 
-        $exitCode = 1 
-        Write-Log "Exit Code: 1 (Download Failure)" -Level Error
-    }
-    elseif ($errorDetails -match "install|Install") { 
-        $exitCode = 2 
-        Write-Log "Exit Code: 2 (Installation Failure)" -Level Error
-    }
-    else { 
-        $exitCode = 99 
-        Write-Log "Exit Code: 99 (General Failure)" -Level Error
-    }
+    # Catch-all error handler
+    Write-Log "CRITICAL ERROR: $_" -Level Error
+    Write-Log "Stack Trace: $($_.ScriptStackTrace)" -Level Error
+    Save-DeploymentStatus -Status "Critical Error" -Version "N/A"
+    exit 99
 }
 finally {
-    Write-Log "Log file location: $($Config.LogPath)"
-    Write-Host "Log saved to: $($Config.LogPath)"
+    Write-Output ""
+    Write-Log "Log file: $($Config.LogPath)"
+    Write-Log "Script execution completed"
 }
 
-# Exit with appropriate code for Intune
-exit $exitCode
 #endregion Main Execution
