@@ -1,4 +1,4 @@
-Get-ChildItem 'HKU:' | ForEach-Object { 
+Get-ChildItem 'Registry::HKEY_USERS' | ForEach-Object {
     $sid = $_.PSChildName
     $key = "Registry::HKEY_USERS\$sid\Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders"
     if (Test-Path $key) {
