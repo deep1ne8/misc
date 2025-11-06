@@ -2,24 +2,18 @@
 
 <#
 .SYNOPSIS
-    Removes all Cloud Drive Mapper versions and performs clean installation with optimal drive letter configuration.
+    Reconfigures Cloud Drive Mapper by finding the installed version, cleaning up, and reinstalling with optimal configuration.
 .DESCRIPTION
-    Comprehensive script that uninstalls all Cloud Drive Mapper instances, removes registry remnants,
-    and installs the latest version with best practice drive letter assignment (Z -> Y -> X, etc.).
-.PARAMETER InstallerPath
-    Path to the CloudDriveMapper.msi installer file.
+    Locates the existing Cloud Drive Mapper installation, extracts the MSI from Windows Installer cache,
+    performs complete cleanup, and reinstalls with best practice drive letter assignment (Z -> Y -> X, etc.).
 .PARAMETER LicenseKey
     License key for Cloud Drive Mapper activation.
 .EXAMPLE
-    .\Deploy-CloudDriveMapper.ps1 -InstallerPath "\\server\share\CloudDriveMapper.msi" -LicenseKey "YOUR-LICENSE-KEY"
+    .\Reconfigure-CloudDriveMapper.ps1 -LicenseKey "5d9a0dba906345e24b3382926c2557fc7abb44841d28d055bd2d"
 #>
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true)]
-    [ValidateScript({ Test-Path $_ -PathType Leaf })]
-    [string]$InstallerPath,
-
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [string]$LicenseKey
@@ -49,6 +43,89 @@ function Get-InstalledCDM {
     Get-ItemProperty $UninstallKeys -ErrorAction SilentlyContinue | 
         Where-Object { $_.DisplayName -like "*Cloud Drive Mapper*" -or $_.DisplayName -like "*CloudDriveMapper*" } |
         Select-Object DisplayName, DisplayVersion, UninstallString, PSChildName
+}
+
+function Get-CDMInstallerPath {
+    Write-Log "Locating existing Cloud Drive Mapper installer..."
+    
+    $CDMInstallation = Get-InstalledCDM | Select-Object -First 1
+    
+    if (-not $CDMInstallation) {
+        Write-Log "No Cloud Drive Mapper installation found on this machine!" -Level 'ERROR'
+        throw "Cloud Drive Mapper must be installed before reconfiguration. Please install it first."
+    }
+    
+    Write-Log "Found installation: $($CDMInstallation.DisplayName) $($CDMInstallation.DisplayVersion)"
+    
+    # Extract product code from PSChildName (GUID)
+    $ProductCode = $CDMInstallation.PSChildName
+    
+    if ($ProductCode -notmatch '^{[A-F0-9-]+}$') {
+        Write-Log "Invalid product code format: $ProductCode" -Level 'ERROR'
+        throw "Unable to extract valid product code from installation."
+    }
+    
+    Write-Log "Product Code: $ProductCode"
+    
+    # Query Windows Installer for the local package path
+    try {
+        $InstallerType = [Type]::GetTypeFromProgID("WindowsInstaller.Installer")
+        $Installer = [Activator]::CreateInstance($InstallerType)
+        $LocalPackage = $Installer.GetType().InvokeMember("ProductInfo", "GetProperty", $null, $Installer, @($ProductCode, "LocalPackage"))
+        
+        if ($LocalPackage -and (Test-Path $LocalPackage)) {
+            Write-Log "Found cached MSI: $LocalPackage"
+            
+            # Copy to a working location to ensure we can use it
+            $BackupPath = "$env:TEMP\CloudDriveMapper_Backup_$(Get-Date -Format 'yyyyMMddHHmmss').msi"
+            Copy-Item -Path $LocalPackage -Destination $BackupPath -Force
+            Write-Log "Backed up installer to: $BackupPath"
+            
+            return $BackupPath
+        }
+    } catch {
+        Write-Log "COM method failed: $_" -Level 'WARN'
+    }
+    
+    # Fallback: Search Windows Installer cache directory
+    Write-Log "Attempting fallback search in Windows Installer cache..."
+    $InstallerCache = "$env:SystemRoot\Installer"
+    
+    if (Test-Path $InstallerCache) {
+        # Get all MSI files and search for Cloud Drive Mapper
+        $MSIFiles = Get-ChildItem -Path $InstallerCache -Filter "*.msi" -File -ErrorAction SilentlyContinue
+        
+        foreach ($MSI in $MSIFiles) {
+            try {
+                $InstallerType = [Type]::GetTypeFromProgID("WindowsInstaller.Installer")
+                $Installer = [Activator]::CreateInstance($InstallerType)
+                $Database = $Installer.GetType().InvokeMember("OpenDatabase", "InvokeMethod", $null, $Installer, @($MSI.FullName, 0))
+                
+                $View = $Database.GetType().InvokeMember("OpenView", "InvokeMethod", $null, $Database, @("SELECT Value FROM Property WHERE Property='ProductName'"))
+                $View.GetType().InvokeMember("Execute", "InvokeMethod", $null, $View, $null)
+                $Record = $View.GetType().InvokeMember("Fetch", "InvokeMethod", $null, $View, $null)
+                
+                if ($Record) {
+                    $ProductName = $Record.GetType().InvokeMember("StringData", "GetProperty", $null, $Record, @(1))
+                    
+                    if ($ProductName -like "*Cloud Drive Mapper*" -or $ProductName -like "*CloudDriveMapper*") {
+                        Write-Log "Found matching MSI: $($MSI.FullName) - Product: $ProductName"
+                        
+                        $BackupPath = "$env:TEMP\CloudDriveMapper_Backup_$(Get-Date -Format 'yyyyMMddHHmmss').msi"
+                        Copy-Item -Path $MSI.FullName -Destination $BackupPath -Force
+                        Write-Log "Backed up installer to: $BackupPath"
+                        
+                        return $BackupPath
+                    }
+                }
+            } catch {
+                # Continue searching
+            }
+        }
+    }
+    
+    Write-Log "Unable to locate Cloud Drive Mapper installer in cache!" -Level 'ERROR'
+    throw "Could not find the original installer. Please provide the MSI file manually."
 }
 
 function Remove-CDMInstances {
@@ -166,9 +243,13 @@ function Get-OptimalDriveLetter {
 }
 
 function Install-CDM {
-    param([string]$DriveLetter)
+    param(
+        [string]$InstallerPath,
+        [string]$DriveLetter
+    )
     
     Write-Log "Installing Cloud Drive Mapper with drive letter: $DriveLetter"
+    Write-Log "Using installer: $InstallerPath"
     
     $Arguments = @(
         "/i `"$InstallerPath`""
@@ -222,23 +303,33 @@ function Verify-Installation {
 # ============================================================================
 
 try {
-    Write-Log "========== Cloud Drive Mapper Deployment Started =========="
-    Write-Log "Installer: $InstallerPath"
+    Write-Log "========== Cloud Drive Mapper Reconfiguration Started =========="
     Write-Log "Log file: $LogPath"
     
+    # Phase 0: Locate existing installer
+    Write-Log "Phase 0: Locating existing Cloud Drive Mapper installer..."
+    $InstallerPath = Get-CDMInstallerPath
+    
+    if (-not $InstallerPath -or -not (Test-Path $InstallerPath)) {
+        throw "Failed to locate valid installer path."
+    }
+    
     # Phase 1: Complete removal
-    Write-Log "Phase 1: Removing existing installations..."
+    Write-Log "Phase 1: Removing existing installation..."
     Remove-CDMInstances
     Remove-CDMRegistry
     Remove-CDMFiles
+    
+    Write-Log "Waiting for cleanup to complete..."
+    Start-Sleep -Seconds 5
     
     # Phase 2: Drive letter determination
     Write-Log "Phase 2: Drive letter configuration..."
     $DriveLetter = Get-OptimalDriveLetter
     
     # Phase 3: Installation
-    Write-Log "Phase 3: Installing Cloud Drive Mapper..."
-    $InstallSuccess = Install-CDM -DriveLetter $DriveLetter
+    Write-Log "Phase 3: Reinstalling Cloud Drive Mapper..."
+    $InstallSuccess = Install-CDM -InstallerPath $InstallerPath -DriveLetter $DriveLetter
     
     if (-not $InstallSuccess) {
         throw "Installation failed. Check logs for details."
@@ -249,17 +340,24 @@ try {
     $VerifySuccess = Verify-Installation
     
     if ($VerifySuccess) {
-        Write-Log "========== Deployment Completed Successfully ==========" -Level 'INFO'
+        Write-Log "========== Reconfiguration Completed Successfully ==========" -Level 'INFO'
+        Write-Log "Drive Letter: $DriveLetter"
         Write-Log "Log saved to: $LogPath"
+        
+        # Cleanup temp installer backup
+        if (Test-Path $InstallerPath) {
+            Remove-Item -Path $InstallerPath -Force -ErrorAction SilentlyContinue
+            Write-Log "Cleaned up temporary installer backup."
+        }
+        
         exit 0
     } else {
         throw "Installation verification failed."
     }
     
 } catch {
-    Write-Log "========== Deployment Failed ==========" -Level 'ERROR'
+    Write-Log "========== Reconfiguration Failed ==========" -Level 'ERROR'
     Write-Log "Error: $_" -Level 'ERROR'
     Write-Log "Log saved to: $LogPath"
     exit 1
 }
-
