@@ -19,8 +19,15 @@ param(
     [string]$LicenseKey
 )
 
-$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Continue'
 $LogPath = "$env:ProgramData\CDM_Deployment_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+
+if (-not(Test-Path $LogPath)){
+Write-Host "Creating Log Directory..."
+New-Item -Path "$env:ProgramData" -ItemType "File" -Name "CDM_Deployment_$(Get-Date -Format 'yyyyMMdd_HHmmss').log" -Verbose -Force
+Start-Sleep 3
+Write-Host "Log File Created...."
+}
 
 function Write-Log {
     param([string]$Message, [string]$Level = 'INFO')
