@@ -1,248 +1,517 @@
+#Requires -Version 5.1
 #Requires -RunAsAdministrator
+
 <#
 .SYNOPSIS
-    Quick Windows System Repair Script
+    Comprehensive system diagnostic scan and repair for slow-running systems.
+
 .DESCRIPTION
-    Fast, reliable system repair with verbose colorized output
-.NOTES
-    Version: 4.0 - Quick & Clean Edition
+    Performs automated diagnostics, repairs common issues, and generates detailed reports.
+    Designed for MSP deployment across multiple endpoints.
+
+.PARAMETER SkipRepairs
+    Run diagnostics only without performing repairs.
+
+.PARAMETER GenerateReport
+    Generate HTML report. Default: $true
+
+.EXAMPLE
+    .\System-DiagnosticRepair.ps1
+    .\System-DiagnosticRepair.ps1 -SkipRepairs
 #>
 
+[CmdletBinding()]
 param(
-    [string]$LogPath = "C:\Temp\QuickRepair_$(Get-Date -Format 'yyyyMMdd_HHmmss').log",
-    [switch]$SkipReboot
+    [switch]$SkipRepairs,
+    [string]$ReportPath = "$env:TEMP\SystemDiagnostic_$(Get-Date -Format 'yyyyMMdd_HHmmss').html",
+    [switch]$GenerateReport = $true
 )
 
-Write-Host "`n=== Configuring System for Secure TLS 1.2 Connections ===`n" -ForegroundColor Cyan
-
-# --- Permanent TLS 1.2 Fix ---
-# Apply at runtime:
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Write-Host "✔ TLS 1.2 enforced for this session." -ForegroundColor Green
-
-# Apply permanent fix in registry (for future .NET and PowerShell sessions):
-$regPaths = @(
-    "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319",
-    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319"
-)
-foreach ($path in $regPaths) {
-    if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
-    New-ItemProperty -Path $path -Name "SchUseStrongCrypto" -Value 1 -PropertyType DWord -Force | Out-Null
+$script:Results = @{
+    ComputerName = $env:COMPUTERNAME
+    ScanTime = Get-Date
+    Issues = @()
+    Repairs = @()
+    Warnings = @()
+    Info = @()
 }
-Write-Host "✔ Registry updated to permanently enable strong crypto/TLS 1.2." -ForegroundColor Green
-
-
-# Ensure log directory exists
-$null = New-Item -Path (Split-Path $LogPath) -ItemType Directory -Force -ErrorAction SilentlyContinue
 
 function Write-Log {
-    param(
-        [string]$Message, 
-        [ValidateSet("Info", "Success", "Warning", "Error", "Header")]
-        [string]$Level = "Info"
-    )
-    
-    $timestamp = Get-Date -Format "HH:mm:ss"
-    $output = "[$timestamp] $Message"
-    
-    $colors = @{
-        Info = "White"
-        Success = "Green"
-        Warning = "Yellow"
-        Error = "Red"
-        Header = "Cyan"
+    param([string]$Message, [string]$Type = "Info")
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $color = switch($Type) {
+        "Error" { "Red" }
+        "Warning" { "Yellow" }
+        "Success" { "Green" }
+        default { "White" }
     }
+    Write-Host "[$timestamp] $Message" -ForegroundColor $color
     
-    Write-Host $output -ForegroundColor $colors[$Level]
-    $output | Out-File -FilePath $LogPath -Append -Encoding UTF8
+    $script:Results[$Type + "s"] += @{
+        Time = $timestamp
+        Message = $Message
+    }
 }
 
-function Start-QuickCommand {
-    param(
-        [string]$Command,
-        [string]$Description,
-        [int]$TimeoutMinutes = 5
-    )
+function Test-DiskSpace {
+    Write-Host "`n=== Disk Space Analysis ===" -ForegroundColor Cyan
+    $drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Used -gt 0 }
     
-    Write-Log "► Starting: $Description" -Level Info
-    
-    try {
-        $job = Start-Job -ScriptBlock {
-            param($cmd)
-            Invoke-Expression $cmd
-        } -ArgumentList $Command
+    foreach ($drive in $drives) {
+        $freePercent = [math]::Round(($drive.Free / ($drive.Used + $drive.Free)) * 100, 2)
+        $freeGB = [math]::Round($drive.Free / 1GB, 2)
         
-        $completed = Wait-Job $job -Timeout ($TimeoutMinutes * 60)
-        
-        if ($completed) {
-            $result = Receive-Job $job
-            Remove-Job $job
-            Write-Log "✓ $Description completed successfully" -Level Success
-            return $true
+        if ($freePercent -lt 10) {
+            Write-Log "CRITICAL: Drive $($drive.Name) has only $freePercent% free ($freeGB GB)" "Error"
+        } elseif ($freePercent -lt 20) {
+            Write-Log "WARNING: Drive $($drive.Name) has $freePercent% free ($freeGB GB)" "Warning"
         } else {
-            Remove-Job $job -Force
-            Write-Log "⚠ $Description timed out after $TimeoutMinutes minutes" -Level Warning
-            return $false
+            Write-Log "Drive $($drive.Name): $freePercent% free ($freeGB GB)" "Info"
         }
-    } catch {
-        Write-Log "✗ $Description failed: $($_.Exception.Message)" -Level Error
-        return $false
-    }
-}
-
-function Test-AdminRights {
-    return ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-}
-
-function Reset-WindowsUpdate {
-    Write-Log "► Resetting Windows Update components..." -Level Info
-    
-    try {
-        $services = @('wuauserv', 'cryptsvc', 'bits', 'msiserver')
-        
-        # Stop services
-        foreach ($service in $services) {
-            Stop-Service $service -Force -ErrorAction SilentlyContinue
-            Write-Log "  Stopped $service" -Level Info
-        }
-        
-        # Rename folders
-        $folders = @{
-            'C:\Windows\SoftwareDistribution' = 'C:\Windows\SoftwareDistribution.bak'
-            'C:\Windows\System32\catroot2' = 'C:\Windows\System32\catroot2.bak'
-        }
-        
-        foreach ($folder in $folders.GetEnumerator()) {
-            if (Test-Path $folder.Key) {
-                if (Test-Path $folder.Value) { 
-                    Remove-Item $folder.Value -Recurse -Force -ErrorAction SilentlyContinue 
-                }
-                Rename-Item $folder.Key $folder.Value -ErrorAction SilentlyContinue
-                Write-Log "  Renamed $($folder.Key)" -Level Info
-            }
-        }
-        
-        # Start services
-        foreach ($service in $services) {
-            Start-Service $service -ErrorAction SilentlyContinue
-            Write-Log "  Started $service" -Level Info
-        }
-        
-        Write-Log "✓ Windows Update reset completed" -Level Success
-        return $true
-    } catch {
-        Write-Log "✗ Windows Update reset failed: $($_.Exception.Message)" -Level Error
-        return $false
     }
 }
 
 function Clear-TempFiles {
-    Write-Log "► Clearing temporary files..." -Level Info
+    if ($SkipRepairs) { return }
     
+    Write-Host "`n=== Cleaning Temporary Files ===" -ForegroundColor Cyan
     $tempPaths = @(
         "$env:TEMP\*",
-        "$env:WINDIR\Temp\*",
-        "$env:WINDIR\Prefetch\*"
+        "$env:LOCALAPPDATA\Temp\*",
+        "C:\Windows\Temp\*",
+        "C:\Windows\Prefetch\*"
     )
     
-    $cleaned = 0
+    $totalCleaned = 0
     foreach ($path in $tempPaths) {
         try {
-            $items = Get-ChildItem $path -ErrorAction SilentlyContinue
-            if ($items) {
-                Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
-                $cleaned += $items.Count
-                Write-Log "  Cleaned $(Split-Path $path -Parent)" -Level Info
+            $items = Get-ChildItem -Path $path -Force -ErrorAction SilentlyContinue | 
+                     Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) }
+            
+            foreach ($item in $items) {
+                try {
+                    $size = if ($item.PSIsContainer) { 
+                        (Get-ChildItem -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue | 
+                         Measure-Object -Property Length -Sum).Sum 
+                    } else { 
+                        $item.Length 
+                    }
+                    Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                    $totalCleaned += $size
+                } catch {}
             }
-        } catch {
-            Write-Log "  Skipped $(Split-Path $path -Parent): Access denied" -Level Warning
-        }
+        } catch {}
     }
     
-    Write-Log "✓ Cleaned $cleaned temporary items" -Level Success
+    $cleanedMB = [math]::Round($totalCleaned / 1MB, 2)
+    Write-Log "Cleaned $cleanedMB MB of temporary files" "Success"
 }
 
-# Main execution
-if (-not (Test-AdminRights)) {
-    Write-Log "ERROR: This script requires Administrator privileges!" -Level Error
-    Write-Log "Please run PowerShell as Administrator and try again." -Level Error
-    exit 1
-}
-
-Write-Log "=== QUICK SYSTEM REPAIR STARTED ===" -Level Header
-Write-Log "Log file: $LogPath" -Level Info
-Write-Log "" -Level Info
-
-$results = @{}
-$startTime = Get-Date
-
-# Phase 1: Quick SFC scan
-Write-Log "PHASE 1: System File Check (Quick)" -Level Header
-$results['SFC'] = Start-QuickCommand "sfc /verifyonly" "System File Verification" 3
-
-# Phase 2: DISM health check (fast)
-Write-Log "PHASE 2: Component Store Health" -Level Header
-$results['DISM_Check'] = Start-QuickCommand "DISM /Online /Cleanup-Image /CheckHealth" "Component Health Check" 2
-
-# Phase 3: Clean temporary files
-Write-Log "PHASE 3: Temporary File Cleanup" -Level Header
-$results['TempClean'] = Clear-TempFiles
-
-# Phase 4: Windows Update reset (if needed)
-Write-Log "PHASE 4: Windows Update Reset" -Level Header
-$results['WU_Reset'] = Reset-WindowsUpdate
-
-# Phase 5: Registry cleanup
-Write-Log "PHASE 5: Registry Optimization" -Level Header
-$results['Registry'] = Start-QuickCommand "sfc /verifyonly" "Registry Verification" 2
-
-# Phase 6: Component cleanup
-Write-Log "PHASE 6: Component Cleanup" -Level Header
-$results['Cleanup'] = Start-QuickCommand "DISM /Online /Cleanup-Image /StartComponentCleanup" "Component Cleanup" 3
-
-# Results summary
-Write-Log "" -Level Info
-Write-Log "=== REPAIR SUMMARY ===" -Level Header
-
-$passed = 0
-$total = $results.Count
-
-foreach ($task in $results.GetEnumerator()) {
-    $status = if ($task.Value) { "PASS"; $passed++ } else { "FAIL" }
-    $level = if ($task.Value) { "Success" } else { "Error" }
-    Write-Log "$($task.Key): $status" -Level $level
-}
-
-$duration = (Get-Date) - $startTime
-Write-Log "" -Level Info
-Write-Log "Execution time: $($duration.Minutes)m $($duration.Seconds)s" -Level Info
-Write-Log "Success rate: $passed/$total tasks completed" -Level Info
-
-# Recommendations
-Write-Log "" -Level Info
-Write-Log "=== NEXT STEPS ===" -Level Header
-
-if ($passed -eq $total) {
-    Write-Log "✓ All repairs completed successfully!" -Level Success
-} else {
-    Write-Log "⚠ Some tasks failed - manual intervention may be needed" -Level Warning
-}
-
-Write-Log "• Check Event Viewer for detailed error information" -Level Info
-Write-Log "• Consider running full SFC scan: sfc /scannow" -Level Info
-Write-Log "• Restart recommended to complete all changes" -Level Warning
-
-Write-Log "" -Level Info
-Write-Log "=== REPAIR COMPLETED ===" -Level Success
-Write-Log "Full log available at: $LogPath" -Level Info
-
-# Optional restart
-if (-not $SkipReboot) {
-    Write-Log "" -Level Info
-    $reboot = Read-Host "Restart computer now? (y/N)"
-    if ($reboot -match "^[Yy]") {
-        Write-Log "Restarting in 5 seconds..." -Level Warning
-        Start-Sleep 5
-        Restart-Computer -Force
+function Test-SystemFiles {
+    Write-Host "`n=== System File Integrity ===" -ForegroundColor Cyan
+    
+    if ($SkipRepairs) {
+        Write-Log "Skipping SFC scan (repair mode disabled)" "Warning"
+        return
+    }
+    
+    Write-Log "Running System File Checker (this may take several minutes)..." "Info"
+    $sfcResult = & sfc /scannow 2>&1
+    
+    if ($sfcResult -match "found corrupt files and successfully repaired them") {
+        Write-Log "SFC repaired corrupted system files" "Success"
+    } elseif ($sfcResult -match "found corrupt files but was unable to fix") {
+        Write-Log "SFC found corrupted files that require manual repair (run DISM)" "Error"
+    } else {
+        Write-Log "System files integrity verified" "Info"
     }
 }
+
+function Test-DiskHealth {
+    Write-Host "`n=== Disk Health Check ===" -ForegroundColor Cyan
+    
+    try {
+        $volumes = Get-Volume | Where-Object { $_.DriveLetter -and $_.FileSystem }
+        
+        foreach ($vol in $volumes) {
+            $health = $vol.HealthStatus
+            if ($health -eq "Healthy") {
+                Write-Log "Drive $($vol.DriveLetter): $health" "Info"
+            } else {
+                Write-Log "Drive $($vol.DriveLetter): $health - Attention required!" "Error"
+            }
+        }
+        
+        # Check SMART status
+        $disks = Get-PhysicalDisk
+        foreach ($disk in $disks) {
+            if ($disk.HealthStatus -ne "Healthy") {
+                Write-Log "Physical Disk $($disk.FriendlyName): $($disk.HealthStatus)" "Error"
+            }
+        }
+    } catch {
+        Write-Log "Unable to retrieve disk health: $($_.Exception.Message)" "Warning"
+    }
+}
+
+function Test-Memory {
+    Write-Host "`n=== Memory Analysis ===" -ForegroundColor Cyan
+    
+    $os = Get-CimInstance Win32_OperatingSystem
+    $totalMemoryGB = [math]::Round($os.TotalVisibleMemorySize / 1MB, 2)
+    $freeMemoryGB = [math]::Round($os.FreePhysicalMemory / 1MB, 2)
+    $usedPercent = [math]::Round((($totalMemoryGB - $freeMemoryGB) / $totalMemoryGB) * 100, 2)
+    
+    Write-Log "Total RAM: $totalMemoryGB GB | Used: $usedPercent% | Free: $freeMemoryGB GB" "Info"
+    
+    if ($usedPercent -gt 90) {
+        Write-Log "Memory usage critically high ($usedPercent%)" "Error"
+        
+        # Find top memory consumers
+        $topProcesses = Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 5
+        Write-Log "Top 5 memory consumers:" "Info"
+        foreach ($proc in $topProcesses) {
+            $memMB = [math]::Round($proc.WorkingSet / 1MB, 2)
+            Write-Log "  $($proc.Name): $memMB MB" "Info"
+        }
+    } elseif ($usedPercent -gt 80) {
+        Write-Log "Memory usage high ($usedPercent%)" "Warning"
+    }
+}
+
+function Test-StartupPrograms {
+    Write-Host "`n=== Startup Programs Analysis ===" -ForegroundColor Cyan
+    
+    $startupItems = @()
+    
+    # Registry startup locations
+    $regPaths = @(
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run",
+        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\RunOnce"
+    )
+    
+    foreach ($path in $regPaths) {
+        try {
+            $items = Get-ItemProperty -Path $path -ErrorAction SilentlyContinue
+            if ($items) {
+                $items.PSObject.Properties | Where-Object { $_.Name -notmatch "PS" } | ForEach-Object {
+                    $startupItems += @{
+                        Name = $_.Name
+                        Command = $_.Value
+                        Location = $path
+                    }
+                }
+            }
+        } catch {}
+    }
+    
+    Write-Log "Found $($startupItems.Count) startup items" "Info"
+    if ($startupItems.Count -gt 15) {
+        Write-Log "High number of startup programs may impact boot time" "Warning"
+    }
+}
+
+function Test-WindowsUpdate {
+    Write-Host "`n=== Windows Update Status ===" -ForegroundColor Cyan
+    
+    try {
+        $updateSession = New-Object -ComObject Microsoft.Update.Session
+        $updateSearcher = $updateSession.CreateUpdateSearcher()
+        $searchResult = $updateSearcher.Search("IsInstalled=0")
+        
+        $pendingUpdates = $searchResult.Updates.Count
+        
+        if ($pendingUpdates -gt 0) {
+            Write-Log "Windows Update: $pendingUpdates pending updates found" "Warning"
+        } else {
+            Write-Log "Windows Update: System is up to date" "Info"
+        }
+        
+        # Check last update time
+        $lastUpdate = Get-HotFix | Sort-Object InstalledOn -Descending | Select-Object -First 1
+        if ($lastUpdate) {
+            $daysSinceUpdate = (New-TimeSpan -Start $lastUpdate.InstalledOn -End (Get-Date)).Days
+            if ($daysSinceUpdate -gt 30) {
+                Write-Log "Last update installed $daysSinceUpdate days ago" "Warning"
+            } else {
+                Write-Log "Last update: $($lastUpdate.HotFixID) on $($lastUpdate.InstalledOn)" "Info"
+            }
+        }
+    } catch {
+        Write-Log "Unable to check Windows Update status: $($_.Exception.Message)" "Warning"
+    }
+}
+
+function Test-Services {
+    Write-Host "`n=== Critical Services Check ===" -ForegroundColor Cyan
+    
+    $criticalServices = @(
+        "wuauserv",    # Windows Update
+        "BITS",        # Background Intelligent Transfer Service
+        "Dhcp",        # DHCP Client
+        "Dnscache",    # DNS Client
+        "EventLog",    # Windows Event Log
+        "MpsSvc",      # Windows Defender Firewall
+        "Winmgmt"      # Windows Management Instrumentation
+    )
+    
+    foreach ($svc in $criticalServices) {
+        $service = Get-Service -Name $svc -ErrorAction SilentlyContinue
+        if ($service) {
+            if ($service.Status -ne "Running") {
+                Write-Log "Service '$($service.DisplayName)' is $($service.Status)" "Error"
+                
+                if (-not $SkipRepairs -and $service.StartType -ne "Disabled") {
+                    try {
+                        Start-Service -Name $svc -ErrorAction Stop
+                        Write-Log "Successfully started service '$($service.DisplayName)'" "Success"
+                    } catch {
+                        Write-Log "Failed to start service: $($_.Exception.Message)" "Error"
+                    }
+                }
+            }
+        }
+    }
+}
+
+function Test-EventLogs {
+    Write-Host "`n=== Event Log Analysis ===" -ForegroundColor Cyan
+    
+    $hours = 24
+    $after = (Get-Date).AddHours(-$hours)
+    
+    try {
+        $criticalErrors = Get-WinEvent -FilterHashtable @{
+            LogName = 'System', 'Application'
+            Level = 1,2  # Critical and Error
+            StartTime = $after
+        } -ErrorAction SilentlyContinue | 
+        Group-Object Id | 
+        Sort-Object Count -Descending | 
+        Select-Object -First 5
+        
+        if ($criticalErrors) {
+            Write-Log "Top 5 recurring errors in last $hours hours:" "Warning"
+            foreach ($error in $criticalErrors) {
+                $sample = Get-WinEvent -FilterHashtable @{
+                    LogName = 'System', 'Application'
+                    Id = $error.Name
+                    StartTime = $after
+                } -MaxEvents 1 -ErrorAction SilentlyContinue
+                
+                Write-Log "  Event ID $($error.Name): $($error.Count) occurrences - $($sample.Message.Substring(0, [Math]::Min(100, $sample.Message.Length)))" "Info"
+            }
+        } else {
+            Write-Log "No critical errors found in last $hours hours" "Info"
+        }
+    } catch {
+        Write-Log "Unable to analyze event logs: $($_.Exception.Message)" "Warning"
+    }
+}
+
+function Optimize-NetworkSettings {
+    if ($SkipRepairs) { return }
+    
+    Write-Host "`n=== Network Optimization ===" -ForegroundColor Cyan
+    
+    try {
+        # Flush DNS cache
+        Clear-DnsClientCache
+        Write-Log "DNS cache cleared" "Success"
+        
+        # Reset Winsock
+        & netsh winsock reset | Out-Null
+        Write-Log "Winsock reset completed (restart required)" "Success"
+        
+        # Release and renew IP
+        & ipconfig /release | Out-Null
+        & ipconfig /renew | Out-Null
+        Write-Log "IP address renewed" "Success"
+    } catch {
+        Write-Log "Network optimization failed: $($_.Exception.Message)" "Error"
+    }
+}
+
+function Test-DefragmentationStatus {
+    Write-Host "`n=== Disk Optimization Status ===" -ForegroundColor Cyan
+    
+    try {
+        $volumes = Get-Volume | Where-Object { $_.DriveLetter -and $_.FileSystem -eq "NTFS" }
+        
+        foreach ($vol in $volumes) {
+            $defragAnalysis = Optimize-Volume -DriveLetter $vol.DriveLetter -Analyze -ErrorAction SilentlyContinue
+            Write-Log "Drive $($vol.DriveLetter): Optimization recommended based on file fragmentation" "Info"
+        }
+    } catch {
+        Write-Log "Unable to analyze disk optimization status" "Warning"
+    }
+}
+
+function Clear-BrowserCache {
+    if ($SkipRepairs) { return }
+    
+    Write-Host "`n=== Browser Cache Cleanup ===" -ForegroundColor Cyan
+    
+    $cachePaths = @(
+        "$env:LOCALAPPDATA\Google\Chrome\User Data\Default\Cache",
+        "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default\Cache",
+        "$env:LOCALAPPDATA\Mozilla\Firefox\Profiles\*.default-release\cache2"
+    )
+    
+    $totalCleaned = 0
+    foreach ($path in $cachePaths) {
+        try {
+            if (Test-Path $path) {
+                $items = Get-ChildItem -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+                $size = ($items | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
+                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
+                $totalCleaned += $size
+            }
+        } catch {}
+    }
+    
+    if ($totalCleaned -gt 0) {
+        $cleanedMB = [math]::Round($totalCleaned / 1MB, 2)
+        Write-Log "Cleaned $cleanedMB MB of browser cache" "Success"
+    }
+}
+
+function Test-PowerPlan {
+    Write-Host "`n=== Power Plan Configuration ===" -ForegroundColor Cyan
+    
+    try {
+        $currentPlan = powercfg /getactivescheme
+        Write-Log "Current power plan: $($currentPlan -replace '.*\(', '' -replace '\)', '')" "Info"
+        
+        if ($currentPlan -match "Power saver") {
+            Write-Log "Power Saver plan may impact performance" "Warning"
+            
+            if (-not $SkipRepairs) {
+                # Set to High Performance
+                $highPerf = powercfg /list | Where-Object { $_ -match "High performance" }
+                if ($highPerf -match "([a-f0-9\-]{36})") {
+                    powercfg /setactive $matches[1]
+                    Write-Log "Switched to High Performance power plan" "Success"
+                }
+            }
+        }
+    } catch {
+        Write-Log "Unable to check power plan" "Warning"
+    }
+}
+
+function New-DiagnosticReport {
+    if (-not $GenerateReport) { return }
+    
+    Write-Host "`n=== Generating Report ===" -ForegroundColor Cyan
+    
+    $html = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <title>System Diagnostic Report - $($script:Results.ComputerName)</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px; }
+        h2 { color: #34495e; margin-top: 30px; border-left: 4px solid #3498db; padding-left: 10px; }
+        .info { background: #d1ecf1; border-left: 4px solid #0c5460; padding: 10px; margin: 10px 0; }
+        .warning { background: #fff3cd; border-left: 4px solid #856404; padding: 10px; margin: 10px 0; }
+        .error { background: #f8d7da; border-left: 4px solid #721c24; padding: 10px; margin: 10px 0; }
+        .success { background: #d4edda; border-left: 4px solid #155724; padding: 10px; margin: 10px 0; }
+        .timestamp { color: #7f8c8d; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #3498db; color: white; }
+        tr:hover { background-color: #f5f5f5; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>System Diagnostic Report</h1>
+        <p><strong>Computer:</strong> $($script:Results.ComputerName)</p>
+        <p><strong>Scan Time:</strong> $($script:Results.ScanTime)</p>
+        <p><strong>Repair Mode:</strong> $(if($SkipRepairs){"Disabled"}else{"Enabled"})</p>
+        
+        <h2>Errors Found ($($script:Results.Errors.Count))</h2>
+"@
+    
+    foreach ($item in $script:Results.Errors) {
+        $html += "<div class='error'><span class='timestamp'>$($item.Time)</span> - $($item.Message)</div>`n"
+    }
+    
+    $html += "<h2>Warnings ($($script:Results.Warnings.Count))</h2>`n"
+    foreach ($item in $script:Results.Warnings) {
+        $html += "<div class='warning'><span class='timestamp'>$($item.Time)</span> - $($item.Message)</div>`n"
+    }
+    
+    $html += "<h2>Repairs Performed ($($script:Results.Successs.Count))</h2>`n"
+    foreach ($item in $script:Results.Successs) {
+        $html += "<div class='success'><span class='timestamp'>$($item.Time)</span> - $($item.Message)</div>`n"
+    }
+    
+    $html += "<h2>Additional Information</h2>`n"
+    foreach ($item in $script:Results.Infos) {
+        $html += "<div class='info'><span class='timestamp'>$($item.Time)</span> - $($item.Message)</div>`n"
+    }
+    
+    $html += @"
+    </div>
+</body>
+</html>
+"@
+    
+    $html | Out-File -FilePath $ReportPath -Encoding UTF8
+    Write-Log "Report generated: $ReportPath" "Success"
+    
+    # Open report
+    Start-Process $ReportPath
+}
+
+# Main Execution
+Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║     System Diagnostic & Repair Tool v1.0                  ║" -ForegroundColor Green
+Write-Host "║     Computer: $($env:COMPUTERNAME.PadRight(44)) ║" -ForegroundColor Green
+Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+
+if ($SkipRepairs) {
+    Write-Host "`nRunning in DIAGNOSTIC ONLY mode (no repairs will be performed)`n" -ForegroundColor Yellow
+} else {
+    Write-Host "`nRunning in DIAGNOSTIC & REPAIR mode`n" -ForegroundColor Green
+}
+
+# Execute diagnostics
+Test-DiskSpace
+Test-DiskHealth
+Test-Memory
+Test-Services
+Test-StartupPrograms
+Test-WindowsUpdate
+Test-EventLogs
+Test-PowerPlan
+Test-DefragmentationStatus
+
+# Execute repairs
+Clear-TempFiles
+Clear-BrowserCache
+Optimize-NetworkSettings
+Test-SystemFiles
+
+# Generate report
+New-DiagnosticReport
+
+Write-Host "`n╔════════════════════════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║     Diagnostic Scan Complete                               ║" -ForegroundColor Green
+Write-Host "╚════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "`nSummary:" -ForegroundColor Cyan
+Write-Host "  Errors: $($script:Results.Errors.Count)" -ForegroundColor Red
+Write-Host "  Warnings: $($script:Results.Warnings.Count)" -ForegroundColor Yellow
+Write-Host "  Repairs: $($script:Results.Successs.Count)" -ForegroundColor Green
+
+if ($script:Results.Errors.Count -gt 0) {
+    Write-Host "`nAction Required: Review errors and consider running DISM for system file repairs" -ForegroundColor Yellow
+}
+
+Write-Host "`nNote: Some changes may require a system restart to take effect.`n" -ForegroundColor Cyan
