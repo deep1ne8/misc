@@ -30,10 +30,10 @@ param(
 $script:Results = @{
     ComputerName = $env:COMPUTERNAME
     ScanTime = Get-Date
-    Issues = @()
-    Repairs = @()
-    Warnings = @()
-    Info = @()
+    Errors = [System.Collections.ArrayList]@()
+    Warnings = [System.Collections.ArrayList]@()
+    Successs = [System.Collections.ArrayList]@()
+    Infos = [System.Collections.ArrayList]@()
 }
 
 function Write-Log {
@@ -47,10 +47,12 @@ function Write-Log {
     }
     Write-Host "[$timestamp] $Message" -ForegroundColor $color
     
-    $script:Results[$Type + "s"] += @{
+    $logEntry = [PSCustomObject]@{
         Time = $timestamp
         Message = $Message
     }
+    
+    $null = $script:Results[$Type + "s"].Add($logEntry)
 }
 
 function Test-DiskSpace {
@@ -88,23 +90,38 @@ function Clear-TempFiles {
             $items = Get-ChildItem -Path $path -Force -ErrorAction SilentlyContinue | 
                      Where-Object { $_.LastWriteTime -lt (Get-Date).AddDays(-7) }
             
-            foreach ($item in $items) {
-                try {
-                    $size = if ($item.PSIsContainer) { 
-                        (Get-ChildItem -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue | 
-                         Measure-Object -Property Length -Sum).Sum 
-                    } else { 
-                        $item.Length 
+            if ($items) {
+                foreach ($item in $items) {
+                    try {
+                        $size = 0
+                        if ($item.PSIsContainer) {
+                            $childItems = Get-ChildItem -Path $item.FullName -Recurse -Force -File -ErrorAction SilentlyContinue
+                            if ($childItems) {
+                                $size = ($childItems | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
+                                if ($null -eq $size) { $size = 0 }
+                            }
+                        } else {
+                            $size = $item.Length
+                        }
+                        
+                        Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
+                        $totalCleaned += $size
+                    } catch {
+                        # Silently continue on access denied or locked files
                     }
-                    Remove-Item -Path $item.FullName -Recurse -Force -ErrorAction SilentlyContinue
-                    $totalCleaned += $size
-                } catch {}
+                }
             }
-        } catch {}
+        } catch {
+            # Path doesn't exist or access denied
+        }
     }
     
     $cleanedMB = [math]::Round($totalCleaned / 1MB, 2)
-    Write-Log "Cleaned $cleanedMB MB of temporary files" "Success"
+    if ($cleanedMB -gt 0) {
+        Write-Log "Cleaned $cleanedMB MB of temporary files" "Success"
+    } else {
+        Write-Log "No temporary files to clean (or all files in use)" "Info"
+    }
 }
 
 function Test-SystemFiles {
@@ -364,17 +381,25 @@ function Clear-BrowserCache {
     foreach ($path in $cachePaths) {
         try {
             if (Test-Path $path) {
-                $items = Get-ChildItem -Path $path -Recurse -Force -ErrorAction SilentlyContinue
-                $size = ($items | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
-                Remove-Item -Path $path -Recurse -Force -ErrorAction SilentlyContinue
-                $totalCleaned += $size
+                $items = Get-ChildItem -Path $path -Recurse -Force -File -ErrorAction SilentlyContinue
+                if ($items) {
+                    $size = ($items | Measure-Object -Property Length -Sum -ErrorAction SilentlyContinue).Sum
+                    if ($null -eq $size) { $size = 0 }
+                    
+                    Remove-Item -Path "$path\*" -Recurse -Force -ErrorAction SilentlyContinue
+                    $totalCleaned += $size
+                }
             }
-        } catch {}
+        } catch {
+            # Path doesn't exist or browser is running
+        }
     }
     
     if ($totalCleaned -gt 0) {
         $cleanedMB = [math]::Round($totalCleaned / 1MB, 2)
         Write-Log "Cleaned $cleanedMB MB of browser cache" "Success"
+    } else {
+        Write-Log "No browser cache to clean (or browsers currently running)" "Info"
     }
 }
 
