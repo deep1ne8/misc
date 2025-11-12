@@ -343,9 +343,9 @@ function Optimize-NetworkSettings {
         Write-Log "Winsock reset completed (restart required)" "Success"
         
         # Release and renew IP
-        & ipconfig /release | Out-Null
-        & ipconfig /renew | Out-Null
-        Write-Log "IP address renewed" "Success"
+        #& ipconfig /release | Out-Null
+        #& ipconfig /renew | Out-Null
+        #Write-Log "IP address renewed" "Success"
     } catch {
         Write-Log "Network optimization failed: $($_.Exception.Message)" "Error"
     }
