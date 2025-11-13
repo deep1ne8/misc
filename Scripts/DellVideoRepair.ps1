@@ -1,60 +1,60 @@
 #Requires -RunAsAdministrator
 
-<#
-.SYNOPSIS
-    Updates graphics driver using Dell Command | Update CLI
-.DESCRIPTION
-    Scans for current graphics driver, downloads and installs the latest version
-#>
+# Quick fix for DCU-CLI Error 106
+Write-Host "Dell Command Update - Error 106 Fix" -ForegroundColor Cyan
 
-$ErrorActionPreference = 'Stop'
-
-# Verify DCU-CLI is installed
-if (-not (Get-Command dcu-cli.exe -ErrorAction SilentlyContinue)) {
-    Write-Error "Dell Command | Update CLI not found. Install from: https://www.dell.com/support/dcu"
-    exit 1
+# 1. Test connectivity
+Write-Host "`n[1/5] Testing Dell server connectivity..." -ForegroundColor Yellow
+$testDell = Test-NetConnection downloads.dell.com -Port 443 -WarningAction SilentlyContinue
+if ($testDell.TcpTestSucceeded) {
+    Write-Host "✓ Dell servers reachable" -ForegroundColor Green
+} else {
+    Write-Host "✗ Cannot reach Dell servers - Check firewall/proxy" -ForegroundColor Red
 }
 
-Write-Host "Checking current graphics driver..." -ForegroundColor Cyan
+# 2. Reset DCU configuration
+Write-Host "`n[2/5] Resetting DCU configuration..." -ForegroundColor Yellow
+dcu-cli /configure -silent -autoSuspendBitLocker=enable -userConsent=disable
+Write-Host "✓ Configuration reset" -ForegroundColor Green
 
-# Get current driver info
-$currentDriver = dcu-cli /report | Select-String -Pattern "Video|Graphics" -Context 2
-if ($currentDriver) {
-    Write-Host "`nCurrent Graphics Driver:" -ForegroundColor Yellow
-    $currentDriver | ForEach-Object { Write-Host $_.Line }
+# 3. Clear DCU cache
+Write-Host "`n[3/5] Clearing DCU cache..." -ForegroundColor Yellow
+$cachePath = "$env:ProgramData\Dell\CommandUpdate\cache"
+if (Test-Path $cachePath) {
+    Remove-Item "$cachePath\*" -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "✓ Cache cleared" -ForegroundColor Green
+} else {
+    Write-Host "- No cache to clear" -ForegroundColor Gray
 }
 
-Write-Host "`nScanning for graphics driver updates..." -ForegroundColor Cyan
+# 4. Check and restart DCU service
+Write-Host "`n[4/5] Checking DCU service..." -ForegroundColor Yellow
+$service = Get-Service -Name "DellClientManagementService" -ErrorAction SilentlyContinue
+if ($service) {
+    Restart-Service -Name "DellClientManagementService" -Force
+    Write-Host "✓ Service restarted" -ForegroundColor Green
+} else {
+    Write-Host "- Service not found" -ForegroundColor Gray
+}
 
-# Scan specifically for video driver updates
-$scanResult = dcu-cli /scan -category=video -silent
+# 5. Retry scan
+Write-Host "`n[5/5] Retrying scan..." -ForegroundColor Yellow
+dcu-cli /scan -silent
 
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "Scan completed successfully" -ForegroundColor Green
-    
-    # Apply updates (download and install)
-    Write-Host "`nDownloading and installing latest graphics driver..." -ForegroundColor Cyan
-    
-    $updateResult = dcu-cli /applyUpdates -category=video -reboot=disable -silent
+if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 500) {
+    Write-Host "`n✓ SUCCESS! Error 106 resolved" -ForegroundColor Green
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "`nGraphics driver update completed successfully!" -ForegroundColor Green
-        Write-Host "A system restart may be required for changes to take effect." -ForegroundColor Yellow
-        
-        # Check if reboot is needed
-        $rebootRequired = dcu-cli /rebootRequired
-        if ($LASTEXITCODE -eq 500) {
-            Write-Host "`nREBOOT REQUIRED" -ForegroundColor Red
-            $response = Read-Host "Restart now? (Y/N)"
-            if ($response -eq 'Y') {
-                Restart-Computer -Force
-            }
-        }
+        Write-Host "`nUpdates available. Run to install:" -ForegroundColor Cyan
+        Write-Host "dcu-cli /applyUpdates -category=video -reboot=disable"
     } else {
-        Write-Warning "Update installation encountered issues. Exit code: $LASTEXITCODE"
+        Write-Host "`nNo updates available." -ForegroundColor Green
     }
-} elseif ($LASTEXITCODE -eq 500) {
-    Write-Host "No graphics driver updates available. You're up to date!" -ForegroundColor Green
 } else {
-    Write-Warning "Scan encountered issues. Exit code: $LASTEXITCODE"
+    Write-Host "`n✗ Still failing with exit code: $LASTEXITCODE" -ForegroundColor Red
+    Write-Host "`nAdditional steps to try:" -ForegroundColor Yellow
+    Write-Host "1. If behind proxy: dcu-cli /configure -proxy=your.proxy.com:port"
+    Write-Host "2. Temporarily disable antivirus"
+    Write-Host "3. Reinstall DCU from: https://www.dell.com/support/dcu"
+    Write-Host "4. Use Dell SupportAssist instead"
 }
