@@ -12,7 +12,8 @@ param()
 # Configuration
 $AppName = "exacqVision Client"
 $Version = "25.1.4.0"
-$DownloadURL = "https://immystrg01016.blob.core.windows.net/software/4c7d8a53-572d-a54a-1594-412e26c2ae34/exacqVisionClient_25.1.4.0_x64.msi?sv=2025-05-05&se=2025-11-15T01%3A47%3A59Z&sr=b&sp=r&sig=d%2BQ79MWYd0qp5HsN4sH%2BWodE5DCet3VC%2FtKu8bCWKkQ%3D"
+#$DownloadURL = "https://immystrg01016.blob.core.windows.net/software/4c7d8a53-572d-a54a-1594-412e26c2ae34/exacqVisionClient_25.1.4.0_x64.msi?sv=2025-05-05&se=2025-11-15T01%3A47%3A59Z&sr=b&sp=r&sig=d%2BQ79MWYd0qp5HsN4sH%2BWodE5DCet3VC%2FtKu8bCWKkQ%3D"
+$DownloadURL = "https://immystrg01016.blob.core.windows.net/software/4c7d8a53-572d-a54a-1594-412e26c2ae34/exacqVisionClient_25.1.4.0_x64.msi?sv=2025-05-05&se=2025-11-17T19%3A18%3A13Z&sr=b&sp=r&sig=U2uq6gwSuA38pvcC%2BZL40XPI7tRbEIaMs6VhqQNJUKE%3D"
 $TempPath = "$env:TEMP\exacqVisionClient_Install"
 $InstallerPath = "$TempPath\exacqVisionClient.msi"
 $LogPath = "$TempPath\Install.log"
