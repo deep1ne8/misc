@@ -2,13 +2,15 @@
 
 <#
 .SYNOPSIS
-    Installs Windows 11 25H2 update
+    Downloads and installs Windows 11 24H2 cumulative updates
 .DESCRIPTION
-    Searches for and installs Windows 11 version 25H2 update using PSWindowsUpdate module
+    Downloads KB5043080 and KB5064081 updates and installs them
 #>
 
 [CmdletBinding()]
-param()
+param(
+    [string]$DownloadPath = "$env:TEMP\WindowsUpdates"
+)
 
 $ErrorActionPreference = "Stop"
 
@@ -19,74 +21,150 @@ function Write-Log {
     Write-Host $logMessage -ForegroundColor $(if($Level -eq "ERROR"){"Red"}elseif($Level -eq "WARN"){"Yellow"}else{"Green"})
 }
 
-try {
-    Write-Log "Starting Windows 11 25H2 update installation"
+function Get-FileHash256 {
+    param([string]$FilePath)
+    return (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
+}
+
+function Download-WithProgress {
+    param([string]$Url, [string]$OutputPath)
     
-    # Check Windows version
-    $osInfo = Get-CimInstance Win32_OperatingSystem
-    Write-Log "Current OS: $($osInfo.Caption) Build $($osInfo.BuildNumber)"
-    
-    if ($osInfo.Caption -notmatch "Windows 11") {
-        throw "This script requires Windows 11"
-    }
-    
-    # Install NuGet provider if needed
-    if (-not (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
-        Write-Log "Installing NuGet provider"
-        Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope AllUsers | Out-Null
-    }
-    
-    # Install PSWindowsUpdate module
-    if (-not (Get-Module -ListAvailable -Name PSWindowsUpdate)) {
-        Write-Log "Installing PSWindowsUpdate module"
-        Install-Module -Name PSWindowsUpdate -Force -Scope AllUsers -AllowClobber
-    }
-    
-    Import-Module PSWindowsUpdate -Force
-    Write-Log "PSWindowsUpdate module loaded"
-    
-    # Search for Windows 11 25H2 update
-    Write-Log "Searching for Windows 11 25H2 feature update..."
-    $updates = Get-WindowsUpdate -MicrosoftUpdate -Title "*Windows 11*25H2*" -Verbose:$false
-    
-    if (-not $updates) {
-        Write-Log "Searching alternative patterns..."
-        $updates = Get-WindowsUpdate -MicrosoftUpdate | Where-Object { 
-            $_.Title -match "Windows 11.*version 25H2" -or 
-            $_.Title -match "Feature update.*Windows 11.*25H2" 
-        }
-    }
-    
-    if (-not $updates) {
-        Write-Log "No Windows 11 25H2 update found. Checking all available updates:" "WARN"
-        Get-WindowsUpdate -MicrosoftUpdate | Select-Object Title, KB, Size | Format-Table -AutoSize
-        throw "Windows 11 25H2 update not available"
-    }
-    
-    Write-Log "Found update(s):"
-    $updates | ForEach-Object { Write-Log "  - $($_.Title) (KB$($_.KB)) - $([math]::Round($_.Size/1MB, 2)) MB" }
-    
-    # Install update
-    Write-Log "Installing Windows 11 25H2 update (this may take a while)..."
-    $result = Install-WindowsUpdate -MicrosoftUpdate -Title "*Windows 11*25H2*" -AcceptAll -IgnoreReboot -Verbose:$false
-    
-    if ($result) {
-        Write-Log "Update installation completed successfully"
-        Write-Log "Result: $($result.Result)"
+    try {
+        $webClient = New-Object System.Net.WebClient
+        $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
         
-        if ($result.RebootRequired) {
-            Write-Log "SYSTEM REBOOT REQUIRED" "WARN"
-            $reboot = Read-Host "Reboot now? (Y/N)"
-            if ($reboot -eq 'Y') {
-                Write-Log "Initiating restart in 30 seconds..."
-                shutdown /r /t 30 /c "Restarting to complete Windows 11 25H2 update installation"
+        Register-ObjectEvent -InputObject $webClient -EventName DownloadProgressChanged -SourceIdentifier WebClient.DownloadProgressChanged -Action {
+            $percent = $EventArgs.ProgressPercentage
+            $received = [math]::Round($EventArgs.BytesReceived / 1MB, 2)
+            $total = [math]::Round($EventArgs.TotalBytesToReceive / 1MB, 2)
+            Write-Progress -Activity "Downloading" -Status "$received MB / $total MB" -PercentComplete $percent
+        } | Out-Null
+        
+        Register-ObjectEvent -InputObject $webClient -EventName DownloadFileCompleted -SourceIdentifier WebClient.DownloadFileCompleted | Out-Null
+        
+        $webClient.DownloadFileAsync($Url, $OutputPath)
+        
+        while ($webClient.IsBusy) {
+            Start-Sleep -Milliseconds 100
+        }
+        
+        Write-Progress -Activity "Downloading" -Completed
+        
+    } finally {
+        Unregister-Event -SourceIdentifier WebClient.DownloadProgressChanged -ErrorAction SilentlyContinue
+        Unregister-Event -SourceIdentifier WebClient.DownloadFileCompleted -ErrorAction SilentlyContinue
+        if ($webClient) { $webClient.Dispose() }
+    }
+}
+
+function Install-MSU {
+    param([string]$MsuPath, [string]$KB)
+    
+    Write-Log "Installing $KB..."
+    $process = Start-Process -FilePath "wusa.exe" -ArgumentList "`"$MsuPath`" /quiet /norestart" -Wait -PassThru -NoNewWindow
+    
+    switch ($process.ExitCode) {
+        0 { Write-Log "$KB installed successfully"; return $true }
+        3010 { Write-Log "$KB installed (reboot required)" "WARN"; return $true }
+        2359302 { Write-Log "$KB already installed" "WARN"; return $true }
+        default { Write-Log "$KB installation failed (Exit code: $($process.ExitCode))" "ERROR"; return $false }
+    }
+}
+
+# Update definitions
+$updates = @(
+    @{
+        KB = "KB5043080"
+        FileName = "windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu"
+        SHA256 = "8196328210101AF11C7290F87B13FF05BF3489B22208263EA03BCC1D1F26A640"
+        Url = "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/updt/2024/08/windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu"
+    },
+    @{
+        KB = "KB5064081"
+        FileName = "windows11.0-kb5064081-x64_a1096145ded3adfc26f8f23442281533429f0e38.msu"
+        SHA256 = "C4BD7AFC0783ECDDD5438866909483F3DE0D0B3F18FF00A677D157E44FF50401"
+        Url = "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/updt/2025/08/windows11.0-kb5064081-x64_a1096145ded3adfc26f8f23442281533429f0e38.msu"
+    }
+)
+
+try {
+    Write-Log "Windows 11 24H2 Cumulative Update Installer"
+    Write-Log "============================================"
+    
+    # Verify OS version
+    $osInfo = Get-CimInstance Win32_OperatingSystem
+    $buildNumber = $osInfo.BuildNumber
+    Write-Log "Current OS: $($osInfo.Caption) Build $buildNumber"
+    
+    if ($buildNumber -ne "26100") {
+        Write-Log "This update is for Windows 11 24H2 (Build 26100). Current build: $buildNumber" "WARN"
+        $continue = Read-Host "Continue anyway? (Y/N)"
+        if ($continue -ne 'Y') { exit 0 }
+    }
+    
+    # Create download directory
+    if (-not (Test-Path $DownloadPath)) {
+        New-Item -ItemType Directory -Path $DownloadPath -Force | Out-Null
+        Write-Log "Created download directory: $DownloadPath"
+    }
+    
+    $rebootRequired = $false
+    
+    foreach ($update in $updates) {
+        Write-Log ""
+        Write-Log "Processing $($update.KB)..."
+        
+        $filePath = Join-Path $DownloadPath $update.FileName
+        
+        # Check if already downloaded and verified
+        if (Test-Path $filePath) {
+            Write-Log "File exists, verifying hash..."
+            $hash = Get-FileHash256 -FilePath $filePath
+            
+            if ($hash -eq $update.SHA256) {
+                Write-Log "Hash verified successfully"
+            } else {
+                Write-Log "Hash mismatch, re-downloading..." "WARN"
+                Remove-Item $filePath -Force
             }
         }
+        
+        # Download if needed
+        if (-not (Test-Path $filePath)) {
+            Write-Log "Downloading $($update.KB) from Microsoft Update Catalog..."
+            Download-WithProgress -Url $update.Url -OutputPath $filePath
+            
+            Write-Log "Verifying download integrity..."
+            $hash = Get-FileHash256 -FilePath $filePath
+            
+            if ($hash -ne $update.SHA256) {
+                throw "Hash verification failed for $($update.KB). Expected: $($update.SHA256), Got: $hash"
+            }
+            Write-Log "Download verified successfully"
+        }
+        
+        # Install update
+        $installed = Install-MSU -MsuPath $filePath -KB $update.KB
+        if ($installed) { $rebootRequired = $true }
     }
     
-    Write-Log "Process completed"
+    Write-Log ""
+    Write-Log "============================================"
+    Write-Log "All updates processed successfully"
+    
+    if ($rebootRequired) {
+        Write-Log "SYSTEM REBOOT REQUIRED" "WARN"
+        $reboot = Read-Host "Reboot now? (Y/N)"
+        if ($reboot -eq 'Y') {
+            Write-Log "Initiating restart in 30 seconds..."
+            shutdown /r /t 30 /c "Restarting to complete Windows updates"
+        } else {
+            Write-Log "Please restart your computer to complete the installation"
+        }
+    }
     
 } catch {
     Write-Log "ERROR: $($_.Exception.Message)" "ERROR"
+    Write-Log "Stack Trace: $($_.ScriptStackTrace)" "ERROR"
     exit 1
 }
