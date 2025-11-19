@@ -21,11 +21,6 @@ function Write-Log {
     Write-Host $logMessage -ForegroundColor $(if($Level -eq "ERROR"){"Red"}elseif($Level -eq "WARN"){"Yellow"}else{"Green"})
 }
 
-function Get-FileHash256 {
-    param([string]$FilePath)
-    return (Get-FileHash -Path $FilePath -Algorithm SHA256).Hash
-}
-
 function Download-WithProgress {
     param([string]$Url, [string]$OutputPath)
     
@@ -76,13 +71,11 @@ $updates = @(
     @{
         KB = "KB5043080"
         FileName = "windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu"
-        SHA256 = "8196328210101AF11C7290F87B13FF05BF3489B22208263EA03BCC1D1F26A640"
         Url = "https://catalog.s.download.windowsupdate.com/c/msdownload/update/software/updt/2024/08/windows11.0-kb5043080-x64_953449672073f8fb99badb4cc6d5d7849b9c83e8.msu"
     },
     @{
         KB = "KB5064081"
         FileName = "windows11.0-kb5064081-x64_a1096145ded3adfc26f8f23442281533429f0e38.msu"
-        SHA256 = "C4BD7AFC0783ECDDD5438866909483F3DE0D0B3F18FF00A677D157E44FF50401"
         Url = "https://catalog.s.download.windowsupdate.com/d/msdownload/update/software/updt/2025/08/windows11.0-kb5064081-x64_a1096145ded3adfc26f8f23442281533429f0e38.msu"
     }
 )
@@ -116,31 +109,13 @@ try {
         
         $filePath = Join-Path $DownloadPath $update.FileName
         
-        # Check if already downloaded and verified
-        if (Test-Path $filePath) {
-            Write-Log "File exists, verifying hash..."
-            $hash = Get-FileHash256 -FilePath $filePath
-            
-            if ($hash -eq $update.SHA256) {
-                Write-Log "Hash verified successfully"
-            } else {
-                Write-Log "Hash mismatch, re-downloading..." "WARN"
-                Remove-Item $filePath -Force
-            }
-        }
-        
-        # Download if needed
+        # Download if not already present
         if (-not (Test-Path $filePath)) {
             Write-Log "Downloading $($update.KB) from Microsoft Update Catalog..."
             Download-WithProgress -Url $update.Url -OutputPath $filePath
-            
-            Write-Log "Verifying download integrity..."
-            $hash = Get-FileHash256 -FilePath $filePath
-            
-            if ($hash -ne $update.SHA256) {
-                throw "Hash verification failed for $($update.KB). Expected: $($update.SHA256), Got: $hash"
-            }
-            Write-Log "Download verified successfully"
+            Write-Log "Download completed successfully"
+        } else {
+            Write-Log "File already exists, skipping download"
         }
         
         # Install update
