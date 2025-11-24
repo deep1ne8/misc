@@ -525,7 +525,8 @@ switch ($Mode) {
         if ($Report.RecentPDFs) {
             Write-DiagLog "Recently accessed PDFs (last 24h):" -Level SUCCESS
             $Report.RecentPDFs | Select-Object -First 10 | ForEach-Object {
-                Write-DiagLog "  $($_.FullName) [$($_.['Size(MB)']) MB]" -Level SUCCESS
+                $SizeMB = $_.'Size(MB)'
+                Write-DiagLog "  $($_.FullName) [$SizeMB MB]" -Level SUCCESS
             }
             
             # Flag large PDFs
@@ -533,7 +534,8 @@ switch ($Mode) {
             if ($LargePDFs) {
                 Write-DiagLog "LARGE PDF FILES (can cause performance issues):" -Level WARNING
                 $LargePDFs | ForEach-Object {
-                    Write-DiagLog "  $($_.FullName) [$($_.['Size(MB)']) MB]" -Level WARNING
+                    $SizeMB = $_.'Size(MB)'
+                    Write-DiagLog "  $($_.FullName) [$SizeMB MB]" -Level WARNING
                 }
             }
         }
@@ -572,7 +574,8 @@ if ($Report.DeepAnalysis) {
         
         $LargePDF = $Report.RecentPDFs | Where-Object { $_.'Size(MB)' -gt 100 } | Select-Object -First 1
         if ($LargePDF) {
-            $Report.RootCauseAnalysis += "POSSIBLE CAUSE: Large PDF file being processed ($($LargePDF.'Size(MB)') MB)"
+            $PDFSize = $LargePDF.'Size(MB)'
+            $Report.RootCauseAnalysis += "POSSIBLE CAUSE: Large PDF file being processed ($PDFSize MB)"
         }
     }
 }
