@@ -328,7 +328,7 @@ function Invoke-DeepAnalysis {
             Name = $Process.ProcessName
             PID = $Process.Id
             Responding = $Process.Responding
-            CPUPercent = [math]::Round((Get-Counter "\Process($($Process.ProcessName))\% Processor Time" -ErrorAction SilentlyContinue).CounterSamples.CookedValue, 2)
+            CPUPercent = [math]::Round((Get-Counter "\\Process($($Process.ProcessName))\\% Processor Time" -ErrorAction SilentlyContinue).CounterSamples.CookedValue, 2)
             MemoryMB = [math]::Round($Process.WorkingSet64/1MB, 2)
             Threads = $Process.Threads.Count
             Handles = $Process.HandleCount
