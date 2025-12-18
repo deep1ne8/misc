@@ -36,6 +36,8 @@
     (Force 24H2 Pro download)
 #>
 
+Function Windows11-DISM-Repair {
+
 [CmdletBinding()]
 param(
     [string]$DestinationDirectory = "C:\WindowsSetup",
@@ -227,7 +229,6 @@ function Repair-Windows {
     }
 }
 
-Function Windows11-DISM-Repair {
 
 # --- Main Execution ---
 Write-Host "Detecting system information..." -ForegroundColor Cyan
@@ -368,4 +369,4 @@ Write-Host "Recommended: Restart your computer to apply all changes.`n" -Foregro
 
 }
 
-Windows11-DISM-Repair
+Windows11-DISM-Repair -Release "25H2" -Arch "x64"
