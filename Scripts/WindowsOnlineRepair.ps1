@@ -36,7 +36,7 @@
     (Force 24H2 Pro download)
 #>
 
-Function Windows11-DISM-Repair {
+Function Win11-DISM-Repair {
 
 [CmdletBinding()]
 param(
@@ -369,4 +369,4 @@ Write-Host "Recommended: Restart your computer to apply all changes.`n" -Foregro
 
 }
 
-Windows11-DISM-Repair -Release "25H2" -Arch "x64" -Edition "Pro"
+Win11-DISM-Repair -Release "25H2" -Arch "x64" -Edition "Pro"
