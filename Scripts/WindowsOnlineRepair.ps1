@@ -1,72 +1,75 @@
 <#
 .SYNOPSIS
-    Download a Windows 10 or 11 ISO via Fido, mount it, run DISM repair, then unmount.
+    Download Windows 11 ISO via Fido, mount it, run DISM repair, then unmount.
+    Updated for Windows 11 25H2 and latest builds (December 2024).
 
 .DESCRIPTION
     - Auto-detects current Windows version and downloads matching ISO
+    - Supports Windows 11 21H2, 22H2, 23H2, 24H2, and 25H2
     - Downloads Fido.ps1 and invokes it to grab the correct ISO
-    - Mounts the ISO, runs DISM /RestoreHealth against install.wim/.esd, then unmounts
+    - Mounts ISO, runs DISM /RestoreHealth, then unmounts
 
 .PARAMETER DestinationDirectory
     Where to store Fido.ps1 and the downloaded ISO. Default: C:\WindowsSetup
 
 .PARAMETER TargetWin
-    "10" or "11". Auto-detected if omitted based on current OS
+    Always "11" for Windows 11. Auto-detected if omitted.
 
 .PARAMETER Release
-    Release build. Auto-detected if omitted (24H2 for Win11, 22H2 for Win10)
+    Release build (22H2, 23H2, 24H2, 25H2). Auto-detected if omitted.
 
 .PARAMETER Edition
     Edition (Pro, Home, etc.). Default: Pro
 
 .PARAMETER Arch
-    Architecture (x64, x86, arm64). Auto-detected if omitted
+    Architecture (x64, arm64). Auto-detected if omitted.
 
 .PARAMETER Language
     Language code. Default: Eng
+
+.EXAMPLE
+    .\Win11-DISM-Repair.ps1
+    (Auto-detects everything)
+
+.EXAMPLE
+    .\Win11-DISM-Repair.ps1 -Release 24H2 -Edition Pro
+    (Force 24H2 Pro download)
 #>
+
 [CmdletBinding()]
 param(
-    [string] $DestinationDirectory = "C:\WindowsSetup",
-    [ValidateSet("10","11")] [string] $TargetWin,
-    [string] $Release,
-    [string] $Edition = "Pro",
-    [ValidateSet("x64","x86","arm64")] [string] $Arch,
-    [string] $Language = "Eng"
+    [string]$DestinationDirectory = "C:\WindowsSetup",
+    [ValidateSet("11")][string]$TargetWin = "11",
+    [ValidateSet("21H2","22H2","23H2","24H2","25H2")][string]$Release,
+    [string]$Edition = "Pro",
+    [ValidateSet("x64","arm64")][string]$Arch,
+    [string]$Language = "Eng"
 )
 
-# Check for administrator privileges
-if (-not ([Security.Principal.WindowsPrincipal] `
-           [Security.Principal.WindowsIdentity]::GetCurrent() `
-         ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Write-Error "This script requires administrator privileges. Please run as Administrator."
-    exit 1
-}
+#Requires -RunAsAdministrator
 
-Write-Host "`n=== Configuring System for Secure TLS 1.2 Connections ===`n" -ForegroundColor Cyan
+Write-Host "`n=== Windows 11 DISM Repair Tool ===`n" -ForegroundColor Cyan
+Write-Host "Updated for Windows 11 25H2 (December 2024)`n" -ForegroundColor Green
 
-# --- Permanent TLS 1.2 Fix ---
-# Apply at runtime:
+# --- TLS 1.2 Configuration ---
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Write-Host "✔ TLS 1.2 enforced for this session." -ForegroundColor Green
+Write-Host "✓ TLS 1.2 enabled for secure connections" -ForegroundColor Green
 
-# Apply permanent fix in registry (for future .NET and PowerShell sessions):
 $regPaths = @(
     "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319",
     "HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319"
 )
 foreach ($path in $regPaths) {
     if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
-    New-ItemProperty -Path $path -Name "SchUseStrongCrypto" -Value 1 -PropertyType DWord -Force | Out-Null
+    Set-ItemProperty -Path $path -Name "SchUseStrongCrypto" -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
 }
-Write-Host "✔ Registry updated to permanently enable strong crypto/TLS 1.2." -ForegroundColor Green
+Write-Host "✓ Strong crypto/TLS 1.2 configured in registry`n" -ForegroundColor Green
 
-
-# Helper function to get system information
+# --- Helper Functions ---
 function Get-SystemInfo {
     try {
-        $os = Get-CimInstance Win32_OperatingSystem
-        $cs = Get-CimInstance Win32_ComputerSystem
+        $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+        $cs = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
         
         return @{
             Caption = $os.Caption
@@ -81,92 +84,80 @@ function Get-SystemInfo {
     }
 }
 
-# Helper function to get disk space information
 function Get-DiskSpace {
-    param([string] $Drive = 'C')
+    param([string]$Drive = 'C')
     try {
         $driveInfo = Get-PSDrive -Name $Drive -ErrorAction Stop
         return @{
-            Root = $driveInfo.Root
-            UsedGB = [math]::Round($driveInfo.Used/1GB, 2)
             FreeGB = [math]::Round($driveInfo.Free/1GB, 2)
             TotalGB = [math]::Round(($driveInfo.Used + $driveInfo.Free)/1GB, 2)
         }
     }
     catch {
-        Write-Warning "Could not retrieve disk space information for drive $Drive"
+        Write-Warning "Could not retrieve disk space for drive $Drive"
         return $null
     }
 }
 
-# Function to download Windows ISO using Fido
 function Download-WindowsISO {
     param(
-        [Parameter(Mandatory)][string] $DestinationDirectory = "C:\WindowsSetup",
-        [Parameter(Mandatory)][ValidateSet("10","11")][string] $Win,
-        [Parameter(Mandatory)][string] $Rel,
-        [Parameter(Mandatory)][string] $Ed,
-        [Parameter(Mandatory)][ValidateSet("x64","x86","arm64")][string] $Arch,
-        [Parameter(Mandatory)][string] $Lang
+        [string]$DestinationDirectory,
+        [string]$Win,
+        [string]$Rel,
+        [string]$Ed,
+        [string]$Arch,
+        [string]$Lang
     )
 
-    # Ensure destination directory exists
     if (-not (Test-Path $DestinationDirectory)) {
-        try {
-            New-Item $DestinationDirectory -ItemType Directory -Force | Out-Null
-            Write-Host "Created directory: $DestinationDirectory"
-        }
-        catch {
-            throw "Failed to create directory ${DestinationDirectory}: $_"
-        }
+        New-Item $DestinationDirectory -ItemType Directory -Force | Out-Null
+        Write-Host "✓ Created directory: $DestinationDirectory" -ForegroundColor Green
     }
 
-    # Download Fido script
     $fidoScript = Join-Path $DestinationDirectory 'Fido.ps1'
-    Write-Host "Downloading Fido.ps1..."
-    
+    $isoName = "Win${Win}_${Rel}_${Lang}_${Arch}.iso"
+    $isoPath = Join-Path $DestinationDirectory $isoName
+
+    # Check existing ISO
+    if (Test-Path $isoPath) {
+        $fileSize = (Get-Item $isoPath).Length / 1GB
+        Write-Host "Found existing ISO: $isoName ($('{0:N2}' -f $fileSize) GB)" -ForegroundColor Yellow
+        
+        $response = Read-Host "Use existing ISO? (Y/N)"
+        if ($response -match '^[Yy]') {
+            return $isoPath
+        }
+        Remove-Item $isoPath -Force
+    }
+
+    # Download Fido
+    Write-Host "Downloading Fido.ps1..." -ForegroundColor Cyan
     try {
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Invoke-WebRequest `
-            -Uri 'https://raw.githubusercontent.com/pbatard/Fido/master/Fido.ps1' `
+        Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/pbatard/Fido/master/Fido.ps1' `
             -OutFile $fidoScript -UseBasicParsing -ErrorAction Stop
-        Write-Host "Successfully downloaded Fido.ps1"
+        Write-Host "✓ Fido.ps1 downloaded" -ForegroundColor Green
     }
     catch {
         throw "Failed to download Fido.ps1: $_"
     }
 
-    # Build ISO name and path
-    $isoName = "Win${Win}_${Rel}_${Lang}_${Arch}.iso"
-    $isoPath = Join-Path $DestinationDirectory $isoName
-
-    # Check if ISO already exists
-    if (Test-Path $isoPath) {
-        $fileSize = (Get-Item $isoPath).Length / 1GB
-        Write-Host "Found existing ISO: $isoName ($('{0:N2}' -f $fileSize) GB)"
-        
-        $response = Read-Host "Do you want to use the existing ISO? (Y/N)"
-        if ($response -match '^[Yy]') {
-            return $isoPath
-        }
-        else {
-            Remove-Item $isoPath -Force
-        }
-    }
-
-    # Execute Fido to download ISO
-    Write-Host "Downloading Windows $Win $Rel ISO (this may take a while)..."
+    # Download ISO
+    Write-Host "`nDownloading Windows $Win $Rel ISO..." -ForegroundColor Cyan
+    Write-Host "This may take 15-30 minutes depending on connection speed..." -ForegroundColor Yellow
+    
     try {
-        & $fidoScript `
-            -Win $Win `
-            -Rel $Rel `
-            -Ed $Ed `
-            -Lang $Lang `
-            -Arch $Arch `
-            -OutFile $isoPath `
-            -ErrorAction Stop
+        $fidoParams = @{
+            Win = $Win
+            Rel = $Rel
+            Ed = $Ed
+            Lang = $Lang
+            Arch = $Arch
+            GetUrl = $false
+        }
+        
+        & $fidoScript @fidoParams -OutFile $isoPath -ErrorAction Stop
 
-        if ($LASTEXITCODE -ne 0) {
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $null) {
             throw "Fido exited with code $LASTEXITCODE"
         }
     }
@@ -179,13 +170,12 @@ function Download-WindowsISO {
     }
     
     $fileSize = (Get-Item $isoPath).Length / 1GB
-    Write-Host "ISO successfully downloaded: $isoName ($('{0:N2}' -f $fileSize) GB)"
+    Write-Host "✓ ISO downloaded: $isoName ($('{0:N2}' -f $fileSize) GB)" -ForegroundColor Green
     return $isoPath
 }
 
-# Function to perform DISM repair using mounted ISO
 function Repair-Windows {
-    param([Parameter(Mandatory)][string] $MountPath)
+    param([string]$MountPath)
 
     $dismExe = Join-Path $env:SystemRoot 'System32\Dism.exe'
     $sourcesPath = Join-Path $MountPath 'sources'
@@ -194,150 +184,157 @@ function Repair-Windows {
         throw "Sources directory not found at $sourcesPath"
     }
 
+    # Find source file
     $wim = Join-Path $sourcesPath 'install.wim'
     $esd = Join-Path $sourcesPath 'install.esd'
 
-    # Determine source file
     if (Test-Path $wim) {
         $sourceArg = $wim
-        Write-Host "Using install.wim as repair source"
+        Write-Host "Using install.wim as repair source" -ForegroundColor Green
     }
     elseif (Test-Path $esd) {
         $sourceArg = "esd:$esd:1"
-        Write-Host "Using install.esd as repair source"
+        Write-Host "Using install.esd as repair source" -ForegroundColor Green
     }
     else {
         throw "No install.wim or install.esd found in $sourcesPath"
     }
 
     # Run DISM repair
-    Write-Host "Running DISM /RestoreHealth with source: $sourceArg"
-    Write-Host "This operation may take 15-30 minutes depending on system condition..."
+    Write-Host "`nRunning DISM /RestoreHealth..." -ForegroundColor Cyan
+    Write-Host "This may take 15-30 minutes. Please wait..." -ForegroundColor Yellow
     
     try {
-        $process = Start-Process -FilePath $dismExe -ArgumentList @(
-            '/Online',
-            '/Cleanup-Image',
-            '/RestoreHealth',
-            "/Source:$sourceArg",
+        $arguments = @(
+            '/Online'
+            '/Cleanup-Image'
+            '/RestoreHealth'
+            "/Source:$sourceArg"
             '/LimitAccess'
-        ) -Wait -PassThru -NoNewWindow
+        )
+        
+        $process = Start-Process -FilePath $dismExe -ArgumentList $arguments `
+            -Wait -PassThru -NoNewWindow
         
         if ($process.ExitCode -ne 0) {
-            throw "DISM command failed with exit code: $($process.ExitCode)"
+            throw "DISM failed with exit code: $($process.ExitCode)"
         }
         
-        Write-Host "DISM repair completed successfully"
+        Write-Host "✓ DISM repair completed successfully" -ForegroundColor Green
     }
     catch {
         throw "DISM repair failed: $_"
     }
 }
 
-# Main execution starts here
-Write-Host "Windows ISO Download and DISM Repair Script"
-Write-Host "===========================================" 
+Function Windows11-DISM-Repair {
 
-# Get system information
-Write-Host "Detecting system information..."
+# --- Main Execution ---
+Write-Host "Detecting system information..." -ForegroundColor Cyan
 $sysInfo = Get-SystemInfo
 
-Write-Host "System Information:"
+Write-Host "`nSystem Information:" -ForegroundColor White
 Write-Host "  OS: $($sysInfo.Caption)"
 Write-Host "  Version: $($sysInfo.Version)"
 Write-Host "  Build: $($sysInfo.BuildNumber)"
 Write-Host "  Architecture: $($sysInfo.OSArchitecture)"
 
-# Auto-detect target Windows version
-if (-not $TargetWin) {
-    if ($sysInfo.Caption -match 'Windows\s+11') {
-        $TargetWin = '11'
-    }
-    elseif ($sysInfo.Caption -match 'Windows\s+10') {
-        $TargetWin = '10'
-    }
-    else {
-        throw "Unsupported Windows version detected: $($sysInfo.Caption)"
-    }
-    Write-Host "Target OS: Windows $TargetWin (auto-detected)"
+# Validate Windows 11
+if ($sysInfo.Caption -notmatch 'Windows\s+11') {
+    throw "This script only supports Windows 11. Detected: $($sysInfo.Caption)"
 }
 
-# Auto-detect release version
+# Auto-detect release version based on build number
 if (-not $Release) {
-    switch ($TargetWin) {
-        '11' { $Release = '24H2' }
-        '10' { $Release = '22H2' }
+    $buildMap = @{
+        26200 = '25H2'  # Windows 11 25H2
+        26100 = '24H2'  # Windows 11 24H2
+        22631 = '23H2'  # Windows 11 23H2
+        22621 = '22H2'  # Windows 11 22H2
+        22000 = '21H2'  # Windows 11 21H2
     }
-    Write-Host "Target Release: $Release (auto-detected)"
+    
+    # Match closest build
+    $detectedRelease = $null
+    foreach ($build in $buildMap.Keys | Sort-Object -Descending) {
+        if ($sysInfo.BuildNumber -ge $build) {
+            $detectedRelease = $buildMap[$build]
+            break
+        }
+    }
+    
+    if ($detectedRelease) {
+        $Release = $detectedRelease
+        Write-Host "  Target Release: $Release (auto-detected)" -ForegroundColor Green
+    }
+    else {
+        # Default to latest if unknown
+        $Release = '25H2'
+        Write-Host "  Target Release: $Release (defaulting to latest)" -ForegroundColor Yellow
+    }
+}
+else {
+    Write-Host "  Target Release: $Release (user-specified)" -ForegroundColor Green
 }
 
 # Auto-detect architecture
 if (-not $Arch) {
-    switch -Regex ($sysInfo.OSArchitecture) {
-        'x64|AMD64' { $Arch = 'x64' }
-        'x86|32-bit' { $Arch = 'x86' }
-        'ARM64' { $Arch = 'arm64' }
-        default { $Arch = 'x64' }
-    }
-    Write-Host "Target Architecture: $Arch (auto-detected)"
+    $Arch = if ($sysInfo.OSArchitecture -match 'ARM64') { 'arm64' } else { 'x64' }
+    Write-Host "  Target Architecture: $Arch (auto-detected)" -ForegroundColor Green
 }
 
-# Display disk space information
-Write-Host "Checking disk space..."
+# Check disk space
+Write-Host "`nChecking disk space..." -ForegroundColor Cyan
 $diskInfo = Get-DiskSpace -Drive 'C'
 if ($diskInfo) {
-    Write-Host "  Drive C: - Total: $($diskInfo.TotalGB) GB, Used: $($diskInfo.UsedGB) GB, Free: $($diskInfo.FreeGB) GB"
+    Write-Host "  Drive C: - Free: $($diskInfo.FreeGB) GB / Total: $($diskInfo.TotalGB) GB"
     
     if ($diskInfo.FreeGB -lt 8) {
-        Write-Warning "Low disk space detected. At least 8GB free space is recommended for ISO download."
+        Write-Warning "Low disk space! At least 8GB free recommended."
+        $continue = Read-Host "Continue anyway? (Y/N)"
+        if ($continue -notmatch '^[Yy]') {
+            Write-Host "Operation cancelled by user." -ForegroundColor Yellow
+            exit 0
+        }
     }
 }
 
-# Build information mapping
+# Build mapping for version comparison
 $buildTargets = @{
-    '10' = @{
-        '22H2' = 19045
-        '21H2' = 19044
-    }
-    '11' = @{
-        '24H2' = 26100
-        '23H2' = 22631
-        '22H2' = 22621
-    }
+    '25H2' = 26200
+    '24H2' = 26100
+    '23H2' = 22631
+    '22H2' = 22621
+    '21H2' = 22000
 }
 
-$targetBuild = $buildTargets[$TargetWin][$Release]
-if (-not $targetBuild) {
-    Write-Warning "Unknown build target for Windows $TargetWin $Release, proceeding with download..."
-    $shouldDownload = $true
-}
-else {
-    Write-Host "Current build: $($sysInfo.BuildNumber), Target build: $targetBuild"
-    $shouldDownload = $sysInfo.BuildNumber -lt $targetBuild
+$targetBuild = $buildTargets[$Release]
+if ($targetBuild) {
+    Write-Host "`nCurrent build: $($sysInfo.BuildNumber) | Target build: $targetBuild"
+    
+    if ($sysInfo.BuildNumber -ge $targetBuild) {
+        Write-Host "Note: Your system is already at or above the target version." -ForegroundColor Yellow
+    }
 }
 
 # Download ISO
+Write-Host "`nPreparing to download Windows 11 $Release ISO..." -ForegroundColor Cyan
 try {
-    $isoPath = Download-WindowsISO `
-        -DestinationDirectory $DestinationDirectory `
-        -Win $TargetWin `
-        -Rel $Release `
-        -Ed $Edition `
-        -Arch $Arch `
-        -Lang $Language
+    $isoPath = Download-WindowsISO -DestinationDirectory $DestinationDirectory `
+        -Win $TargetWin -Rel $Release -Ed $Edition -Arch $Arch -Lang $Language
 }
 catch {
     Write-Error "Failed to download ISO: $_"
     exit 1
 }
 
-# Mount the ISO
-Write-Host "Mounting ISO: $isoPath"
+# Mount ISO
+Write-Host "`nMounting ISO: $isoPath" -ForegroundColor Cyan
 try {
     $mount = Mount-DiskImage -ImagePath $isoPath -PassThru -ErrorAction Stop
     $vol = Get-Volume -DiskImage $mount -ErrorAction Stop
     $drive = $vol.DriveLetter + ':\'
-    Write-Host "ISO mounted successfully at: $drive"
+    Write-Host "✓ ISO mounted at: $drive" -ForegroundColor Green
 }
 catch {
     Write-Error "Failed to mount ISO: $_"
@@ -350,25 +347,25 @@ try {
 }
 catch {
     Write-Error "DISM repair failed: $_"
-    # Ensure cleanup even if repair fails
-    try {
-        Dismount-DiskImage -ImagePath $isoPath -ErrorAction SilentlyContinue
-    }
-    catch {
-        Write-Warning "Failed to unmount ISO during cleanup"
-    }
+    Dismount-DiskImage -ImagePath $isoPath -ErrorAction SilentlyContinue
     exit 1
 }
-
-# Clean up - unmount the ISO
-Write-Host "Unmounting ISO..."
-try {
-    Dismount-DiskImage -ImagePath $isoPath -ErrorAction SilentlyContinue
-    Write-Host "ISO unmounted successfully"
+finally {
+    # Cleanup
+    Write-Host "`nUnmounting ISO..." -ForegroundColor Cyan
+    try {
+        Dismount-DiskImage -ImagePath $isoPath -ErrorAction Stop
+        Write-Host "✓ ISO unmounted" -ForegroundColor Green
+    }
+    catch {
+        Write-Warning "Failed to unmount ISO: $_"
+    }
 }
-catch {
-    Write-Warning "Failed to unmount ISO: $_"
+
+Write-Host "`n=== Script Completed Successfully ===`n" -ForegroundColor Green
+Write-Host "System repair using Windows 11 $Release has been completed." -ForegroundColor White
+Write-Host "Recommended: Restart your computer to apply all changes.`n" -ForegroundColor Yellow
+
 }
 
-Write-Host "Script completed successfully!"
-Write-Host "System repair using Windows $TargetWin $Release has been completed."
+Windows11-DISM-Repair
