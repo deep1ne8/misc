@@ -1,0 +1,14 @@
+<Configuration>
+    <Add OfficeClientEdition="64" Channel="Monthly">
+        <Product ID="O365ProPlusRetail">
+            <Language ID="en-us" />
+            <ExcludeApp ID="Groove" />
+        </Product>
+    </Add>
+    <Display Level="None" AcceptEULA="TRUE" />
+    <Property Name="AUTOACTIVATE" Value="1" />
+    <Property Name="FORCEAPPSHUTDOWN" Value="TRUE" />
+    <Property Name="SharedComputerLicensing" Value="0" />
+    <Property Name="PinIconsToTaskbar" Value="TRUE" />
+    <Updates Enabled="TRUE" />
+</Configuration>
