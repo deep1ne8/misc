@@ -1,0 +1,7 @@
+{
+    "terminal.explorerKind": "both",
+    "githubPullRequests.ignoredPullRequestBranches": [
+        "main"
+    ],
+    "CodeGPT.apiKey": "CodeGPT Plus Beta"
+}
