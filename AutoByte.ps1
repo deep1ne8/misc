@@ -1,356 +1,127 @@
-#Requires -Version 5.1
-<#
-.SYNOPSIS
-    AutoByte - MSP Automation Toolkit
-.DESCRIPTION
-    Production-grade PowerShell automation for MSP engineers.
-    Covers system health, M365, software deployment, disk, and diagnostics.
-.NOTES
-    Author  : Earl Quinn
-    GitHub  : https://github.com/deep1ne8/misc
-    Version : 2.0.0
-#>
+Write-Host "`n=== Configuring System for Secure TLS 1.2 Connections ===`n" -ForegroundColor Cyan
 
-Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
+# --- Permanent TLS 1.2 Fix ---
+# Apply at runtime:
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Write-Host "✔ TLS 1.2 enforced for this session." -ForegroundColor Green
 
-#region ── Config ──────────────────────────────────────────────────────────────
-$Script:Config = @{
-    LogPath   = "$env:ProgramData\AutoByte\Logs\AutoByte_$(Get-Date -f 'yyyyMMdd').log"
-    TempPath  = "$env:TEMP\AutoByte"
-    Version   = '2.0.0'
+# Apply permanent fix in registry (for future .NET and PowerShell sessions):
+$regPaths = @(
+    "HKLM:\SOFTWARE\Microsoft\.NETFramework\v4.0.30319",
+    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\.NETFramework\v4.0.30319"
+)
+foreach ($path in $regPaths) {
+    if (-not (Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
+    New-ItemProperty -Path $path -Name "SchUseStrongCrypto" -Value 1 -PropertyType DWord -Force | Out-Null
 }
-#endregion
+Write-Host "✔ Registry updated to permanently enable strong crypto/TLS 1.2." -ForegroundColor Green
 
-#region ── Helpers ─────────────────────────────────────────────────────────────
-function Write-Log {
-    param([string]$Message, [ValidateSet('INFO','WARN','ERROR','OK')]$Level = 'INFO')
-    $ts   = Get-Date -f 'yyyy-MM-dd HH:mm:ss'
-    $line = "[$ts] [$Level] $Message"
-    $null = New-Item -ItemType Directory -Force -Path (Split-Path $Script:Config.LogPath)
-    Add-Content -Path $Script:Config.LogPath -Value $line
-    $colour = @{ INFO='Cyan'; WARN='Yellow'; ERROR='Red'; OK='Green' }[$Level]
-    Write-Host $line -ForegroundColor $colour
-}
 
-function Invoke-WithLog {
-    param([string]$Label, [scriptblock]$Action)
-    Write-Log "START: $Label"
-    try   { & $Action; Write-Log "DONE:  $Label" -Level OK }
-    catch { Write-Log "FAIL:  $Label — $_" -Level ERROR }
-}
+$GitHubScripts = @(
 
-function Assert-Admin {
-    if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
-        [Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        throw 'AutoByte must run as Administrator.'
-    }
-}
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/QBDiag.ps1"; Description = "QuickBooks Diagnostics" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/GSuite_WorkSpace_Diag.ps1"; Description = "GWS HealthCheck" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/Get-PrinterSupplies.ps1"; Description = "Get Printer Supplies" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/WindowsOnlineRepair.ps1"; Description = "WindowsOnlineRepair" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/GetWindowsEvents.ps1"; Description = "Get Windows Events" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DellCommandUpdate.ps1"; Description = "Dell Command Update" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InstallWindowsUpdate.ps1"; Description = "ResetandInstallWindowsUpdate" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/WindowsSystemRepair.ps1"; Description = "WindowsSystemRepair" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/ResetandClearWindowsSearchDB.ps1"; Description = "ResetandClearWindowsSearchdb" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/M365_Office32bitRepair.ps1"; Description = "M365_DeployOffice32bit" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/CheckDriveSpace.ps1"; Description = "CheckDriveSpace" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetSpeedTest.ps1"; Description = "InternetSpeedTest" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/InternetLatencyTest.ps1"; Description = "InternetLatencyTest" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/M365_Office64bitRepair.ps1"; Description = "M365_DeployOffice64bit" }
+)
 
-function Show-Banner {
-    Clear-Host
-    Write-Host @'
-
-  ___         _       ___      _       
- / _ \ _  _ | |_  __| _ ) ___| |_  ___
-| (_) | || ||  _|/ _ | _ \/ -_)  _|/ -_)
- \___/ \_,_| \__|\___/___/\___|\__|\___|
-
-  MSP Automation Toolkit  v2.0.0
-  github.com/deep1ne8/misc
-'@ -ForegroundColor Cyan
-}
-
-function Show-Menu {
-    param([string]$Title, [string[]]$Options)
-    Write-Host "`n  ── $Title ──" -ForegroundColor DarkCyan
-    for ($i = 0; $i -lt $Options.Count; $i++) {
-        Write-Host "  [$($i+1)] $($Options[$i])"
-    }
-    Write-Host "  [0] Back / Exit`n"
-    $choice = Read-Host '  Select'
-    return $choice
-}
-#endregion
-
-#region ── 1. System Health ────────────────────────────────────────────────────
-function Get-SystemHealth {
-    Write-Log 'Running system health check'
-
-    $cpu  = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
-    $ram  = Get-CimInstance Win32_OperatingSystem
-    $ramUsed = [math]::Round(($ram.TotalVisibleMemorySize - $ram.FreePhysicalMemory) / 1MB, 2)
-    $ramTotal = [math]::Round($ram.TotalVisibleMemorySize / 1MB, 2)
-    $uptime = (Get-Date) - $ram.LastBootUpTime
-
-    $disks = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Used -and $_.Free } | ForEach-Object {
-        $usedPct = [math]::Round($_.Used / ($_.Used + $_.Free) * 100, 1)
-        [pscustomobject]@{ Drive="$($_.Name):"; UsedPct=$usedPct; FreeGB=[math]::Round($_.Free/1GB,1) }
-    }
-
-    Write-Host "`n  CPU Load   : $cpu%" -ForegroundColor $(if($cpu -gt 80){'Red'}else{'Green'})
-    Write-Host "  RAM Used   : $ramUsed GB / $ramTotal GB"
-    Write-Host "  Uptime     : $([math]::Floor($uptime.TotalDays))d $($uptime.Hours)h $($uptime.Minutes)m"
-    Write-Host "`n  Disk Usage:"
-    $disks | Format-Table -AutoSize | Out-Host
-
-    Write-Log "Health check complete — CPU $cpu%, RAM $ramUsed/$ramTotal GB"
-}
-#endregion
-
-#region ── 2. Windows Update ───────────────────────────────────────────────────
-function Invoke-WindowsUpdate {
-    Invoke-WithLog 'Windows Update scan + install' {
-        if (-not (Get-Module -ListAvailable PSWindowsUpdate)) {
-            Install-Module PSWindowsUpdate -Force -Scope CurrentUser
-        }
-        Import-Module PSWindowsUpdate
-        Get-WindowsUpdate -AcceptAll -Install -AutoReboot:$false | Out-Host
-    }
-}
-#endregion
-
-#region ── 3. Disk Cleanup ─────────────────────────────────────────────────────
-function Invoke-DiskCleanup {
-    Invoke-WithLog 'Disk cleanup' {
-        $targets = @(
-            "$env:TEMP\*",
-            "$env:SystemRoot\Temp\*",
-            "$env:SystemRoot\SoftwareDistribution\Download\*",
-            "$env:LOCALAPPDATA\Microsoft\Windows\INetCache\*"
-        )
-        $freed = 0
-        foreach ($path in $targets) {
-            $size  = (Get-ChildItem $path -Recurse -Force -ErrorAction SilentlyContinue | Measure-Object Length -Sum).Sum
-            Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
-            $freed += $size
-            Write-Log "Cleaned: $path ($([math]::Round($size/1MB,1)) MB)" -Level OK
-        }
-        Write-Host "  Total freed: $([math]::Round($freed/1MB,1)) MB" -ForegroundColor Green
-    }
-}
-#endregion
-
-#region ── 4. Software Deployment ─────────────────────────────────────────────
-function Install-WingetApp {
-    param([string]$AppId, [string]$AppName = $AppId)
-    Invoke-WithLog "Install $AppName via winget" {
-        winget install --id $AppId --silent --accept-source-agreements --accept-package-agreements
-    }
-}
-
-function Invoke-SoftwareMenu {
-    $apps = [ordered]@{
-        '7-Zip'             = '7zip.7zip'
-        'Google Chrome'     = 'Google.Chrome'
-        'Mozilla Firefox'   = 'Mozilla.Firefox'
-        'Notepad++'         = 'Notepad++.Notepad++'
-        'VLC'               = 'VideoLAN.VLC'
-        'VS Code'           = 'Microsoft.VisualStudioCode'
-        'Zoom'              = 'Zoom.Zoom'
-        'Teams (new)'       = 'Microsoft.Teams'
-        'Adobe Reader'      = 'Adobe.Acrobat.Reader.64-bit'
-        'Greenshot'         = 'Greenshot.Greenshot'
-    }
-    $names = $apps.Keys | ForEach-Object { $_ }
-    $sel = Show-Menu 'Software Deployment' $names
-    if ($sel -match '^\d+$' -and [int]$sel -ge 1 -and [int]$sel -le $apps.Count) {
-        $name = $names[[int]$sel - 1]
-        Install-WingetApp -AppId $apps[$name] -AppName $name
-    }
-}
-#endregion
-
-#region ── 5. M365 / Azure AD Diagnostics ─────────────────────────────────────
-function Get-M365Status {
-    Invoke-WithLog 'M365 tenant diagnostics' {
-        $modules = @('MSOnline','AzureAD','ExchangeOnlineManagement','MicrosoftTeams')
-        foreach ($mod in $modules) {
-            $installed = Get-Module -ListAvailable $mod
-            $status    = if ($installed) { '✓ Installed' } else { '✗ Missing' }
-            Write-Host "  $status  $mod" -ForegroundColor $(if($installed){'Green'}else{'Yellow'})
-        }
-
-        Write-Host "`n  Checking Microsoft Online connectivity..."
-        $resp = Invoke-WebRequest -Uri 'https://login.microsoftonline.com' -UseBasicParsing -TimeoutSec 5
-        Write-Host "  login.microsoftonline.com : HTTP $($resp.StatusCode)" -ForegroundColor Green
-    }
-}
-#endregion
-
-#region ── 6. OneDrive Files On-Demand ────────────────────────────────────────
-function Set-OneDriveFilesOnDemand {
-    param([ValidateSet('Enable','Disable')][string]$Action = 'Enable')
-    Invoke-WithLog "OneDrive Files On-Demand: $Action" {
-        $regPath = 'HKCU:\Software\Microsoft\OneDrive'
-        $val     = if ($Action -eq 'Enable') { 1 } else { 0 }
-        Set-ItemProperty -Path $regPath -Name 'FilesOnDemandEnabled' -Value $val -Type DWord
-        Write-Log "FilesOnDemandEnabled set to $val" -Level OK
-    }
-}
-#endregion
-
-#region ── 7. Dell Command Update ─────────────────────────────────────────────
-function Invoke-DellCommandUpdate {
-    Invoke-WithLog 'Dell Command Update' {
-        $dcu = Get-Command 'dcu-cli.exe' -ErrorAction SilentlyContinue
-        if (-not $dcu) { $dcu = 'C:\Program Files\Dell\CommandUpdate\dcu-cli.exe' }
-        if (-not (Test-Path $dcu)) { throw 'Dell Command Update not found.' }
-        & $dcu /applyUpdates -reboot=disable | Out-Host
-    }
-}
-#endregion
-
-#region ── 8. Network Diagnostics ─────────────────────────────────────────────
-function Get-NetworkDiagnostics {
-    Invoke-WithLog 'Network diagnostics' {
-        $targets = @('8.8.8.8','1.1.1.1','login.microsoftonline.com','outlook.office365.com')
-        foreach ($t in $targets) {
-            $ping = Test-Connection $t -Count 2 -ErrorAction SilentlyContinue
-            if ($ping) {
-                $avg = [math]::Round(($ping | Measure-Object ResponseTime -Average).Average)
-                Write-Host "  ✓ $t — ${avg}ms" -ForegroundColor Green
-            } else {
-                Write-Host "  ✗ $t — unreachable" -ForegroundColor Red
-            }
-        }
-        Write-Host "`n  Active adapters:"
-        Get-NetAdapter | Where-Object Status -eq 'Up' |
-            Select-Object Name, InterfaceDescription, LinkSpeed |
-            Format-Table -AutoSize | Out-Host
-    }
-}
-#endregion
-
-#region ── 9. Intune Sync ─────────────────────────────────────────────────────
-function Invoke-IntuneSync {
-    Invoke-WithLog 'Intune policy sync' {
-        $svc = Get-Service -Name 'dmwappushservice' -ErrorAction SilentlyContinue
-        if ($svc) { Start-Service $svc -ErrorAction SilentlyContinue }
-
-        $intuneAgent = "$env:ProgramFiles\Microsoft Intune Management Extension\AgentExecutor.exe"
-        if (Test-Path $intuneAgent) {
-            Start-Process $intuneAgent -ArgumentList '-syncApp' -NoNewWindow -Wait
-            Write-Log 'Intune Management Extension sync triggered' -Level OK
-        }
-
-        # Trigger MDM enrollment sync via scheduled task
-        $task = Get-ScheduledTask -TaskName 'PushLaunch' -ErrorAction SilentlyContinue
-        if ($task) { Start-ScheduledTask -TaskName 'PushLaunch' }
-
-        Write-Host '  Intune sync triggered. Check Intune portal for status.' -ForegroundColor Green
-    }
-}
-#endregion
-
-#region ── 10. Export Report ──────────────────────────────────────────────────
-function Export-SystemReport {
-    Invoke-WithLog 'Generating system report' {
-        $out  = "$env:USERPROFILE\Desktop\AutoByte_Report_$(Get-Date -f 'yyyyMMdd_HHmm').html"
-        $cpu  = (Get-CimInstance Win32_Processor | Measure-Object LoadPercentage -Average).Average
-        $os   = Get-CimInstance Win32_OperatingSystem
-        $cs   = Get-CimInstance Win32_ComputerSystem
-        $bios = Get-CimInstance Win32_BIOS
-        $net  = Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.PrefixOrigin -ne 'WellKnown' }
-        $disks= Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Used }
-
-        $diskRows = $disks | ForEach-Object {
-            $pct = if (($_.Used + $_.Free) -gt 0) { [math]::Round($_.Used/($_.Used+$_.Free)*100) } else { 0 }
-            "<tr><td>$($_.Name):</td><td>$([math]::Round($_.Used/1GB,1)) GB used</td><td>$([math]::Round($_.Free/1GB,1)) GB free</td><td>$pct%</td></tr>"
-        }
-
-        $netRows = $net | ForEach-Object {
-            "<tr><td>$($_.InterfaceAlias)</td><td>$($_.IPAddress)</td><td>/$($_.PrefixLength)</td></tr>"
-        }
-
-        $html = @"
-<!DOCTYPE html><html><head><meta charset='utf-8'>
-<title>AutoByte System Report</title>
-<style>
-  body { font-family: Segoe UI, sans-serif; background: #0f1117; color: #e0e0e0; margin: 0; padding: 2rem; }
-  h1   { color: #00d4ff; border-bottom: 1px solid #333; padding-bottom: .5rem; }
-  h2   { color: #7dd3fc; margin-top: 2rem; }
-  table{ width: 100%; border-collapse: collapse; margin-top: .5rem; }
-  th   { background: #1e2535; padding: 8px 12px; text-align: left; color: #7dd3fc; }
-  td   { padding: 8px 12px; border-bottom: 1px solid #1e2535; }
-  .badge { display:inline-block; padding:2px 10px; border-radius:12px; font-size:12px; }
-  .ok  { background:#064e3b; color:#34d399; }
-  footer{ margin-top:3rem; font-size:12px; color:#555; }
-</style></head><body>
-<h1>⚡ AutoByte System Report</h1>
-<p>Generated: $(Get-Date -f 'yyyy-MM-dd HH:mm:ss') &nbsp;|&nbsp; Host: $($env:COMPUTERNAME) &nbsp;|&nbsp; User: $($env:USERNAME)</p>
-
-<h2>System</h2>
-<table><tr><th>Property</th><th>Value</th></tr>
-<tr><td>Model</td><td>$($cs.Manufacturer) $($cs.Model)</td></tr>
-<tr><td>Serial</td><td>$($bios.SerialNumber)</td></tr>
-<tr><td>OS</td><td>$($os.Caption) $($os.OSArchitecture)</td></tr>
-<tr><td>Build</td><td>$($os.BuildNumber)</td></tr>
-<tr><td>CPU Load</td><td>$cpu%</td></tr>
-<tr><td>RAM</td><td>$([math]::Round($os.TotalVisibleMemorySize/1MB,1)) GB total</td></tr>
-<tr><td>Last Boot</td><td>$($os.LastBootUpTime)</td></tr>
-</table>
-
-<h2>Disk</h2>
-<table><tr><th>Drive</th><th>Used</th><th>Free</th><th>Usage%</th></tr>
-$($diskRows -join "`n")
-</table>
-
-<h2>Network Adapters</h2>
-<table><tr><th>Adapter</th><th>IP</th><th>Prefix</th></tr>
-$($netRows -join "`n")
-</table>
-
-<footer>AutoByte v$($Script:Config.Version) — github.com/deep1ne8/misc</footer>
-</body></html>
-"@
-        $html | Set-Content -Path $out -Encoding UTF8
-        Write-Host "  Report saved: $out" -ForegroundColor Cyan
-        Start-Process $out
-    }
-}
-#endregion
-
-#region ── Main Menu ──────────────────────────────────────────────────────────
-function Start-AutoByte {
-    Assert-Admin
-    Show-Banner
-
-    $menuItems = @(
-        'System Health Check'
-        'Windows Update'
-        'Disk Cleanup'
-        'Software Deployment (Winget)'
-        'M365 Module Status'
-        'OneDrive Files On-Demand'
-        'Dell Command Update'
-        'Network Diagnostics'
-        'Intune Policy Sync'
-        'Export HTML System Report'
+function InitiateScriptFromUrl {
+    param (
+        [string]$Url
     )
-
-    do {
-        $sel = Show-Menu 'Main Menu' $menuItems
-        switch ($sel) {
-            '1'  { Get-SystemHealth }
-            '2'  { Invoke-WindowsUpdate }
-            '3'  { Invoke-DiskCleanup }
-            '4'  { Invoke-SoftwareMenu }
-            '5'  { Get-M365Status }
-            '6'  {
-                $a = Read-Host '  [1] Enable  [2] Disable'
-                Set-OneDriveFilesOnDemand -Action $(if($a -eq '2'){'Disable'}else{'Enable'})
-            }
-            '7'  { Invoke-DellCommandUpdate }
-            '8'  { Get-NetworkDiagnostics }
-            '9'  { Invoke-IntuneSync }
-            '10' { Export-SystemReport }
-            '0'  { Write-Host "`n  Goodbye.`n" -ForegroundColor DarkGray; return }
-            default { Write-Host '  Invalid option.' -ForegroundColor Yellow }
-        }
-        Write-Host "`n  Press any key to continue..."
-        $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')
-    } while ($true)
+    try {
+        $scriptContent = Invoke-WebRequest -Uri $Url -UseBasicParsing | Select-Object -ExpandProperty Content
+        Invoke-Expression $scriptContent
+    }
+    catch {
+        Write-Host "Failed to download or run script from URL: $Url" -ForegroundColor Red
+    }
 }
 
-Start-AutoByte
+function Show-AutoByteMenu {
+Clear-Host
+Clear-Host
+$separator = "================================================================"
+
+Write-Host "`n"
+Write-Host $separator -ForegroundColor Cyan
+Write-Host "                        AutoByte Menu                           " -BackgroundColor Blue -ForegroundColor White
+Write-Host $separator -ForegroundColor Cyan
+Write-Host "`n"
+Write-Host "   ______           __           ____             __" -ForegroundColor Cyan
+Write-Host "  /\  _  \         /\ \__       /\  _ \          /\ \__" -ForegroundColor White
+Write-Host "  \ \ \L\ \  __  __\ \  _\   __ \ \ \_\ \      __\ \  _\   __" -ForegroundColor Red
+Write-Host "   \ \  __ \/\ \/\ \\ \ \/  / __ \ \  _ < /\ \/\ \\ \ \/  / __ \" -ForegroundColor Red
+Write-Host "    \ \ \/\ \ \ \_\ \\ \ \_/\ \L\ \ \ \L\ \ \ \_\ \\ \ \_/\  __/" -ForegroundColor White
+Write-Host "     \ \_\ \_\ \____/ \ \__\ \____/\ \____/\/ ____ \\ \__\ \____\" -ForegroundColor Cyan
+Write-Host "      \/_/\/_/\/___/   \/__/\/___/  \/___/   /___/> \\/__/\/____/" -ForegroundColor Cyan
+Write-Host "                                               /\___/" -ForegroundColor White
+Write-Host "                                               \/__/" -ForegroundColor Red
+Write-Host "`n"
+Write-Host "Choose a script to run from the following options:" -BackgroundColor Blue -ForegroundColor White
+Write-Host $separator -ForegroundColor Cyan
+Write-Host ""
+
+
+    $index = 1
+    foreach ($script in $GitHubScripts) {
+        Write-Host "$index. $($script.Description)" -ForegroundColor Green
+        $index++
+    }
+    Write-Host "14. Exit" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "================================================================" -ForegroundColor Cyan
+
+    $choice = Read-Host "Enter your choice (1-14)"  
+    switch ($choice) {
+        "1" { InitiateScriptFromUrl $GitHubScripts[0].ScriptUrl; Show-ReturnMenu }
+        "2" { InitiateScriptFromUrl $GitHubScripts[1].ScriptUrl; Show-ReturnMenu }
+        "3" { InitiateScriptFromUrl $GitHubScripts[2].ScriptUrl; Show-ReturnMenu }
+        "4" { InitiateScriptFromUrl $GitHubScripts[3].ScriptUrl; Show-ReturnMenu }
+        "5" { InitiateScriptFromUrl $GitHubScripts[4].ScriptUrl; Show-ReturnMenu }
+        "6" { InitiateScriptFromUrl $GitHubScripts[5].ScriptUrl; Show-ReturnMenu }
+        "7" { InitiateScriptFromUrl $GitHubScripts[6].ScriptUrl; Show-ReturnMenu }
+        "8" { InitiateScriptFromUrl $GitHubScripts[7].ScriptUrl; Show-ReturnMenu }
+        "9" { InitiateScriptFromUrl $GitHubScripts[8].ScriptUrl; Show-ReturnMenu }
+        "10" { InitiateScriptFromUrl $GitHubScripts[9].ScriptUrl; Show-ReturnMenu }
+        "11" { InitiateScriptFromUrl $GitHubScripts[10].ScriptUrl; Show-ReturnMenu }
+        "12" { InitiateScriptFromUrl $GitHubScripts[11].ScriptUrl; Show-ReturnMenu }
+        "13" { InitiateScriptFromUrl $GitHubScripts[12].ScriptUrl; Show-ReturnMenu }
+        "14" {
+            Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
+            return
+        }
+        default {
+            Write-Host "Invalid choice, please try again." -ForegroundColor Red
+            Show-AutoByteMenu
+        }
+    }
+}
+
+function Show-ReturnMenu {
+    $returnChoice = Read-Host "`nReturn to the menu or exit? (Enter [1] for 'Yes' or [2] for 'exit')"
+    switch ($returnChoice.ToLower()) {
+        "1" { Show-AutoByteMenu }
+        "2" {
+            Write-Host "Exiting. Goodbye!" -ForegroundColor Yellow
+            return
+        }
+        default {
+            Write-Host "Invalid choice, please try again." -ForegroundColor Red
+            Show-ReturnMenu
+        }
+    }
+}
+
+
+Show-AutoByteMenu
