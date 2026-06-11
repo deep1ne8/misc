@@ -7,32 +7,53 @@
 .DESCRIPTION
     Optimized PowerShell script for comprehensive system cleanup with improved efficiency,
     better error handling, and enhanced user experience.
+.PARAMETER Mode
+    Execution mode: Interactive menu, Silent automation run, or DryRun analysis preview.
+.PARAMETER DaysOld
+    Age threshold in days for qualifying temp files and user profile items for deletion.
+.PARAMETER LargeFileSizeGB
+    Size threshold in Gigabytes to flag a single file for cleanup evaluation.
+.PARAMETER LogPath
+    The absolute path to the target execution log file.
 .NOTES
-    Version: 2.0
-    Requires: PowerShell 5.1+, Administrator privileges
+    Version: 2.1
+    Architecture: Enterprise MSP / Automation Ready
 #>
 
 [CmdletBinding()]
 param(
     [ValidateSet('Interactive', 'Silent', 'DryRun')]
     [string]$Mode = 'Interactive',
+    
     [int]$DaysOld = 30,
+    
     [double]$LargeFileSizeGB = 1.0,
+    
     [string]$LogPath = "$env:TEMP\SystemCleanup_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 )
 
-# Initialize logging
+# Initialize global or script-scoped run tracking safely
+if (-not (Test-Path (Split-Path $LogPath))) {
+    New-Item -ItemType Directory -Path (Split-Path $LogPath) -Force | Out-Null
+}
+
 function Write-Log {
-    param([string]$Message, [string]$Level = "INFO")
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+        [ValidateSet('INFO', 'WARN', 'ERROR', 'SUCCESS')]
+        [string]$Level = "INFO"
+    )
     $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
     $logEntry = "[$timestamp] [$Level] $Message"
     Add-Content -Path $LogPath -Value $logEntry -Force
     
     switch ($Level) {
-        "ERROR" { Write-Host $Message -ForegroundColor Red }
-        "WARN"  { Write-Host $Message -ForegroundColor Yellow }
+        "ERROR"   { Write-Host $Message -ForegroundColor Red }
+        "WARN"    { Write-Host $Message -ForegroundColor Yellow }
         "SUCCESS" { Write-Host $Message -ForegroundColor Green }
-        default { Write-Host $Message -ForegroundColor White }
+        default   { Write-Host $Message -ForegroundColor White }
     }
 }
 
@@ -40,10 +61,10 @@ function Get-DiskSpace {
     param([string]$Drive = "C:")
     try {
         $disk = Get-CimInstance -ClassName Win32_LogicalDisk -Filter "DeviceID='$Drive'" -ErrorAction Stop
-        return [PSCustomObject]@{
-            TotalGB = [math]::Round($disk.Size / 1GB, 2)
-            FreeGB = [math]::Round($disk.FreeSpace / 1GB, 2)
-            UsedGB = [math]::Round(($disk.Size - $disk.FreeSpace) / 1GB, 2)
+        [PSCustomObject]@{
+            TotalGB     = [math]::Round($disk.Size / 1GB, 2)
+            FreeGB      = [math]::Round($disk.FreeSpace / 1GB, 2)
+            UsedGB      = [math]::Round(($disk.Size - $disk.FreeSpace) / 1GB, 2)
             FreePercent = [math]::Round(($disk.FreeSpace / $disk.Size) * 100, 2)
         }
     }
@@ -63,7 +84,7 @@ function Remove-ItemSafely {
     try {
         if (-not (Test-Path $Path)) { return $false }
         
-        # Handle long paths
+        # Handle long paths natively via UNC parsing or specific filesystem targets
         if ($Path.Length -gt 260) {
             $longPath = "\\?\$($Path -replace '^\\\\', '\\')"
             if (Test-Path $longPath) {
@@ -77,10 +98,9 @@ function Remove-ItemSafely {
             }
         }
         
-        # Standard removal
         $params = @{
-            Path = $Path
-            Force = $Force
+            Path        = $Path
+            Force       = $Force
             ErrorAction = 'Stop'
         }
         if ($Recurse) { $params.Recurse = $true }
@@ -96,13 +116,14 @@ function Remove-ItemSafely {
 
 function Get-FolderSize {
     param([string]$Path)
-    
     if (-not (Test-Path $Path)) { return 0 }
     
     try {
-        $size = Get-ChildItem -Path $Path -Recurse -File -Force -ErrorAction SilentlyContinue |
-                Measure-Object -Property Length -Sum |
-                Select-Object -ExpandProperty Sum
+        $size = 0
+        # Streaming pipeline to prevent high memory usage during size calculation
+        Get-ChildItem -Path $Path -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+            $size += $_.Length
+        }
         return [math]::Max($size, 0)
     }
     catch {
@@ -116,13 +137,10 @@ function Start-AdvancedSystemCleanup {
     
     Write-Log "Starting Advanced System Cleanup (DryRun: $($DryRun.IsPresent))" "INFO"
     
-    # Get initial disk space
     $initialDisk = Get-DiskSpace
     if (-not $initialDisk) { return }
-    
     Write-Log "Initial free space: $($initialDisk.FreeGB) GB ($($initialDisk.FreePercent)%)" "INFO"
 
-    # Define cleanup locations with validation
     $cleanupPaths = @(
         @{ Path = $env:TEMP; Description = "User Temp Files"; SkipRunning = $false },
         @{ Path = "$env:SystemRoot\Temp"; Description = "System Temp Files"; SkipRunning = $false },
@@ -134,37 +152,38 @@ function Start-AdvancedSystemCleanup {
     ) | Where-Object { Test-Path $_.Path }
 
     $totalSpaceCleaned = 0
-    $cleanupResults = @()
+    $cleanupResults = [System.Collections.Generic.List[PSCustomObject]]::new()
+    $ageCutoff = (Get-Date).AddDays(-$DaysOld)
+    $sizeCutoffBytes = $LargeFileSizeGB * 1GB
 
     foreach ($item in $cleanupPaths) {
-        Write-Progress -Activity "System Cleanup" -Status "Processing $($item.Description)" -PercentComplete ((($cleanupPaths.IndexOf($item) + 1) / $cleanupPaths.Count) * 100)
+        $currentIndex = $cleanupPaths.IndexOf($item)
+        Write-Progress -Activity "System Cleanup" -Status "Processing $($item.Description)" -PercentComplete ((($currentIndex + 1) / $cleanupPaths.Count) * 100)
         
         $beforeSize = Get-FolderSize -Path $item.Path
         Write-Log "Processing $($item.Description) at $($item.Path) (Size: $([math]::Round($beforeSize / 1GB, 2)) GB)" "INFO"
 
         if ($DryRun) {
-            $filesToClean = Get-ChildItem -Path $item.Path -Recurse -File -Force -ErrorAction SilentlyContinue |
-                           Where-Object { 
-                               $_.LastWriteTime -lt (Get-Date).AddDays(-$DaysOld) -or 
-                               $_.Length -gt ($LargeFileSizeGB * 1GB) 
-                           }
-            
-            $dryRunSize = ($filesToClean | Measure-Object -Property Length -Sum).Sum
+            $dryRunSize = 0
+            Get-ChildItem -Path $item.Path -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                if ($_.LastWriteTime -lt $ageCutoff -or $_.Length -gt $sizeCutoffBytes) {
+                    $dryRunSize += $_.Length
+                }
+            }
             Write-Log "DryRun: Would clean $([math]::Round($dryRunSize / 1GB, 2)) GB from $($item.Description)" "INFO"
             continue
         }
 
-        # Stop related services if needed
+        # Handle scoped services targeting isolation rules
+        $stoppedServices = [System.Collections.Generic.List[string]]::new()
         if ($item.SkipRunning) {
             $services = @("wuauserv", "bits", "cryptsvc")
-            $stoppedServices = @()
-            
             foreach ($service in $services) {
                 try {
                     $svc = Get-Service -Name $service -ErrorAction SilentlyContinue
                     if ($svc -and $svc.Status -eq 'Running') {
                         Stop-Service -Name $service -Force -NoWait -ErrorAction Stop
-                        $stoppedServices += $service
+                        $stoppedServices.Add($service) | Out-Null
                         Write-Log "Stopped service: $service" "INFO"
                     }
                 }
@@ -176,24 +195,17 @@ function Start-AdvancedSystemCleanup {
         }
 
         try {
-            # Enhanced file filtering with better performance
-            $filesToRemove = Get-ChildItem -Path $item.Path -Recurse -File -Force -ErrorAction SilentlyContinue |
-                            Where-Object { 
-                                ($_.LastWriteTime -lt (Get-Date).AddDays(-$DaysOld)) -or 
-                                ($_.Length -gt ($LargeFileSizeGB * 1GB)) 
-                            }
-
             $removedCount = 0
-            $removedSize = 0
-
-            foreach ($file in $filesToRemove) {
-                if (Remove-ItemSafely -Path $file.FullName) {
-                    $removedCount++
-                    $removedSize += $file.Length
+            # Memory optimized pipeline processing
+            Get-ChildItem -Path $item.Path -Recurse -File -Force -ErrorAction SilentlyContinue | ForEach-Object {
+                if ($_.LastWriteTime -lt $ageCutoff -or $_.Length -gt $sizeCutoffBytes) {
+                    if (Remove-ItemSafely -Path $_.FullName) {
+                        $removedCount++
+                    }
                 }
             }
 
-            # Restart stopped services
+            # Safely recover stopped services tied specifically to this context loop
             foreach ($service in $stoppedServices) {
                 try {
                     Start-Service -Name $service -ErrorAction Stop
@@ -208,40 +220,39 @@ function Start-AdvancedSystemCleanup {
             $spaceCleaned = [math]::Round(($beforeSize - $afterSize) / 1GB, 2)
             $totalSpaceCleaned += $spaceCleaned
 
-            $cleanupResults += [PSCustomObject]@{
-                Location = $item.Description
-                FilesRemoved = $removedCount
+            $cleanupResults.Add([PSCustomObject]@{
+                Location       = $item.Description
+                FilesRemoved   = $removedCount
                 SpaceCleanedGB = $spaceCleaned
-                Status = "Success"
-            }
+                Status         = "Success"
+            })
 
             Write-Log "Cleaned $spaceCleaned GB ($removedCount files) from $($item.Description)" "SUCCESS"
         }
         catch {
-            $cleanupResults += [PSCustomObject]@{
-                Location = $item.Description
-                FilesRemoved = 0
+            $cleanupResults.Add([PSCustomObject]@{
+                Location       = $item.Description
+                FilesRemoved   = 0
                 SpaceCleanedGB = 0
-                Status = "Failed: $($_.Exception.Message)"
-            }
+                Status         = "Failed: $($_.Exception.Message)"
+            })
             Write-Log "Error cleaning $($item.Description): $($_.Exception.Message)" "ERROR"
         }
     }
 
     Write-Progress -Activity "System Cleanup" -Completed
 
-    # Final disk space check
     $finalDisk = Get-DiskSpace
-    
-    # Display comprehensive summary
     Write-Log "`n========== CLEANUP SUMMARY ==========" "INFO"
-    Write-Log "Initial free space: $($initialDisk.FreeGB) GB ($($initialDisk.FreePercent)%)" "INFO"
-    Write-Log "Final free space: $($finalDisk.FreeGB) GB ($($finalDisk.FreePercent)%)" "INFO"
+    Write-Log "Initial free space: $($initialDisk.FreeGB) GB" "INFO"
+    Write-Log "Final free space: $($finalDisk.FreeGB) GB" "INFO"
     Write-Log "Space recovered: $([math]::Round($finalDisk.FreeGB - $initialDisk.FreeGB, 2)) GB" "SUCCESS"
     
     if ($cleanupResults.Count -gt 0) {
         Write-Log "`nDetailed Results:" "INFO"
-        $cleanupResults | Format-Table -AutoSize | Out-String | ForEach-Object { Write-Log $_ "INFO" }
+        foreach ($res in $cleanupResults) {
+            Write-Log "Location: $($res.Location) | Cleaned: $($res.SpaceCleanedGB) GB | Status: $($res.Status)" "INFO"
+        }
     }
 
     if (-not $DryRun) {
@@ -258,29 +269,26 @@ function Find-LargeFiles {
 
     Write-Log "Scanning for files larger than $SizeThresholdGB GB in: $SourcePath" "INFO"
     $sizeThresholdBytes = $SizeThresholdGB * 1GB
-    $largeFiles = @()
+    $largeFiles = [System.Collections.Generic.List[PSCustomObject]]::new()
 
     try {
-        # Use more efficient approach with ForEach-Object for memory management
-        Get-ChildItem -Path $SourcePath -Recurse -File -Force -ErrorAction SilentlyContinue |
-        Where-Object { $_.Length -gt $sizeThresholdBytes } |
-        Sort-Object -Property Length -Descending |
-        Select-Object -First $TopN |
-        ForEach-Object {
-            $largeFiles += [PSCustomObject]@{
-                Path = $_.FullName
-                SizeGB = [math]::Round($_.Length / 1GB, 2)
-                LastModified = $_.LastWriteTime
-                Extension = $_.Extension
+        Get-ChildItem -Path $SourcePath -Recurse -File -Force -ErrorAction SilentlyContinue | 
+            Where-Object { $_.Length -gt $sizeThresholdBytes } | 
+            Sort-Object -Property Length -Descending | 
+            Select-Object -First $TopN | ForEach-Object {
+                $largeFiles.Add([PSCustomObject]@{
+                    Path         = $_.FullName
+                    SizeGB       = [math]::Round($_.Length / 1GB, 2)
+                    LastModified = $_.LastWriteTime
+                    Extension    = $_.Extension
+                })
             }
-        }
 
         if ($largeFiles.Count -gt 0) {
             Write-Log "Found $($largeFiles.Count) large files:" "SUCCESS"
-            $largeFiles | Format-Table -AutoSize | Out-String | ForEach-Object { Write-Log $_ "INFO" }
-            
-            $totalSize = ($largeFiles | Measure-Object -Property SizeGB -Sum).Sum
-            Write-Log "Total size of large files: $([math]::Round($totalSize, 2)) GB" "INFO"
+            foreach ($file in $largeFiles) {
+                Write-Log "Size: $($file.SizeGB) GB | Path: $($file.Path)" "INFO"
+            }
         } else {
             Write-Log "No files larger than $SizeThresholdGB GB found." "INFO"
         }
@@ -297,17 +305,14 @@ function Get-OldUserProfiles {
     )
     
     $excludeProfiles = @("Public", "TEMP", "defaultuser1", "All Users", "default", "Default User", "DefaultAppPool", "HvmService")
-    
     Write-Log "Scanning for user profiles older than $DaysOld days..." "INFO"
     
     try {
-        $userProfiles = Get-ChildItem -Path $UsersPath -Directory -Force -ErrorAction Stop |
-                       Where-Object { 
-                           $_.Name -notin $excludeProfiles -and
-                           ($_.Attributes -band [System.IO.FileAttributes]::Hidden) -eq 0
-                       }
+        $userProfiles = Get-ChildItem -Path $UsersPath -Directory -Force -ErrorAction Stop | Where-Object {
+            $_.Name -notin $excludeProfiles -and ($_.Attributes -band [System.IO.FileAttributes]::Hidden) -eq 0
+        }
 
-        $results = @()
+        $results = [System.Collections.Generic.List[PSCustomObject]]::new()
         $currentProfile = 0
         $totalProfiles = $userProfiles.Count
 
@@ -321,15 +326,14 @@ function Get-OldUserProfiles {
                 
                 if ($daysSinceLastUse -gt $DaysOld) {
                     $profileSize = Get-FolderSize -Path $profile.FullName
-                    
                     if ($profileSize -gt 0) {
-                        $results += [PSCustomObject]@{
-                            ProfileName = $profile.Name
-                            LastUsed = $lastWriteTime
+                        $results.Add([PSCustomObject]@{
+                            ProfileName  = $profile.Name
+                            LastUsed     = $lastWriteTime
                             DaysInactive = $daysSinceLastUse
-                            SpaceUsedGB = [math]::Round($profileSize / 1GB, 2)
-                            FullPath = $profile.FullName
-                        }
+                            SpaceUsedGB  = [math]::Round($profileSize / 1GB, 2)
+                            FullPath     = $profile.FullName
+                        })
                     }
                 }
             }
@@ -342,16 +346,13 @@ function Get-OldUserProfiles {
 
         if ($results.Count -gt 0) {
             Write-Log "Found $($results.Count) old user profiles:" "SUCCESS"
-            $results | Sort-Object -Property SpaceUsedGB -Descending | 
-                      Format-Table -AutoSize | Out-String | 
-                      ForEach-Object { Write-Log $_ "INFO" }
-            
-            $totalSpaceUsed = ($results | Measure-Object -Property SpaceUsedGB -Sum).Sum
-            Write-Log "Total space used by old profiles: $([math]::Round($totalSpaceUsed, 2)) GB" "SUCCESS"
+            $sortedResults = $results | Sort-Object -Property SpaceUsedGB -Descending
+            foreach ($entry in $sortedResults) {
+                Write-Log "Profile: $($entry.ProfileName) | Size: $($entry.SpaceUsedGB) GB | Inactive: $($entry.DaysInactive) days" "INFO"
+            }
         } else {
             Write-Log "No user profiles older than $DaysOld days found." "INFO"
         }
-        
         return $results
     }
     catch {
@@ -365,39 +366,38 @@ function Remove-BloatwareApps {
     
     Write-Log "Checking for bloatware removal for manufacturer: $Manufacturer" "INFO"
     
-    # Common bloatware patterns
     $bloatwarePatterns = @(
         "*McAfee*", "*Norton*", "*WildTangent*", "*Games*", "*Trial*",
         "*Candy*", "*Farm*", "*Bubble*", "*Hidden*", "*March*",
         "*Soda*", "*King*", "*Facebook*", "*Netflix*", "*Spotify*"
     )
     
-    # Manufacturer-specific patterns
     $manufacturerPatterns = switch ($Manufacturer.ToLower()) {
-        "dell" { @("*Dell*", "*Alienware*", "*SupportAssist*") }
-        "hp" { @("*HP*", "*Hewlett*", "*Smart*") }
-        "lenovo" { @("*Lenovo*", "*ThinkPad*", "*Vantage*") }
-        "asus" { @("*ASUS*", "*ROG*", "*Armoury*") }
-        default { @() }
+        "dell"     { @("*Dell*", "*Alienware*", "*SupportAssist*") }
+        "hp"       { @("*HP*", "*Hewlett*", "*Smart*") }
+        "lenovo"   { @("*Lenovo*", "*ThinkPad*", "*Vantage*") }
+        "asus"     { @("*ASUS*", "*ROG*", "*Armoury*") }
+        default    { @() }
     }
     
     $allPatterns = $bloatwarePatterns + $manufacturerPatterns
     
     try {
         $installedApps = Get-AppxPackage -AllUsers -ErrorAction Stop
-        $appsToRemove = @()
+        $appsToRemove = [System.Collections.Generic.List[PSCustomObject]]::new()
         
         foreach ($pattern in $allPatterns) {
             $matchingApps = $installedApps | Where-Object { $_.Name -like $pattern }
-            $appsToRemove += $matchingApps
+            if ($matchingApps) {
+                foreach ($app in $matchingApps) { $appsToRemove.Add($app) }
+            }
         }
         
-        $appsToRemove = $appsToRemove | Sort-Object -Property Name -Unique
+        $uniqueApps = $appsToRemove | Sort-Object -Property Name -Unique
         
-        if ($appsToRemove.Count -gt 0) {
-            Write-Log "Found $($appsToRemove.Count) bloatware apps to remove:" "INFO"
-            
-            foreach ($app in $appsToRemove) {
+        if ($uniqueApps) {
+            Write-Log "Found operational app listings target." "INFO"
+            foreach ($app in $uniqueApps) {
                 try {
                     Write-Log "Removing: $($app.Name)" "INFO"
                     Remove-AppxPackage -Package $app.PackageFullName -AllUsers -ErrorAction Stop
@@ -424,7 +424,7 @@ function Show-CleanupMenu {
         $diskInfo = Get-DiskSpace
         
         Write-Host "==========================================" -ForegroundColor Cyan
-        Write-Host "    ADVANCED SYSTEM CLEANUP TOOL v2.0     " -ForegroundColor Yellow
+        Write-Host "    ADVANCED SYSTEM CLEANUP TOOL v2.1     " -ForegroundColor Yellow
         Write-Host "==========================================" -ForegroundColor Cyan
         Write-Host "Current Disk Space: $($diskInfo.FreeGB)GB free / $($diskInfo.TotalGB)GB total ($($diskInfo.FreePercent)%)" -ForegroundColor Green
         Write-Host ""
@@ -438,7 +438,8 @@ function Show-CleanupMenu {
         Write-Host "==========================================" -ForegroundColor Cyan
 
         try {
-            [int]$choice = Read-Host "Enter your choice (1-7)"
+            $inputChoice = Read-Host "Enter your choice (1-7)"
+            if ($inputChoice -match '^\d+$') { [int]$choice = $inputChoice } else { $choice = 0 }
             $stopwatch.Restart()
             
             switch ($choice) {
@@ -485,7 +486,7 @@ function Show-CleanupMenu {
             
             $stopwatch.Stop()
             $executionTime = $stopwatch.Elapsed
-            Write-Host "`nExecution Time: $($executionTime.Minutes):$($executionTime.Seconds.ToString('00')).$($executionTime.Milliseconds.ToString('000'))" -ForegroundColor Cyan
+            Write-Host ("`nExecution Time: {0:d2}:{1:d2}.{2:d3}" -f $executionTime.Minutes, $executionTime.Seconds, $executionTime.Milliseconds) -ForegroundColor Cyan
             
             if ($choice -ne 7) {
                 Write-Host "`nPress any key to return to menu..." -ForegroundColor Yellow
@@ -500,7 +501,7 @@ function Show-CleanupMenu {
     } while ($true)
 }
 
-# Script execution
+# Script execution execution control
 if ($Mode -eq 'Interactive') {
     Show-CleanupMenu
 } elseif ($Mode -eq 'DryRun') {
