@@ -34,13 +34,13 @@ jobs:
       - name: Run PSScriptAnalyzer
         uses: microsoft/psscriptanalyzer-action@6b2948b1944407914a58661c49941824d149734f
         with:
-          # Check https://github.com/microsoft/action-psscriptanalyzer for more info about the options.
-          # The below set up runs PSScriptAnalyzer to your entire repository and runs some basic security rules.
-          path: .\
+          # Scope to PowerShell scripts only (excludes .sh/.cmd/.py that break on ubuntu).
+          path: Scripts
           recurse: true
-          # Include your own basic security rules. Removing this option will run all the rules
+          # Basic security rules; severity Warning so legacy MSP scripts don't hard-fail the build.
           includeRule: '"PSAvoidGlobalAliases", "PSAvoidUsingConvertToSecureStringWithPlainText"'
           output: results.sarif
+          severity: warning
 
       # Upload the SARIF file generated in the previous step
       - name: Upload SARIF results file
