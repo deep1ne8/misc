@@ -25,7 +25,25 @@ Execute AutoByteGUI:
 & python .\AutoByteGUI.py
 ```
 
-![AutoByteGUI](https://github.com/deep1ne8/misc/blob/main/AutoByteGUI.png)
+## 🖥️ AutoByte CLI (new)
+A self-discovering launcher for the `Scripts/` library. It reads every
+`Scripts/*.ps1`, shows what each does, and runs the one you pick.
+
+```powershell
+.\AutoByte-CLI.ps1                # interactive numbered menu
+.\AutoByte-CLI.ps1 list           # all scripts + descriptions
+.\AutoByte-CLI.ps1 categories     # grouped by inferred category
+.\AutoByte-CLI.ps1 show <name>    # description of one script
+.\AutoByte-CLI.ps1 run <name>     # run a script by name
+```
+
+Example:
+```powershell
+.\AutoByte-CLI.ps1 run CheckIfUserIsAdmin
+```
+
+> Each script runs in its own PowerShell process. Review scripts before
+> production use — many require Administrator and modify system state.
 
 ## 📖 Documentation
 For detailed guides and usage instructions, visit the [AutoByte Wiki](https://github.com/deep1ne8/misc/wiki).
