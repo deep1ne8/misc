@@ -14,10 +14,23 @@ if (-not $User) {
 # Extract only the username (removes domain/machine name)
 $UserName = $User -replace '.*\\'
 
-# Check if the logged-in user is in the local administrators group
-if (Get-LocalGroupMember -Group "Administrators" -Name $UserName -ErrorAction SilentlyContinue) {
-    Write-Host "Is Admin: YES"
-} else {
-    Write-Host "Is Admin: NO"
+if (-not $UserName) {
+    Write-Host "Is Admin: UNKNOWN (could not resolve username)"
+    exit
 }
+
+# Check if the logged-in user is in the local Administrators group.
+# Use -Member (not -Name, which collides with the group-name parameter).
+$isAdmin = $false
+try {
+    $members = Get-LocalGroupMember -Group "Administrators" -ErrorAction Stop
+    $isAdmin = ($members.Name -contains ".\$UserName") -or
+               ($members.Name -contains "$env:COMPUTERNAME\$UserName") -or
+               ($members.Name -contains $UserName)
+} catch {
+    Write-Host "Is Admin: UNKNOWN (could not read Administrators group: $($_.Exception.Message))"
+    exit
+}
+Write-Host "Is Admin: $(if ($isAdmin) { 'YES' } else { 'NO' })"
+
 
