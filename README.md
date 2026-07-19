@@ -4,10 +4,22 @@
 
 AutoByte is a **PowerShell automation tool** that simplifies system tasks, making it easier to manage deployments, configurations, and automation workflows.
 
+## 🤖 AutoByte Agent (new — the headline feature)
+A **local, private Windows AI troubleshooting agent**. Talk to it in plain English; it inspects your PC with safe probes, explains issues, and (with your approval) runs fixes from the bundled script library. Runs a small GGUF model on your CPU — no data leaves the machine, no token limit.
+
+```powershell
+cd AutoByte-Agent
+pip install -r requirements.txt
+python setup_model.py      # one-time ~4.7GB model download
+python agent.py            # chat with your PC
+```
+Test the framework without a download: `python agent.py --mock`. Full docs in [`AutoByte-Agent/README.md`](AutoByte-Agent/README.md).
+
 ## 🔥 Features
-- Automates repetitive system tasks
-- Lightweight and fast execution
-- Seamless integration with PowerShell
+- Local AI agent that troubleshoots, fixes, repairs and updates Windows (propose-and-confirm safety)
+- 93 bundled PowerShell scripts (printers, Office/M365, Windows repair, network, Dell/HP, calendar/Exchange, deploy)
+- AutoByte CLI — self-discovering script launcher
+- AutoByteGUI — Python/Tk front-end
 
 ## This is my personal project to improve my PowerShell skills and to automate repetitive troubleshooting tasks.
 ## Tool in continious development. New features will be added soon!!!!
