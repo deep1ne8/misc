@@ -1,5 +1,3 @@
-#Requires -Version 5.1
-
 $ErrorActionPreference = 'Continue'
 
 $LogPath = Join-Path $env:TEMP "Liongard-Agent-Removal.log"
