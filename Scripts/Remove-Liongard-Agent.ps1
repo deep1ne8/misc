@@ -1,404 +1,189 @@
-$ErrorActionPreference = 'Continue'
+#Requires -RunAsAdministrator
+<#
+.SYNOPSIS
+    Fully removes the Liongard agent (MSI/EXE uninstall + forced remnant cleanup).
+#>
 
+$ErrorActionPreference = 'Stop'
 $LogPath = Join-Path $env:TEMP "Liongard-Agent-Removal.log"
 
 function Write-Log {
-param(
-[string]$Message,
-[string]$Level = "INFO"
-)
-
-```
-$Entry = "[{0}] [{1}] {2}" -f (Get-Date -Format "yyyy-MM-dd HH:mm:ss"), $Level, $Message
-
-Write-Host $Entry
-
-try {
-    Add-Content -Path $LogPath -Value $Entry -Encoding UTF8 -ErrorAction SilentlyContinue
-}
-catch {
-}
-```
-
+    param([string]$Message, [ValidateSet('INFO','WARN','ERROR')][string]$Level = 'INFO')
+    $Entry = "[{0}] [{1}] {2}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $Level, $Message
+    Write-Host $Entry
+    try { Add-Content -Path $LogPath -Value $Entry -Encoding UTF8 -ErrorAction SilentlyContinue } catch {}
 }
 
 function Get-LiongardUninstallEntries {
-$RegistryPaths = @(
-"HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall*",
-"HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall*"
-)
-
-```
-$Entries = foreach ($RegistryPath in $RegistryPaths) {
-    Get-ItemProperty -Path $RegistryPath -ErrorAction SilentlyContinue |
+    $paths = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+    Get-ItemProperty -Path $paths -ErrorAction SilentlyContinue |
         Where-Object {
-            $_.DisplayName -match '(?i)Liongard' -or
-            $_.Publisher -match '(?i)Liongard' -or
+            $_.DisplayName    -match '(?i)Liongard' -or
+            $_.Publisher      -match '(?i)Liongard' -or
             $_.InstallLocation -match '(?i)Liongard'
-        }
-}
-
-$Entries |
-    Sort-Object PSPath -Unique
-```
-
+        } |
+        Sort-Object PSPath -Unique
 }
 
 function Stop-LiongardComponents {
-Write-Log "Stopping Liongard services and processes."
+    Write-Log "Stopping Liongard services and processes."
 
-```
-Get-Service -ErrorAction SilentlyContinue |
-    Where-Object {
-        $_.Name -match '(?i)Liongard' -or
-        $_.DisplayName -match '(?i)Liongard'
-    } |
-    ForEach-Object {
-        try {
-            if ($_.Status -ne 'Stopped') {
-                Stop-Service -Name $_.Name -Force -ErrorAction SilentlyContinue
-                Write-Log "Stopped service: $($_.Name)"
-            }
+    Get-Service -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '(?i)Liongard' -or $_.DisplayName -match '(?i)Liongard' } |
+        ForEach-Object {
+            try {
+                if ($_.Status -ne 'Stopped') {
+                    Stop-Service -Name $_.Name -Force -ErrorAction SilentlyContinue
+                    Write-Log "Stopped service: $($_.Name)"
+                }
+            } catch { Write-Log "Unable to stop service $($_.Name): $($_.Exception.Message)" 'WARN' }
         }
-        catch {
-            Write-Log "Unable to stop service $($_.Name): $($_.Exception.Message)" "WARN"
-        }
-    }
 
-Get-Process -ErrorAction SilentlyContinue |
-    Where-Object {
-        $_.ProcessName -match '(?i)Liongard'
-    } |
-    ForEach-Object {
-        try {
-            Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
-            Write-Log "Stopped process: $($_.ProcessName), PID $($_.Id)"
+    Get-Process -ErrorAction SilentlyContinue |
+        Where-Object { $_.ProcessName -match '(?i)Liongard' } |
+        ForEach-Object {
+            try {
+                Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+                Write-Log "Stopped process: $($_.ProcessName), PID $($_.Id)"
+            } catch { Write-Log "Unable to stop process $($_.ProcessName): $($_.Exception.Message)" 'WARN' }
         }
-        catch {
-            Write-Log "Unable to stop process $($_.ProcessName): $($_.Exception.Message)" "WARN"
-        }
-    }
-```
-
 }
 
 function Invoke-LiongardUninstall {
-param(
-[Parameter(Mandatory)]
-[object]$Entry
-)
+    param([Parameter(Mandatory)][object]$Entry)
 
-```
-$DisplayName = $Entry.DisplayName
-$ProductCode = $null
+    $DisplayName = $Entry.DisplayName
+    $ProductCode = $null
+    if ($Entry.PSChildName -match '^\{[0-9A-Fa-f-]{36}\}$') { $ProductCode = $Entry.PSChildName }
 
-if ($Entry.PSChildName -match '^\{[0-9A-Fa-f-]{36}\}$') {
-    $ProductCode = $Entry.PSChildName
-}
-
-if ($ProductCode) {
-    Write-Log "Attempting MSI uninstall for: $DisplayName"
-    Write-Log "Product code: $ProductCode"
-
-    try {
-        $Process = Start-Process `
-            -FilePath "msiexec.exe" `
-            -ArgumentList "/x $ProductCode /qn /norestart REBOOT=ReallySuppress" `
-            -Wait `
-            -PassThru `
-            -NoNewWindow `
-            -ErrorAction Stop
-
-        Write-Log "MSI uninstall exit code: $($Process.ExitCode)"
-
-        return $Process.ExitCode
+    if ($ProductCode) {
+        Write-Log "Attempting MSI uninstall for: $DisplayName ($ProductCode)"
+        try {
+            $p = Start-Process -FilePath 'msiexec.exe' `
+                -ArgumentList "/x `"$ProductCode`" /qn /norestart REBOOT=ReallySuppress" `
+                -Wait -PassThru -NoNewWindow
+            Write-Log "MSI uninstall exit code: $($p.ExitCode)"
+            return $p.ExitCode
+        } catch { Write-Log "MSI uninstall failed: $($_.Exception.Message)" 'ERROR'; return 1603 }
     }
-    catch {
-        Write-Log "MSI uninstall failed: $($_.Exception.Message)" "ERROR"
 
-        return 1603
-    }
-}
+    $cmd = $Entry.QuietUninstallString
+    if (-not $cmd) { $cmd = $Entry.UninstallString }
 
-if ($Entry.QuietUninstallString) {
-    $UninstallCommand = $Entry.QuietUninstallString
-    Write-Log "Using QuietUninstallString for: $DisplayName"
-
-    try {
-        $Process = Start-Process `
-            -FilePath "cmd.exe" `
-            -ArgumentList "/c $UninstallCommand" `
-            -Wait `
-            -PassThru `
-            -NoNewWindow `
-            -ErrorAction Stop
-
-        Write-Log "Silent uninstall exit code: $($Process.ExitCode)"
-
-        return $Process.ExitCode
-    }
-    catch {
-        Write-Log "Silent uninstall failed: $($_.Exception.Message)" "ERROR"
-
-        return 1603
-    }
-}
-
-if ($Entry.UninstallString) {
-    $UninstallCommand = $Entry.UninstallString
-
-    if ($UninstallCommand -match '(?i)msiexec(\.exe)?') {
-        $UninstallCommand = $UninstallCommand `
-            -replace '(?i)/I(?=\s|\{)', '/X'
-
-        if ($UninstallCommand -notmatch '(?i)/q') {
-            $UninstallCommand += ' /qn'
+    if ($cmd) {
+        if ($cmd -match '(?i)msiexec') {
+            $cmd = $cmd -replace '(?i)/I(?=\s|\{)', '/X'
+            if ($cmd -notmatch '(?i)/q')         { $cmd += ' /qn' }
+            if ($cmd -notmatch '(?i)/norestart') { $cmd += ' /norestart REBOOT=ReallySuppress' }
         }
-
-        if ($UninstallCommand -notmatch '(?i)/norestart') {
-            $UninstallCommand += ' /norestart REBOOT=ReallySuppress'
-        }
+        Write-Log "Running uninstall command for: $DisplayName"
+        try {
+            $p = Start-Process -FilePath 'cmd.exe' -ArgumentList "/c `"$cmd`"" -Wait -PassThru -NoNewWindow
+            Write-Log "Uninstall exit code: $($p.ExitCode)"
+            return $p.ExitCode
+        } catch { Write-Log "Uninstall command failed: $($_.Exception.Message)" 'ERROR'; return 1603 }
     }
 
-    Write-Log "Using uninstall command for: $DisplayName"
-
-    try {
-        $Process = Start-Process `
-            -FilePath "cmd.exe" `
-            -ArgumentList "/c $UninstallCommand" `
-            -Wait `
-            -PassThru `
-            -NoNewWindow `
-            -ErrorAction Stop
-
-        Write-Log "Uninstall exit code: $($Process.ExitCode)"
-
-        return $Process.ExitCode
-    }
-    catch {
-        Write-Log "Uninstall command failed: $($_.Exception.Message)" "ERROR"
-
-        return 1603
-    }
-}
-
-Write-Log "No uninstall command found for: $DisplayName" "WARN"
-
-return 1612
-```
-
+    Write-Log "No uninstall command found for: $DisplayName" 'WARN'
+    return 1612
 }
 
 function Remove-LiongardRemnants {
-Write-Log "Starting Liongard cleanup."
+    Write-Log "Starting forced Liongard cleanup."
+    Stop-LiongardComponents
 
-```
-Stop-LiongardComponents
-
-$Services = Get-Service -ErrorAction SilentlyContinue |
-    Where-Object {
-        $_.Name -match '(?i)Liongard' -or
-        $_.DisplayName -match '(?i)Liongard'
-    }
-
-foreach ($Service in $Services) {
-    try {
-        & sc.exe delete $Service.Name | Out-Null
-        Write-Log "Deleted service: $($Service.Name)"
-    }
-    catch {
-        Write-Log "Unable to delete service $($Service.Name): $($_.Exception.Message)" "WARN"
-    }
-}
-
-$Folders = @(
-    "$env:ProgramFiles\Liongard",
-    "$env:ProgramFiles\Liongard Agent",
-    "${env:ProgramFiles(x86)}\Liongard",
-    "${env:ProgramFiles(x86)}\Liongard Agent",
-    "$env:ProgramData\Liongard",
-    "$env:ProgramData\LionGard",
-    "$env:LOCALAPPDATA\Liongard",
-    "$env:APPDATA\Liongard"
-) |
-    Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_)
-    } |
-    Select-Object -Unique
-
-foreach ($Folder in $Folders) {
-    if (Test-Path $Folder) {
-        try {
-            Remove-Item -Path $Folder -Recurse -Force -ErrorAction Stop
-            Write-Log "Removed folder: $Folder"
-        }
-        catch {
-            Write-Log "Unable to remove folder $Folder: $($_.Exception.Message)" "WARN"
-        }
-    }
-}
-
-$RegistryRoots = @(
-    "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
-    "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
-)
-
-foreach ($RegistryRoot in $RegistryRoots) {
-    Get-ChildItem -Path $RegistryRoot -ErrorAction SilentlyContinue |
+    Get-Service -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '(?i)Liongard' -or $_.DisplayName -match '(?i)Liongard' } |
         ForEach-Object {
             try {
-                $Property = Get-ItemProperty -Path $_.PSPath -ErrorAction SilentlyContinue
+                & sc.exe delete $_.Name | Out-Null
+                Start-Sleep -Milliseconds 500
+                Write-Log "Deleted service: $($_.Name)"
+            } catch { Write-Log "Unable to delete service $($_.Name): $($_.Exception.Message)" 'WARN' }
+        }
 
-                if (
-                    $Property.DisplayName -match '(?i)Liongard' -or
-                    $Property.Publisher -match '(?i)Liongard' -or
-                    $Property.InstallLocation -match '(?i)Liongard'
-                ) {
-                    Remove-Item -Path $_.PSPath -Recurse -Force -ErrorAction SilentlyContinue
-                    Write-Log "Removed uninstall registry entry: $($_.PSChildName)"
-                }
-            }
-            catch {
+    $folders = @(
+        "$env:ProgramFiles\Liongard", "$env:ProgramFiles\Liongard Agent",
+        "${env:ProgramFiles(x86)}\Liongard", "${env:ProgramFiles(x86)}\Liongard Agent",
+        "$env:ProgramData\Liongard", "$env:ProgramData\LionGard",
+        "$env:LOCALAPPDATA\Liongard", "$env:APPDATA\Liongard"
+    ) | Where-Object { $_ -and (Test-Path $_) } | Select-Object -Unique
+
+    foreach ($f in $folders) {
+        try { Remove-Item -Path $f -Recurse -Force -ErrorAction Stop; Write-Log "Removed folder: $f" }
+        catch { Write-Log "Unable to remove folder $f`: $($_.Exception.Message)" 'WARN' }
+    }
+
+    @('HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall',
+      'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall') |
+    ForEach-Object {
+        Get-ChildItem -Path $_ -ErrorAction SilentlyContinue | ForEach-Object {
+            $prop = Get-ItemProperty -Path $_.PSPath -ErrorAction SilentlyContinue
+            if ($prop -and ($prop.DisplayName -match '(?i)Liongard' -or $prop.Publisher -match '(?i)Liongard' -or $prop.InstallLocation -match '(?i)Liongard')) {
+                Remove-Item -Path $_.PSPath -Recurse -Force -ErrorAction SilentlyContinue
+                Write-Log "Removed uninstall registry entry: $($_.PSChildName)"
             }
         }
-}
+    }
 
-$AdditionalRegistryPaths = @(
-    "HKLM:\SOFTWARE\Liongard",
-    "HKLM:\SOFTWARE\WOW6432Node\Liongard"
-)
-
-foreach ($RegistryPath in $AdditionalRegistryPaths) {
-    if (Test-Path $RegistryPath) {
-        try {
-            Remove-Item -Path $RegistryPath -Recurse -Force -ErrorAction Stop
-            Write-Log "Removed registry path: $RegistryPath"
-        }
-        catch {
-            Write-Log "Unable to remove registry path $RegistryPath: $($_.Exception.Message)" "WARN"
+    @('HKLM:\SOFTWARE\Liongard', 'HKLM:\SOFTWARE\WOW6432Node\Liongard') | ForEach-Object {
+        if (Test-Path $_) {
+            try { Remove-Item -Path $_ -Recurse -Force -ErrorAction Stop; Write-Log "Removed registry path: $_" }
+            catch { Write-Log "Unable to remove registry path $_`: $($_.Exception.Message)" 'WARN' }
         }
     }
 }
-```
 
-}
-
+# ---- Main ----
 Write-Log "Starting dynamic Liongard Agent removal."
 Write-Log "Log file: $LogPath"
 
-$IsAdministrator = (
-[Security.Principal.WindowsPrincipal]
-[Security.Principal.WindowsIdentity]::GetCurrent()
-).IsInRole(
-[Security.Principal.WindowsBuiltInRole]::Administrator
-)
+$isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) { Write-Log "Administrator privileges are required." 'ERROR'; exit 1 }
 
-if (-not $IsAdministrator) {
-Write-Log "Administrator privileges are required." "ERROR"
-exit 1
-}
+$entries = @(Get-LiongardUninstallEntries)
+$uninstallFailed = $false
 
-$LiongardEntries = @(Get-LiongardUninstallEntries)
-
-if ($LiongardEntries.Count -eq 0) {
-Write-Log "No Liongard uninstall entries were found."
-Write-Log "Checking for orphaned services, processes, files, and registry entries."
-
-```
-Remove-LiongardRemnants
-
-Write-Log "Liongard cleanup completed."
-exit 0
-```
-
-}
-
-Write-Log "Found $($LiongardEntries.Count) Liongard installation entry or entries."
-
-$UninstallFailed = $false
-
-foreach ($Entry in $LiongardEntries) {
-Write-Log "Detected: $($Entry.DisplayName)"
-
-```
-Stop-LiongardComponents
-
-$ExitCode = Invoke-LiongardUninstall -Entry $Entry
-
-switch ($ExitCode) {
-    0 {
-        Write-Log "Liongard uninstall completed successfully."
-    }
-
-    3010 {
-        Write-Log "Liongard uninstall completed. A restart is required." "WARN"
-    }
-
-    1641 {
-        Write-Log "Liongard uninstall completed and initiated a restart." "WARN"
-    }
-
-    1605 {
-        Write-Log "Product is already removed. Performing cleanup." "WARN"
-        Remove-LiongardRemnants
-    }
-
-    1612 {
-        Write-Log "Installer source is unavailable. Performing forced cleanup." "WARN"
-        Remove-LiongardRemnants
-    }
-
-    default {
-        Write-Log "Uninstall returned exit code $ExitCode. Performing cleanup." "WARN"
-        $UninstallFailed = $true
-        Remove-LiongardRemnants
+if ($entries.Count -eq 0) {
+    Write-Log "No uninstall entries found. Checking for orphaned remnants."
+    Remove-LiongardRemnants
+} else {
+    Write-Log "Found $($entries.Count) Liongard installation entry(ies)."
+    foreach ($entry in $entries) {
+        Write-Log "Detected: $($entry.DisplayName)"
+        Stop-LiongardComponents
+        $code = Invoke-LiongardUninstall -Entry $entry
+        switch ($code) {
+            0        { Write-Log "Uninstall completed successfully." }
+            3010     { Write-Log "Uninstall completed. Restart required." 'WARN' }
+            1641     { Write-Log "Uninstall completed; restart initiated." 'WARN' }
+            1605     { Write-Log "Already removed. Cleaning remnants." 'WARN'; Remove-LiongardRemnants }
+            1612     { Write-Log "Installer source unavailable. Forcing cleanup." 'WARN'; Remove-LiongardRemnants }
+            default  { Write-Log "Uninstall returned exit code $code. Forcing cleanup." 'WARN'; $uninstallFailed = $true; Remove-LiongardRemnants }
+        }
     }
 }
-```
 
+$remainingEntries = @(Get-LiongardUninstallEntries)
+if ($remainingEntries.Count -gt 0) {
+    Write-Log "Entries remain after uninstall. Running final cleanup." 'WARN'
+    Remove-LiongardRemnants
 }
 
-$RemainingEntries = @(Get-LiongardUninstallEntries)
+$remainingServices = @(Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '(?i)Liongard' -or $_.DisplayName -match '(?i)Liongard' })
+$remainingFolders = @(
+    "$env:ProgramFiles\Liongard", "$env:ProgramFiles\Liongard Agent",
+    "${env:ProgramFiles(x86)}\Liongard", "${env:ProgramFiles(x86)}\Liongard Agent",
+    "$env:ProgramData\Liongard", "$env:ProgramData\LionGard"
+) | Where-Object { $_ -and (Test-Path $_) }
 
-if ($RemainingEntries.Count -gt 0) {
-Write-Log "Liongard uninstall entries remain. Running final cleanup." "WARN"
-Remove-LiongardRemnants
+if ($remainingEntries.Count -eq 0 -and $remainingServices.Count -eq 0 -and $remainingFolders.Count -eq 0) {
+    Write-Log "Liongard Agent removed successfully."
+    exit 0
 }
 
-$RemainingServices = @(
-Get-Service -ErrorAction SilentlyContinue |
-Where-Object {
-$*.Name -match '(?i)Liongard' -or
-$*.DisplayName -match '(?i)Liongard'
-}
-)
-
-$RemainingFolders = @(
-"$env:ProgramFiles\Liongard",
-"$env:ProgramFiles\Liongard Agent",
-"${env:ProgramFiles(x86)}\Liongard",
-"${env:ProgramFiles(x86)}\Liongard Agent",
-"$env:ProgramData\Liongard",
-"$env:ProgramData\LionGard"
-) |
-Where-Object {
--not [string]::IsNullOrWhiteSpace($*) -and
-(Test-Path $*)
-}
-
-if (
-$RemainingEntries.Count -eq 0 -and
-$RemainingServices.Count -eq 0 -and
-$RemainingFolders.Count -eq 0
-) {
-Write-Log "Liongard Agent was removed successfully."
-exit 0
-}
-
-Write-Log "Liongard cleanup completed, but some remnants may remain." "ERROR"
-
-if ($UninstallFailed) {
-exit 1
-}
-
-exit 0
+Write-Log "Cleanup completed, but some remnants may remain." 'ERROR'
+exit ($(if ($uninstallFailed) { 1 } else { 0 }))
