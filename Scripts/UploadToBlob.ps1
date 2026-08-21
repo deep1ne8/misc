@@ -7,6 +7,15 @@ if (-not (Test-Path $LogPath)) {
     exit 1
 }
 
+# Backup ACL
+$OriginalACL = Get-Acl $LogPath
+
+# Grant SYSTEM read access temporarily
+$Rule = New-Object System.Security.AccessControl.FileSystemAccessRule("SYSTEM","Read","Allow")
+$ACL = Get-Acl $LogPath
+$ACL.AddAccessRule($Rule)
+Set-Acl -Path $LogPath -AclObject $ACL
+
 # Upload endpoint
 $UploadUrl = "https://tmpfiles.org/api/v1/upload"
 
@@ -74,6 +83,8 @@ try {
 }
 catch {
     Write-Output "Upload failed: $($_.Exception.Message)"
-    exit 1
 }
-
+finally {
+    # Restore original ACL
+    Set-Acl -Path $LogPath -AclObject $OriginalACL
+}
