@@ -3,8 +3,8 @@ $LogPath = "C:\Program Files (x86)\LiongardInc\LiongardAgent\logs\agent.log"
 
 # Validate file exists
 if (-not (Test-Path $LogPath)) {
-    Write-Output "Log file not found: $LogPath"
-    exit 1
+    Write-Host "Log file not found: $LogPath"
+    
 }
 
 # Backup ACL
