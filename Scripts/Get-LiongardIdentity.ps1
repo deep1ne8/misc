@@ -3,28 +3,32 @@
     Collects Windows and Liongard Agent identity information.
 
 .DESCRIPTION
+    Read-only diagnostic script for investigating Liongard Agent
+    identity conflicts caused by cloned Windows machines.
+
     Collects:
     - Computer name
-    - Domain/workgroup
-    - Windows MachineGuid
-    - Windows Product ID
-    - Computer System UUID
+    - FQDN
+    - Domain / Workgroup
+    - Manufacturer
+    - Model
     - BIOS serial number
     - BIOS version
-    - Manufacturer and model
+    - System UUID
+    - Windows MachineGuid
+    - Windows Product ID
     - Windows version/build
     - OS installation date
-    - Liongard Agent MachineID
+    - Last boot time
+    - Liongard MachineID
+    - Liongard Agent service
     - Liongard Agent version
-    - Liongard Agent service status
-    - Liongard Agent installation information
-    - Network adapter information
-    - IP addresses
-
-    Output is displayed using Format-List.
+    - Liongard registry information
+    - Network information
 
 .NOTES
-    Read-only. This script does not modify the machine.
+    READ-ONLY.
+    This script does not modify Windows or Liongard.
 #>
 
 [CmdletBinding()]
@@ -32,68 +36,81 @@ param()
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-function Get-RegistryValue {
-    param (
-        [string]$Path,
-        [string]$Name
-    )
-
-    if (Test-Path $Path) {
-        try {
-            return (Get-ItemProperty -Path $Path -Name $Name -ErrorAction Stop).$Name
-        }
-        catch {
-            return $null
-        }
-    }
-
-    return $null
-}
-
-# ------------------------------------------------------------
-# System Information
-# ------------------------------------------------------------
+# ============================================================
+# SYSTEM INFORMATION
+# ============================================================
 
 $ComputerSystem = Get-CimInstance -ClassName Win32_ComputerSystem
 $ComputerSystemProduct = Get-CimInstance -ClassName Win32_ComputerSystemProduct
 $BIOS = Get-CimInstance -ClassName Win32_BIOS
 $OperatingSystem = Get-CimInstance -ClassName Win32_OperatingSystem
 
-# ------------------------------------------------------------
-# Windows MachineGuid
-# ------------------------------------------------------------
+# ============================================================
+# FQDN
+# ============================================================
 
-$MachineGuid = Get-RegistryValue `
-    -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' `
-    -Name 'MachineGuid'
+$FQDN = $null
 
-# ------------------------------------------------------------
-# Windows Product Information
-# ------------------------------------------------------------
+try {
+    $FQDN = [System.Net.Dns]::GetHostEntry(
+        $env:COMPUTERNAME
+    ).HostName
+}
+catch {
+    $FQDN = $env:COMPUTERNAME
+}
 
-$WindowsProductName = Get-RegistryValue `
-    -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' `
-    -Name 'ProductName'
+# ============================================================
+# WINDOWS MACHINE GUID
+# ============================================================
 
-$WindowsDisplayVersion = Get-RegistryValue `
-    -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' `
-    -Name 'DisplayVersion'
+$MachineGuid = $null
 
-$WindowsCurrentBuild = Get-RegistryValue `
-    -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' `
-    -Name 'CurrentBuild'
+try {
+    $MachineGuid = (
+        Get-ItemProperty `
+            -Path 'HKLM:\SOFTWARE\Microsoft\Cryptography' `
+            -Name 'MachineGuid' `
+            -ErrorAction Stop
+    ).MachineGuid
+}
+catch {
+    $MachineGuid = 'NOT FOUND'
+}
 
-$WindowsUBR = Get-RegistryValue `
-    -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' `
-    -Name 'UBR'
+# ============================================================
+# WINDOWS INFORMATION
+# ============================================================
 
-$WindowsProductID = Get-RegistryValue `
-    -Path 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion' `
-    -Name 'ProductId'
+$WindowsRegistryPath = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion'
 
-# ------------------------------------------------------------
-# Liongard Agent Registry Locations
-# ------------------------------------------------------------
+$WindowsProductName = $null
+$WindowsDisplayVersion = $null
+$WindowsBuild = $null
+$WindowsUBR = $null
+$WindowsProductID = $null
+
+try {
+    $WindowsInfo = Get-ItemProperty -Path $WindowsRegistryPath
+
+    $WindowsProductName = $WindowsInfo.ProductName
+    $WindowsDisplayVersion = $WindowsInfo.DisplayVersion
+    $WindowsBuild = $WindowsInfo.CurrentBuild
+    $WindowsUBR = $WindowsInfo.UBR
+    $WindowsProductID = $WindowsInfo.ProductId
+}
+catch {
+}
+
+$FullWindowsBuild = $WindowsBuild
+
+if ($WindowsBuild -and ($null -ne $WindowsUBR)) {
+    $FullWindowsBuild = "$WindowsBuild.$WindowsUBR"
+}
+
+# ============================================================
+# LIONGARD REGISTRY
+# ============================================================
 
 $LiongardRegistryPaths = @(
     'HKLM:\SOFTWARE\Liongard\LiongardAgent',
@@ -108,35 +125,56 @@ foreach ($Path in $LiongardRegistryPaths) {
 
     if (Test-Path $Path) {
 
-        $Properties = Get-ItemProperty -Path $Path
+        try {
+            $Properties = Get-ItemProperty -Path $Path
 
-        if (-not $LiongardMachineID) {
-            $LiongardMachineID = $Properties.MachineID
+            if (-not $LiongardMachineID) {
+                $LiongardMachineID = $Properties.MachineID
+            }
+
+            if (-not $LiongardRegistryPath) {
+                $LiongardRegistryPath = $Path
+            }
+
+            if (-not $LiongardRegistryProperties) {
+                $LiongardRegistryProperties = $Properties
+            }
         }
-
-        if (-not $LiongardRegistryPath) {
-            $LiongardRegistryPath = $Path
-        }
-
-        if (-not $LiongardRegistryProperties) {
-            $LiongardRegistryProperties = $Properties
+        catch {
         }
     }
 }
 
-# ------------------------------------------------------------
-# Liongard Agent Service
-# ------------------------------------------------------------
+if (-not $LiongardMachineID) {
+    $LiongardMachineID = 'NOT FOUND'
+}
 
-$LiongardServices = Get-CimInstance Win32_Service |
-    Where-Object {
-        $_.Name -match 'Liongard|Roar' -or
-        $_.DisplayName -match 'Liongard|Roar'
-    }
+if (-not $LiongardRegistryPath) {
+    $LiongardRegistryPath = 'NOT FOUND'
+}
 
-# ------------------------------------------------------------
-# Liongard Installed Software
-# ------------------------------------------------------------
+# ============================================================
+# LIONGARD SERVICES
+# ============================================================
+
+$LiongardServices = @(
+    Get-CimInstance -ClassName Win32_Service |
+        Where-Object {
+            $_.Name -match 'Liongard|Roar' -or
+            $_.DisplayName -match 'Liongard|Roar'
+        } |
+        Select-Object Name,
+                      DisplayName,
+                      State,
+                      Status,
+                      StartMode,
+                      StartName,
+                      PathName
+)
+
+# ============================================================
+# LIONGARD INSTALLED SOFTWARE
+# ============================================================
 
 $LiongardSoftware = @()
 
@@ -147,212 +185,205 @@ $UninstallPaths = @(
 
 foreach ($Path in $UninstallPaths) {
 
-    $LiongardSoftware += Get-ItemProperty $Path |
-        Where-Object {
-            $_.DisplayName -match 'Liongard'
-        } |
-        Select-Object DisplayName,
-                      DisplayVersion,
-                      Publisher,
-                      InstallDate,
-                      InstallLocation,
-                      UninstallString
+    $LiongardSoftware += @(
+        Get-ItemProperty -Path $Path |
+            Where-Object {
+                $_.DisplayName -match 'Liongard'
+            } |
+            Select-Object DisplayName,
+                          DisplayVersion,
+                          Publisher,
+                          InstallDate,
+                          InstallLocation,
+                          UninstallString
+    )
 }
 
-# ------------------------------------------------------------
-# Liongard Agent Files
-# ------------------------------------------------------------
+# ============================================================
+# NETWORK INFORMATION
+# ============================================================
 
-$LiongardPossiblePaths = @(
-    'C:\Program Files\Liongard',
-    'C:\Program Files (x86)\Liongard',
-    'C:\ProgramData\Liongard',
-    'C:\Liongard'
+$NetworkAdapters = @(
+    Get-CimInstance -ClassName Win32_NetworkAdapterConfiguration |
+        Where-Object {
+            $_.IPEnabled -eq $true
+        } |
+        Select-Object Description,
+                      MACAddress,
+                      IPAddress,
+                      IPSubnet,
+                      DefaultIPGateway,
+                      DNSServerSearchOrder
 )
 
-$LiongardFiles = foreach ($Path in $LiongardPossiblePaths) {
-
-    if (Test-Path $Path) {
-
-        Get-ChildItem `
-            -Path $Path `
-            -Recurse `
-            -File `
-            -ErrorAction SilentlyContinue |
-            Select-Object FullName,
-                          Length,
-                          LastWriteTime
-    }
-}
-
-# ------------------------------------------------------------
-# Network Information
-# ------------------------------------------------------------
-
-$NetworkAdapters = Get-CimInstance Win32_NetworkAdapterConfiguration |
-    Where-Object {
-        $_.IPEnabled -eq $true
-    } |
-    Select-Object Description,
-                  MACAddress,
-                  IPAddress,
-                  IPSubnet,
-                  DefaultIPGateway,
-                  DNSServerSearchOrder
-
-# ------------------------------------------------------------
-# Build Output Object
-# ------------------------------------------------------------
+# ============================================================
+# MAIN INFORMATION OBJECT
+# ============================================================
 
 $Output = [PSCustomObject]@{
 
-    'Computer Name'              = $env:COMPUTERNAME
+    'Computer Name'               = $env:COMPUTERNAME
 
-    'FQDN'                       = try {
-        [System.Net.Dns]::GetHostEntry($env:COMPUTERNAME).HostName
-    }
-    catch {
-        $null
-    }
+    'FQDN'                        = $FQDN
 
-    'Domain / Workgroup'         = $ComputerSystem.Domain
+    'Domain / Workgroup'          = $ComputerSystem.Domain
 
-    'Domain Role'                = $ComputerSystem.DomainRole
+    'Domain Role'                 = $ComputerSystem.DomainRole
 
-    'Manufacturer'               = $ComputerSystem.Manufacturer
+    'Manufacturer'                = $ComputerSystem.Manufacturer
 
-    'Model'                      = $ComputerSystem.Model
+    'Model'                       = $ComputerSystem.Model
 
-    'BIOS Serial Number'         = $BIOS.SerialNumber
+    'BIOS Serial Number'           = $BIOS.SerialNumber
 
-    'BIOS Version'               = ($BIOS.SMBIOSBIOSVersion -join ', ')
+    'BIOS Version'                 = ($BIOS.SMBIOSBIOSVersion -join ', ')
 
-    'System UUID'                = $ComputerSystemProduct.UUID
+    'System UUID'                  = $ComputerSystemProduct.UUID
 
-    'Windows MachineGuid'        = $MachineGuid
+    'Windows MachineGuid'          = $MachineGuid
 
-    'Windows Product ID'         = $WindowsProductID
+    'Windows Product ID'           = $WindowsProductID
 
-    'Windows Product Name'       = $WindowsProductName
+    'Windows Product Name'         = $WindowsProductName
 
-    'Windows Display Version'    = $WindowsDisplayVersion
+    'Windows Display Version'      = $WindowsDisplayVersion
 
-    'Windows Build'              = "$WindowsCurrentBuild.$WindowsUBR"
+    'Windows Build'                = $FullWindowsBuild
 
-    'Windows Version'            = $OperatingSystem.Version
+    'Windows Version'              = $OperatingSystem.Version
 
-    'OS Architecture'            = $OperatingSystem.OSArchitecture
+    'OS Architecture'              = $OperatingSystem.OSArchitecture
 
-    'OS Install Date'            = $OperatingSystem.InstallDate
+    'OS Install Date'              = $OperatingSystem.InstallDate
 
-    'Last Boot Time'             = $OperatingSystem.LastBootUpTime
+    'Last Boot Time'                = $OperatingSystem.LastBootUpTime
 
-    'Liongard MachineID'         = $LiongardMachineID
+    'Liongard MachineID'            = $LiongardMachineID
 
-    'Liongard Registry Path'     = $LiongardRegistryPath
+    'Liongard Registry Path'        = $LiongardRegistryPath
 
-    'Liongard Agent Service'     = $LiongardServices
+    'Liongard Agent Service'        = $LiongardServices
 
-    'Liongard Installed Software'= $LiongardSoftware
+    'Liongard Installed Software'   = $LiongardSoftware
 
-    'Network Adapters'            = $NetworkAdapters
+    'Network Adapters'               = $NetworkAdapters
 }
 
-# ------------------------------------------------------------
-# Display Main Information
-# ------------------------------------------------------------
+# ============================================================
+# DISPLAY MAIN INFORMATION
+# ============================================================
 
-Write-Host ""
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host " WINDOWS / LIONGARD IDENTITY INFORMATION" -ForegroundColor Cyan
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host ''
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ' WINDOWS / LIONGARD DEVICE IDENTITY INFORMATION' -ForegroundColor Cyan
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ''
 
 $Output | Format-List
 
-# ------------------------------------------------------------
-# Display Liongard Registry Details
-# ------------------------------------------------------------
+# ============================================================
+# LIONGARD REGISTRY DETAILS
+# ============================================================
 
-Write-Host ""
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host " LIONGARD REGISTRY DETAILS" -ForegroundColor Cyan
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host ''
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ' LIONGARD REGISTRY DETAILS' -ForegroundColor Cyan
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ''
 
 if ($LiongardRegistryProperties) {
+
     $LiongardRegistryProperties |
         Format-List
+
 }
 else {
-    Write-Host "Liongard Agent registry information was not found." `
+
+    Write-Host 'Liongard Agent registry information was not found.' `
         -ForegroundColor Yellow
 }
 
-# ------------------------------------------------------------
-# Display Liongard Software
-# ------------------------------------------------------------
+# ============================================================
+# LIONGARD SOFTWARE
+# ============================================================
 
-Write-Host ""
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host " LIONGARD INSTALLED SOFTWARE" -ForegroundColor Cyan
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host ''
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ' LIONGARD INSTALLED SOFTWARE' -ForegroundColor Cyan
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ''
 
-if ($LiongardSoftware) {
-    $LiongardSoftware | Format-List
+if ($LiongardSoftware.Count -gt 0) {
+
+    $LiongardSoftware |
+        Format-List
+
 }
 else {
-    Write-Host "Liongard Agent installation was not detected." `
+
+    Write-Host 'Liongard Agent installation was not detected.' `
         -ForegroundColor Yellow
 }
 
-# ------------------------------------------------------------
-# Display Network Information
-# ------------------------------------------------------------
+# ============================================================
+# NETWORK INFORMATION
+# ============================================================
 
-Write-Host ""
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host " NETWORK INFORMATION" -ForegroundColor Cyan
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host ""
+Write-Host ''
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ' NETWORK INFORMATION' -ForegroundColor Cyan
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ''
 
-$NetworkAdapters | Format-List
+if ($NetworkAdapters.Count -gt 0) {
 
-# ------------------------------------------------------------
-# Identity Conflict Check
-# ------------------------------------------------------------
+    $NetworkAdapters |
+        Format-List
 
-Write-Host ""
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host " IDENTITY CHECK" -ForegroundColor Cyan
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host ""
-
-if ([string]::IsNullOrWhiteSpace($MachineGuid)) {
-
-    Write-Host "Windows MachineGuid : NOT FOUND" -ForegroundColor Yellow
 }
 else {
 
-    Write-Host "Windows MachineGuid : $MachineGuid"
+    Write-Host 'No active network adapters found.' `
+        -ForegroundColor Yellow
 }
 
-if ([string]::IsNullOrWhiteSpace($LiongardMachineID)) {
+# ============================================================
+# IDENTITY SUMMARY
+# ============================================================
 
-    Write-Host "Liongard MachineID  : NOT FOUND" -ForegroundColor Yellow
-}
-else {
+Write-Host ''
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ' IDENTITY SUMMARY' -ForegroundColor Cyan
+Write-Host '============================================================' -ForegroundColor Cyan
+Write-Host ''
 
-    Write-Host "Liongard MachineID  : $LiongardMachineID"
-}
+Write-Host "Computer Name       : $env:COMPUTERNAME"
+Write-Host "BIOS Serial Number  : $($BIOS.SerialNumber)"
+Write-Host "System UUID         : $($ComputerSystemProduct.UUID)"
+Write-Host "Windows MachineGuid : $MachineGuid"
+Write-Host "Liongard MachineID  : $LiongardMachineID"
+Write-Host ''
 
-if ($MachineGuid -and $LiongardMachineID) {
+# ============================================================
+# BASIC DUPLICATE INDICATOR
+# ============================================================
 
-    Write-Host ""
-    Write-Host "Both Windows MachineGuid and Liongard MachineID were detected." `
+if (
+    $MachineGuid -and
+    $LiongardMachineID -and
+    $MachineGuid -ne 'NOT FOUND' -and
+    $LiongardMachineID -ne 'NOT FOUND'
+) {
+
+    Write-Host 'Identity information successfully collected.' `
         -ForegroundColor Green
 }
+else {
 
-Write-Host ""
-Write-Host "Collection complete." -ForegroundColor Cyan
+    Write-Host 'One or more identity values could not be detected.' `
+        -ForegroundColor Yellow
+}
+
+Write-Host ''
+Write-Host 'Collection complete.' -ForegroundColor Cyan
+Write-Host ''
