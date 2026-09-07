@@ -21,7 +21,7 @@ $GitHubScripts = @(
 
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DiskCleaner.ps1"; Description = "Windows C Drive Cleaner Tool" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts//Get-LiongardIdentity.ps1"; Description = "Get Windows and Liongard Device GUID" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/Install-LanSweeper.ps1"; Description = "Install LanSweeper" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/Datto_VM_Deployment_Remediation.ps1"; Description = "Datto VM Deployment Remediation Probe" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/WindowsOnlineRepair.ps1"; Description = "WindowsOnlineRepair" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/GetWindowsEvents.ps1"; Description = "Get Windows Events" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DellCommandUpdate.ps1"; Description = "Dell Command Update" },
