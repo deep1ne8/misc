@@ -20,7 +20,7 @@ Write-Host "✔ Registry updated to permanently enable strong crypto/TLS 1.2." -
 $GitHubScripts = @(
 
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/DiskCleaner.ps1"; Description = "Windows C Drive Cleaner Tool" },
-    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts//Get-LiongardIdentity.ps1"; Description = "Get Windows and Liongard Device GUID" },
+    @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts//NetworkScan.ps1"; Description = "Windows Network Scanner" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/Datto_VM_Deployment_Remediation.ps1"; Description = "Datto VM Deployment Remediation Probe" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Scripts/WindowsOnlineRepair.ps1"; Description = "WindowsOnlineRepair" },
     @{ ScriptUrl = "https://raw.githubusercontent.com/deep1ne8/misc/main/Scripts/GetWindowsEvents.ps1"; Description = "Get Windows Events" },
