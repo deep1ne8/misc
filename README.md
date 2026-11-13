@@ -67,6 +67,21 @@ The agent can call any of the **93 bundled PowerShell scripts** in `../Scripts`
 (printers, Office/M365, Windows repair, network, Dell/HP, calendar/Exchange,
 deploy). Full detail in [`AutoByte-Agent/README.md`](AutoByte-Agent/README.md).
 
+## Script launcher (RMM / technicians)
+
+```powershell
+# menu (scripts fetched from the pinned release and SHA-256 verified)
+.\AutoByte.ps1
+# one script, non-interactive, exit code passed through (0 / 1 / 3010)
+.\AutoByte.ps1 -Script CheckDriveSpace
+# preview without running
+.\AutoByte.ps1 -Script DiskCleaner -WhatIf
+```
+
+The launcher never uses `Invoke-Expression` and refuses unpinned refs such as
+`main` unless `-AllowUnpinnedRef` is given. TLS 1.2+ is set for the session only;
+`-PersistStrongCrypto` opts in to the machine-wide .NET registry setting.
+
 ## Safety
 
 - Mutating actions never run without an explicit `Y`.

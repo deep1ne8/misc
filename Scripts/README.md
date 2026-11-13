@@ -98,9 +98,12 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
 - `Skip_TPM_Check_on_Dynamic_Update.cmd` — skip TPM check on dynamic update.
 
 ## Launchers
-- `AutoByte.ps1` (repo root) — original hub: enforces TLS1.2, lists a curated
-  set of scripts by URL, runs them.
-- `ScriptStar.ps1` — alternate hub with a different curated list.
+- `AutoByte.ps1` (repo root) — curated menu. Downloads scripts from a pinned
+  release tag (`-Ref vX.Y.Z` or a commit SHA), verifies each against
+  `scripts.manifest.json` (SHA-256), then runs it. Non-interactive:
+  `AutoByte.ps1 -Script <Name>` returns the script's exit code for RMM.
+- `ScriptStar.ps1` — legacy alternate hub (unverified `iex` from `main`, several
+  URLs are broken). Deprecated: use `AutoByte.ps1`.
 - `AutoByteGUI.py` + `AutoByteGUI-Build.ps1` — Python/Tk GUI front-end.
 
 > NOTE: scripts are run-at-your-own-risk MSP utilities. Many require Admin and
