@@ -1,0 +1,24 @@
+[project]
+name = "autobyte-agent"
+version = "1.0.0"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B", "S", "UP", "I", "SIM"]
+ignore = ["E501"]  # embedded PowerShell blocks have long lines
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S603", "S607"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+ignore_missing_imports = true
+files = ["agent.py", "tools.py", "setup_model.py"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

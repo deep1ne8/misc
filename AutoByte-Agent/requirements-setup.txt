@@ -1,0 +1,2 @@
+# Optional: setup_model.py (model download + checksum verification).
+huggingface_hub==2.4.0

@@ -1,0 +1,2 @@
+# Optional: OpenAI-compatible API mode.
+openai==3.50.0
