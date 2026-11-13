@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '35 1 * * 2'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PSSA_VERSION: '1.25.0'
+  PESTER_VERSION: '6.2.0'
+
+jobs:
+  manifest:
+    name: manifest (fresh)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check scripts.manifest.json is up to date
+        shell: pwsh
+        run: ./build/Build-ScriptManifest.ps1 -Check
+
+  lint-powershell:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Parse every script with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $bad = 0
+          Get-ChildItem -Recurse -Force -Include *.ps1,*.psm1 -File | Where-Object { $_.FullName -notmatch '\\\.git\\' -and $_.Length -gt 0 } | ForEach-Object {
+            $e = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$e)
+            foreach ($x in $e) { $bad++; Write-Output "::error file=$($_.FullName),line=$($x.Extent.StartLineNumber)::$($x.Message)" }
+          }
+          if ($bad) { throw "$bad parse error(s) under Windows PowerShell $($PSVersionTable.PSVersion)" }
+      - name: PSScriptAnalyzer (fail on errors)
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -RequiredVersion $env:PSSA_VERSION -Scope CurrentUser -Force
+          $files = Get-ChildItem -Recurse -Force -Include *.ps1,*.psm1,*.psd1 -File | Where-Object FullName -notmatch '[\\/]\.git[\\/]'
+          $r = $files | ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Settings ./PSScriptAnalyzerSettings.psd1 }
+          $r | Group-Object RuleName | Sort-Object Count -Descending | Format-Table Count, Name -AutoSize | Out-String | Write-Output
+          $errors = @($r | Where-Object Severity -eq 'Error')
+          foreach ($x in $errors) { Write-Output "::error file=$($x.ScriptPath),line=$($x.Line)::$($x.RuleName): $($x.Message)" }
+          Write-Output "Warnings: $(@($r | Where-Object Severity -eq 'Warning').Count) (tracked down over time)"
+          if ($errors.Count) { throw "$($errors.Count) PSScriptAnalyzer error(s)" }
+      - name: PSScriptAnalyzer SARIF
+        if: always()
+        uses: microsoft/psscriptanalyzer-action@6b2948b1944407914a58661c49941824d149734f # v1.1
+        with:
+          path: .\
+          recurse: true
+          settings: .\PSScriptAnalyzerSettings.psd1
+          output: results.sarif
+      - name: Upload SARIF
+        if: always() && hashFiles('results.sarif') != ''
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: results.sarif
+          category: psscriptanalyzer
+
+  test-powershell:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Pester
+        shell: pwsh
+        run: |
+          Install-Module Pester -RequiredVersion $env:PESTER_VERSION -Scope CurrentUser -Force -SkipPublisherCheck
+          Import-Module Pester -RequiredVersion $env:PESTER_VERSION
+          $c = New-PesterConfiguration
+          $c.Run.Path = 'tests/powershell'
+          $c.Run.Exit = $true
+          $c.Output.Verbosity = 'Detailed'
+          $c.TestResult.Enabled = $true
+          $c.TestResult.OutputPath = 'pester.xml'
+          Invoke-Pester -Configuration $c
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pester-results
+          path: pester.xml
+
+  lint-test-python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.13']
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: python -m pip install -r AutoByte-Agent/requirements-dev.txt -r AutoByte-Agent/requirements-api.txt -r requirements.txt
+      - name: ruff
+        run: |
+          ruff check AutoByte-Agent
+          ruff format --check AutoByte-Agent
+          ruff check --config AutoByte-Agent/pyproject.toml AutoByteGUI.py tests/python
+      - name: mypy
+        working-directory: AutoByte-Agent
+        run: mypy
+      - name: pytest (agent, safety gate, GUI download path)
+        run: python -m pytest -q AutoByte-Agent/tests tests/python
+      - name: agent --mock smoke test
+        working-directory: AutoByte-Agent
+        shell: bash
+        run: printf 'hello\nquit\n' | python agent.py --mock | tee out.txt && grep -q "mock responder" out.txt
+
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GITLEAKS_VERSION: '8.30.1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install gitleaks (checksum verified)
+        run: |
+          set -euo pipefail
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          tgz="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o "$tgz" "$base/$tgz"
+          curl -sSfL -o sums.txt "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " $tgz\$" sums.txt | sha256sum -c -
+          tar -xzf "$tgz" gitleaks
+      - name: Scan full history
+        run: ./gitleaks git --redact --verbose --exit-code 1 .

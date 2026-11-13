@@ -356,8 +356,8 @@ $warnings = $logContent | Where-Object { $_ -match "\[WARNING\]" }
 
 if ($criticalErrors) {
     Write-Log "Critical errors were found during troubleshooting:" "ERROR"
-    foreach ($error in $criticalErrors) {
-        Write-Log "  - $($error.Substring($error.IndexOf(']') + 2))" "ERROR"
+    foreach ($errLine in $criticalErrors) {
+        Write-Log "  - $($errLine.Substring($errLine.IndexOf(']') + 2))" "ERROR"
     }
     
     Write-Log "Recommended actions for Pervasive error 3110:" "INFO"
