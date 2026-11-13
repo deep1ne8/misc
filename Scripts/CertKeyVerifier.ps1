@@ -1,4 +1,4 @@
-# CertKeyVerifier.ps1 (Updated with Native + OpenSSL Hybrid Verification)
+﻿# CertKeyVerifier.ps1 (Updated with Native + OpenSSL Hybrid Verification)
 # GUI tool to verify a private key matches a certificate and export to various formats
 
 Add-Type -AssemblyName PresentationFramework

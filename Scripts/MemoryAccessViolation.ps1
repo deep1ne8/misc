@@ -1,4 +1,4 @@
-# Memory Access Violation Troubleshooting Script
+﻿# Memory Access Violation Troubleshooting Script
 # Run as Administrator
 
 Write-Host "=== Memory Access Violation Troubleshooting ===" -ForegroundColor Cyan

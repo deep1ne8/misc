@@ -58,7 +58,7 @@
     {
       "name": "BloatWareRemover",
       "path": "Scripts/BloatWareRemover.ps1",
-      "sha256": "e3bc54d6f55c38e73bdc3801c0eeebb39b7bb0170e0c6bc118a26a255e8f0bbf",
+      "sha256": "bd8cbad83a1d7a2548d268a0ff9796f62e50300184156c8c90f9b7e7a2c05399",
       "version": "0.0.0",
       "description": "",
       "platform": "windows",
@@ -97,7 +97,7 @@
     {
       "name": "CertKeyVerifier",
       "path": "Scripts/CertKeyVerifier.ps1",
-      "sha256": "390714b9e84655f27c42e811e4dfbdd654579d3fdac42af819a5982eb7418732",
+      "sha256": "e98da1c3963a79654a4b662770d63257f630f339ff1f13d1e835a15319de16e5",
       "version": "0.0.0",
       "description": "CertKeyVerifier.ps1 (Updated with Native + OpenSSL Hybrid Verification)",
       "platform": "windows",
@@ -292,7 +292,7 @@
     {
       "name": "EnableFilesOnDemand",
       "path": "Scripts/EnableFilesOnDemand.ps1",
-      "sha256": "16512fd07166ebb03ff8602428b2854497158f1fbceb62640f589c1ca6f2b764",
+      "sha256": "636f1fa343481ca3fc288b624c6ef1ccc72f853725f54d8fd94a0f05aa87909b",
       "version": "0.0.0",
       "description": "PowerShell Verbose Logging Template",
       "platform": "windows",
@@ -409,7 +409,7 @@
     {
       "name": "Get-PrinterTonerLevel",
       "path": "Scripts/Get-PrinterTonerLevel.ps1",
-      "sha256": "0406aadc1a8a174dd22a919ccac4e460d48df455799c873d7df8d6499f944684",
+      "sha256": "c527e6e89af9fde08fa267a73b14bd7067111b12d18a750b13768dc0a5a84892",
       "version": "0.0.0",
       "description": "Toner monitor for SNMP-capable printers with HTML email via Microsoft Graph.",
       "platform": "windows",
@@ -448,7 +448,7 @@
     {
       "name": "GetUSBPrinter",
       "path": "Scripts/GetUSBPrinter.ps1",
-      "sha256": "3019a7df95c1c52dccea732a096679f4e9a62fcdac2ad0edcc845145fce77898",
+      "sha256": "81679cc0e2e72bdd9bd4bd7cb8da13269ed2b91684e92c8ccc58ef430b5edd01",
       "version": "0.0.0",
       "description": "Initialize arrays for printer details",
       "platform": "windows",
@@ -461,7 +461,7 @@
     {
       "name": "GetWindowsEvents",
       "path": "Scripts/GetWindowsEvents.ps1",
-      "sha256": "3285117f977a9d9557d2ac87a06fa8abe8feeba019c07704514762aee5b38131",
+      "sha256": "5173d40f85683759b09ab40d9dc06f2c582f42f21f9a112519d18ae023a7cf57",
       "version": "0.0.0",
       "description": "Interactive Windows Event Log Query Tool with Color-coded Output",
       "platform": "windows",
@@ -643,7 +643,7 @@
     {
       "name": "InstallWinGet",
       "path": "Scripts/InstallWinGet.ps1",
-      "sha256": "7fd1f1013576e85c1c1ce62dfc16e0dd145efb3b7a16bfc730d3d78e07ba5341",
+      "sha256": "2e16c27e0176fbc1169b5fdd94cc5020b99dd51d6a95d0ebf9cc7f78c21375ca",
       "version": "0.0.0",
       "description": "Installs Windows Package Manager (winget) via the latest App Installer package.",
       "platform": "windows",
@@ -695,7 +695,7 @@
     {
       "name": "IntuneRemediate",
       "path": "Scripts/IntuneRemediate.ps1",
-      "sha256": "45824338bb8e51ef4ddd7fe45e2ef2f63977d5650470888fe6fa8ba316ddb740",
+      "sha256": "f2b5546f9b2a749d28f9a76132809867a8ef7a9829285f8d88b6f219ddafc0d4",
       "version": "0.0.0",
       "description": "Fixes looping IME failures around Dell Command | Endpoint Configure by:",
       "platform": "windows",
@@ -708,7 +708,7 @@
     {
       "name": "M365_Office32bitRepair",
       "path": "Scripts/M365_Office32bitRepair.ps1",
-      "sha256": "0a6597a10ab356fa8e9444fab389976b0596bd4ef1ded870ebc56788b8ef9331",
+      "sha256": "952b8b7d8145cf2c531219de23fba6ece5ca94fd5a04cfb9d3cd224070d7670b",
       "version": "1.1",
       "description": "Automated Microsoft Apps for Business 32-bit Deployment Script",
       "platform": "windows",
@@ -721,7 +721,7 @@
     {
       "name": "M365_Office64bitRepair",
       "path": "Scripts/M365_Office64bitRepair.ps1",
-      "sha256": "1764da5a4860862896f027db4872e62d18398bcd09c8e4d5ed2ad6492ea6d0fa",
+      "sha256": "3caa110e7e41d91071fba625d1f9f3c021b97d2e11e8120aa05b6ee73dba5399",
       "version": "1.0",
       "description": "Automated Microsoft Apps for Business 64-bit Deployment Script",
       "platform": "windows",
@@ -747,7 +747,7 @@
     {
       "name": "MemoryAccessViolation",
       "path": "Scripts/MemoryAccessViolation.ps1",
-      "sha256": "53af4aaf034cf733e1bec7ce4350a6f95136ab09033dab62cbb83900dd680e7d",
+      "sha256": "31df40d954d6cbedb1c69a75ce3eab289a83fce209b8dc2d8f3425b50511160a",
       "version": "0.0.0",
       "description": "Memory Access Violation Troubleshooting Script",
       "platform": "windows",
@@ -760,7 +760,7 @@
     {
       "name": "NetworkScan",
       "path": "Scripts/NetworkScan.ps1",
-      "sha256": "929a68bda3c666de79f0d4bfaeb1ef069ed2b78358a2c4bd2e2b47b97a3f4b0d",
+      "sha256": "69da24b1f9c163019a9f7a472fa85a18586d32b7ab344eb4b5526bc221327d4b",
       "version": "0.0.0",
       "description": "Interactive native PowerShell IPv4 network scanner.",
       "platform": "windows",
@@ -786,7 +786,7 @@
     {
       "name": "OfficeSetTrustedLocation",
       "path": "Scripts/OfficeSetTrustedLocation.ps1",
-      "sha256": "ddf423fdb6c6258d27843ed613052fc55ca71d08ca37bb44227077eeb04946c6",
+      "sha256": "7879798410097468bc006d734b5f1f29594d6169020f19ab4019d06c5ee5ad24",
       "version": "0.0.0",
       "description": "Interactive PowerShell Script to Add a Trusted Network Location for Office Apps",
       "platform": "windows",
@@ -825,7 +825,7 @@
     {
       "name": "QBDiag",
       "path": "Scripts/QBDiag.ps1",
-      "sha256": "ae3954d9d5037b28e9c4dc4b1aface0fbb4ab43d8c3ea54a6b70ae9c6e824408",
+      "sha256": "9e26114b84d48710f5db8f69a2dcdadc23a32296ed9d951c178d1cbf8163d36c",
       "version": "0.0.0",
       "description": "Enhanced QuickBooks Freeze Diagnostic with issue detection and fix recommendations",
       "platform": "windows",
@@ -929,7 +929,7 @@
     {
       "name": "SetCalendarPermissions",
       "path": "Scripts/SetCalendarPermissions.ps1",
-      "sha256": "d6e042dfc0fc2153e5d31c3383d4991d37a022db23cb9dc24a6e246c4dd76f88",
+      "sha256": "a49d38bbd2c6d662f79a9f144da747176acee6002c644bc7dfd474df40340f99",
       "version": "0.0.0",
       "description": "Modern Exchange Online Calendar Permissions Management Tool (EXO V3)",
       "platform": "windows",
@@ -955,7 +955,7 @@
     {
       "name": "SetExchangeCalendarToReViewer",
       "path": "Scripts/SetExchangeCalendarToReViewer.ps1",
-      "sha256": "73257306396889f1c18b2cf6f31778ef539f8e742437b64f54a443fc6bf3029b",
+      "sha256": "b232b07117d296e27b54c2878795008296b4f4d4617f9cf9e489092bc4aea813",
       "version": "0.0.0",
       "description": "Interactive Exchange Online Calendar Permissions Manager",
       "platform": "windows",
@@ -1020,7 +1020,7 @@
     {
       "name": "Testing",
       "path": "Scripts/Testing.ps1",
-      "sha256": "ddf423fdb6c6258d27843ed613052fc55ca71d08ca37bb44227077eeb04946c6",
+      "sha256": "7879798410097468bc006d734b5f1f29594d6169020f19ab4019d06c5ee5ad24",
       "version": "0.0.0",
       "description": "Interactive PowerShell Script to Add a Trusted Network Location for Office Apps",
       "platform": "windows",
@@ -1124,7 +1124,7 @@
     {
       "name": "WindowsOnlineRepair",
       "path": "Scripts/WindowsOnlineRepair.ps1",
-      "sha256": "82103f0f9b68b7d2515f589cca7f4f9cef1e8b41396748ab34dff78de79dd654",
+      "sha256": "dca07e7c805aa1031fe8d33cff73274b701bfd2826a7f797469a3c2b5bd2189e",
       "version": "0.0.0",
       "description": "Download a Windows 10 or 11 ISO via Fido, mount it, run DISM repair, then unmount.",
       "platform": "windows",
@@ -1137,7 +1137,7 @@
     {
       "name": "WindowsOSRepair",
       "path": "Scripts/WindowsOSRepair.ps1",
-      "sha256": "4009a17d96d7172ca558e7694f85252eb14b048b1a98bfe31fa311950653daa3",
+      "sha256": "57dadf6cc66d01e49415a247626e5567ade4c12a7a9b335bc7fc9b7c76fc5fb9",
       "version": "0.0.0",
       "description": "Automated health check and repair for Windows image issues.",
       "platform": "windows",
@@ -1150,7 +1150,7 @@
     {
       "name": "WindowsSystemRepair",
       "path": "Scripts/WindowsSystemRepair.ps1",
-      "sha256": "2f2b77597b7a98490eb17f4ddc4b8fb472e2a5d28ca64303c06c2cd6b4f67d03",
+      "sha256": "c8897d3e8f2d4ef505ca504ca587b2c3343ca8088f4d0b9406cc99bd290406be",
       "version": "4.0",
       "description": "Quick Windows System Repair Script",
       "platform": "windows",
