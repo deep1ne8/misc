@@ -38,8 +38,19 @@ function Install-Chocolatey {
         # Use TLS 1.2 for security
         [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
         
-        # Download and run Chocolatey installer
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        # Download the official Chocolatey installer, verify its Authenticode signature, then run it.
+        $chocoInstaller = Join-Path $env:TEMP ("choco-install-{0}.ps1" -f [guid]::NewGuid().ToString('N'))
+        try {
+            Invoke-WebRequest -Uri 'https://community.chocolatey.org/install.ps1' -OutFile $chocoInstaller -UseBasicParsing
+            $chocoSig = Get-AuthenticodeSignature -FilePath $chocoInstaller
+            if ($chocoSig.Status -ne 'Valid' -or $chocoSig.SignerCertificate.Subject -notmatch 'Chocolatey Software') {
+                throw "Chocolatey installer signature check failed ($($chocoSig.Status))"
+            }
+            & $chocoInstaller
+        }
+        finally {
+            Remove-Item -LiteralPath $chocoInstaller -Force -ErrorAction SilentlyContinue
+        }
         
         # Refresh environment variables
         $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
