@@ -268,7 +268,7 @@ $companyObj = @{}
 if ($CompanyFilePath) {
     $companyObj.Path     = $CompanyFilePath
     $companyObj.Exists   = Test-Path -LiteralPath $CompanyFilePath
-    $companyObj.PathType = ($CompanyFilePath -like '\\*') ? 'UNC' : 'Local/Drive'
+    $companyObj.PathType = if ($CompanyFilePath -like '\\*') { 'UNC' } else { 'Local/Drive' }  # 5.1-compatible (no ternary)
     $parent = Split-Path $CompanyFilePath -Parent
     $serverName = Get-ServerFromUNC $CompanyFilePath
     $companyObj.ParentDir = $parent

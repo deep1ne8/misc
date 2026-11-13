@@ -851,7 +851,7 @@
     {
       "name": "QBDiag",
       "path": "Scripts/QBDiag.ps1",
-      "sha256": "fc0a2a101c3913ec78f1fff95ed28e97e768511af56a5d1c7fde0bf99e28a69b",
+      "sha256": "ae3954d9d5037b28e9c4dc4b1aface0fbb4ab43d8c3ea54a6b70ae9c6e824408",
       "version": "0.0.0",
       "description": "Enhanced QuickBooks Freeze Diagnostic with issue detection and fix recommendations",
       "platform": "windows",
@@ -1046,7 +1046,7 @@
     {
       "name": "TeamsOutlookTroubleshoot",
       "path": "Scripts/TeamsOutlookTroubleshoot.ps1",
-      "sha256": "94daba8847c0e37d8a1a477388bffaaf3bbe19725f4bd838bd6308eeefbbd2fd",
+      "sha256": "f0a90c088d0af1825f7782ecbd5fc280403d978722674c4f615ff9cb3dd14535",
       "version": "1.0",
       "description": "Comprehensive diagnostic tool for Teams-Exchange integration issues.",
       "platform": "windows",
@@ -1085,7 +1085,7 @@
     {
       "name": "TestSage",
       "path": "Scripts/TestSage.ps1",
-      "sha256": "74aa4916a0c4a8280618abe917cfbf74cbfc75466e9e71a3e2185516d8195cdd",
+      "sha256": "df8e08cd1f93bfec2bffd7100a8e013da226daa068f222df2daac391d46bb4ee",
       "version": "0.0.0",
       "description": "Sage 300 CRE Pervasive Connection Troubleshooter",
       "platform": "windows",
@@ -1215,7 +1215,7 @@
     {
       "name": "WorkPaperMonitorTroubleShooter",
       "path": "Scripts/WorkPaperMonitorTroubleShooter.ps1",
-      "sha256": "d6997c2ecdea485ed0466c36b14e43c28d305946b849beb4ff57c7c29aa4a9dc",
+      "sha256": "ecb0aa559bb7934ebd78cf8b7450252dbce297941f1acfa888066492f9e4ecba",
       "version": "0.0.0",
       "description": "",
       "platform": "windows",
