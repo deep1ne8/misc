@@ -1,8 +1,12 @@
 # Script to set a specific account as default in Outlook
 # This uses the Outlook COM object to programmatically change the default account
 
-# Define the email address to set as default
-$targetEmailAddress = "user@example.com"
+[CmdletBinding()]
+param(
+    # Email address of the Outlook account to make the default (was hard-coded to a client mailbox).
+    [Parameter(Mandatory)][ValidatePattern('^[^@\s]+@[^@\s]+\.[^@\s]+$')][string]$TargetEmailAddress
+)
+$targetEmailAddress = $TargetEmailAddress
 
 try {
     # Create Outlook COM object
