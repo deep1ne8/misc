@@ -32,7 +32,10 @@ $Script:Config = @{
     DCUPath     = "C:\Program Files\Dell\CommandUpdate\dcu-cli.exe"
     DCUPathAlt  = "C:\Program Files (x86)\Dell\CommandUpdate\dcu-cli.exe"
     DCUVersion  = "5.5.0"
-    DCUUrl      = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/Assets/Dell-Command-Update-Windows-Universal-Application_C8JXV_WIN64_5.5.0_A00_01.EXE"
+    # Vendor binary is no longer stored in git: hosted as a GitHub Release asset, pinned by SHA-256
+    # (matches Dell's published C8JXV 5.5.0 A00_01 package) and checked for a valid Dell signature.
+    DCUUrl      = "https://github.com/deep1ne8/misc/releases/download/vendor-assets-v1/Dell-Command-Update-Windows-Universal-Application_C8JXV_WIN64_5.5.0_A00_01.EXE"
+    DCUSha256   = "017d24d38d758fe1d585ea895bb285fad4488aaf95e2be343bfb88e6b3345cb3"
     TempPath    = Join-Path $env:TEMP "DellCommandUpdate.exe"
     LogPath     = $LogPath
     UpdateTypes = "driver,firmware,BIOS"
@@ -131,6 +134,17 @@ function Install-DellCommandUpdate {
                 $delay *= 2
             }
         } while ($retryCount -lt $maxRetries)
+
+        $actualHash = (Get-FileHash -LiteralPath $Script:Config.TempPath -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($actualHash -ne $Script:Config.DCUSha256) {
+            Remove-Item $Script:Config.TempPath -Force -ErrorAction SilentlyContinue
+            throw "Installer SHA-256 mismatch (expected $($Script:Config.DCUSha256), got $actualHash)"
+        }
+        $sig = Get-AuthenticodeSignature -FilePath $Script:Config.TempPath
+        if ($sig.Status -ne 'Valid' -or $sig.SignerCertificate.Subject -notmatch 'Dell') {
+            Remove-Item $Script:Config.TempPath -Force -ErrorAction SilentlyContinue
+            throw "Installer signature invalid ($($sig.Status))"
+        }
 
         Write-Log "Installing Dell Command Update..."
         $installProcess = Start-Process -FilePath $Script:Config.TempPath -ArgumentList "/S" -Wait -PassThru -NoNewWindow

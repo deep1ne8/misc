@@ -63,7 +63,7 @@ Set `"mode": "api"` and your key to use a cloud model instead.
 **Mutating (confirm first):** `run_fix <script>`, `run_command <powershell>`,
 `install_updates`
 
-The agent can call any of the **93 bundled PowerShell scripts** in `../Scripts`
+The agent can call the bundled PowerShell scripts listed in [`scripts.manifest.json`](scripts.manifest.json)
 (printers, Office/M365, Windows repair, network, Dell/HP, calendar/Exchange,
 deploy). Full detail in [`AutoByte-Agent/README.md`](AutoByte-Agent/README.md).
 
@@ -99,7 +99,7 @@ misc/
     setup_model.py  <- one-command local model download
     config.json     <- model mode / path / api key
     README.md       <- agent docs
-  Scripts/          <- 93 bundled PowerShell scripts the agent can call
+  Scripts/          <- bundled PowerShell scripts (see scripts.manifest.json)
   README.legacy.md  <- archived pre-agent README
 ```
 
