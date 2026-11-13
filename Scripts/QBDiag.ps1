@@ -1,4 +1,4 @@
-<# 
+﻿<# 
 .SYNOPSIS
   Enhanced QuickBooks Freeze Diagnostic with issue detection and fix recommendations
 .DESCRIPTION

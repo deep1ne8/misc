@@ -1,4 +1,4 @@
-<#
+﻿<#
 Dell Bloatware and Office Language Remover
 
 Author: EDaniels

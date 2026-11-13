@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
 Automated health check and repair for Windows image issues.
 .DESCRIPTION

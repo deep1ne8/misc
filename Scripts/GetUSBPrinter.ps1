@@ -1,4 +1,4 @@
-# Initialize arrays for printer details
+﻿# Initialize arrays for printer details
 $ModelInfo = @()
 $SerialInfo = @()
 $Final = @()

@@ -1,4 +1,4 @@
-# Interactive PowerShell Script to Add a Trusted Network Location for Office Apps
+﻿# Interactive PowerShell Script to Add a Trusted Network Location for Office Apps
 
 Add-Type -AssemblyName Microsoft.VisualBasic
 

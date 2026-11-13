@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Download a Windows 10 or 11 ISO via Fido, mount it, run DISM repair, then unmount.
 

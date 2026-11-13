@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Installs Windows Package Manager (winget) via the latest App Installer package.
 .DESCRIPTION

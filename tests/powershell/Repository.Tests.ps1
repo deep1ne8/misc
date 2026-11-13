@@ -39,6 +39,13 @@ Describe 'Every PowerShell file' {
         @($ps7 | ForEach-Object { "line $($_.Extent.StartLineNumber): $($_.Extent.Text)" }) | Should -BeNullOrEmpty
     }
 
+    It '<Rel> has a UTF-8 BOM if it contains non-ASCII (Windows PowerShell 5.1 misreads BOM-less UTF-8)' -ForEach $PsFiles {
+        $bytes = [System.IO.File]::ReadAllBytes($Path)
+        $hasBom = $bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF
+        $nonAscii = @($bytes | Where-Object { $_ -gt 127 }).Count -gt 0
+        if ($nonAscii) { $hasBom | Should -BeTrue }
+    }
+
     It '<Rel> contains no obvious embedded credentials' -ForEach $PsFiles {
         $text = Get-Content -LiteralPath $Path -Raw
         $text | Should -Not -Match '(?i)\$\w*(secret|password|passwd|apikey|accesskey)\w*\s*=\s*["''][A-Za-z0-9+/=_\-]{12,}["'']'

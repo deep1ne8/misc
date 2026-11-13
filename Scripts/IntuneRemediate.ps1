@@ -1,4 +1,4 @@
-<# 
+﻿<# 
 .SYNOPSIS
   Fixes looping IME failures around Dell Command | Endpoint Configure by:
   - Uninstalling/removing remnants

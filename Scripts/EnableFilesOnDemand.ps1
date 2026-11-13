@@ -1,4 +1,4 @@
-# PowerShell Verbose Logging Template
+﻿# PowerShell Verbose Logging Template
 
 # Define log file path
 $LogFile = "C:\Windows\Temp\EnableFilesOnDemand_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
