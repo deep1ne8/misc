@@ -1,3 +1,2 @@
-llama-cpp-python>=0.3.0
-# optional, only for API mode:
-# openai>=1.0.0
+# Runtime for local (GGUF) mode. Pinned; Dependabot keeps these current.
+llama-cpp-python==0.3.36
