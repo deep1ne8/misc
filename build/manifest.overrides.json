@@ -1,0 +1,4 @@
+{
+  "_comment": "Reviewed exceptions to the AST mutation detector. Each entry needs a reason. Keys: mutating, requiresAdmin, interactive, unsupported, description.",
+  "scripts": {}
+}
