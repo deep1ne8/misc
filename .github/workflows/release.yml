@@ -1,0 +1,128 @@
+name: Release
+
+# Push a tag such as v2.0.0 to publish a release. AutoByte.ps1 and AutoByteGUI.py
+# download scripts from the tag, so the tag must point at a commit whose
+# scripts.manifest.json is current (the verify job enforces this).
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Manifest is current at this tag
+        shell: pwsh
+        run: ./build/Build-ScriptManifest.ps1 -Check
+
+  # Optional Authenticode signing. Runs only when the 'release-signing' environment
+  # (configure it with required reviewers) provides SIGNING_CERT_PFX_BASE64 and
+  # SIGNING_CERT_PASSWORD. Signed copies are attached to the release as a zip;
+  # the repository files (and therefore the manifest hashes) are not modified.
+  sign:
+    needs: verify
+    runs-on: windows-latest
+    environment: release-signing
+    permissions:
+      contents: read
+    env:
+      PFX_B64: ${{ secrets.SIGNING_CERT_PFX_BASE64 }}
+      PFX_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Sign scripts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path signed | Out-Null
+          if (-not $env:PFX_B64) { Write-Output 'No signing certificate configured; skipping.'; exit 0 }
+          $pfx = Join-Path $env:RUNNER_TEMP 'sign.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:PFX_B64))
+          try {
+            $pw = ConvertTo-SecureString $env:PFX_PASSWORD -AsPlainText -Force
+            $cert = Get-PfxCertificate -FilePath $pfx -Password $pw
+            Copy-Item -Path Scripts, AutoByte.ps1, AutoByteGUI-Build.ps1 -Destination signed -Recurse
+            Get-ChildItem signed -Recurse -Include *.ps1 | ForEach-Object {
+              $r = Set-AuthenticodeSignature -FilePath $_.FullName -Certificate $cert -TimestampServer 'http://timestamp.digicert.com' -HashAlgorithm SHA256
+              if ($r.Status -ne 'Valid') { throw "Signing failed for $($_.Name): $($r.StatusMessage)" }
+            }
+            Compress-Archive -Path signed/* -DestinationPath AutoByte-signed-scripts.zip
+          }
+          finally { Remove-Item $pfx -Force -ErrorAction SilentlyContinue }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: signed-scripts
+          path: AutoByte-signed-scripts.zip
+          if-no-files-found: ignore
+
+  publish:
+    needs: [verify, sign]
+    if: always() && needs.verify.result == 'success' && needs.sign.result != 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        continue-on-error: true
+        with:
+          name: signed-scripts
+          path: dist
+      - name: Build release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          tag="${GITHUB_REF_NAME}"
+          cp scripts.manifest.json dist/
+          git archive --format=zip --prefix="AutoByte-${tag}/" -o "dist/AutoByte-${tag}.zip" "${tag}"
+          # Checksums of every script as served from this tag (sha256 over the git blob bytes).
+          git ls-files Scripts AutoByte.ps1 AutoByteGUI.py AutoByteGUI-Build.ps1 | sort | while read -r f; do
+            printf '%s  %s\n' "$(git show "${tag}:${f}" | sha256sum | cut -d' ' -f1)" "$f"
+          done > dist/SCRIPTS-SHA256SUMS.txt
+          # SBOM of the Python dependency pins (SPDX tag-value, no network needed).
+          {
+            echo "SPDXVersion: SPDX-2.3"; echo "DataLicense: CC0-1.0"; echo "SPDXID: SPDXRef-DOCUMENT"
+            echo "DocumentName: AutoByte-${tag}"; echo "DocumentNamespace: https://github.com/${GITHUB_REPOSITORY}/releases/${tag}"
+            echo "Creator: Tool: release.yml"; echo "Created: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            for req in requirements.txt AutoByte-Agent/requirements*.txt; do
+              grep -E '^[A-Za-z0-9_.-]+==' "$req" | while IFS='=' read -r name _ ver; do
+                echo; echo "PackageName: ${name}"; echo "SPDXID: SPDXRef-${name//[^A-Za-z0-9]/-}-${ver//[^A-Za-z0-9]/-}"
+                echo "PackageVersion: ${ver}"; echo "PackageDownloadLocation: https://pypi.org/project/${name}/${ver}/"
+                echo "FilesAnalyzed: false"; echo "ExternalRef: PACKAGE-MANAGER purl pkg:pypi/${name,,}@${ver}"
+                echo "PackageComment: from ${req}"
+              done
+            done
+          } > dist/AutoByte-${tag}.spdx
+          (cd dist && sha256sum -- * > SHA256SUMS.txt)
+          # Changelog from Conventional Commits since the previous tag.
+          prev="$(git describe --tags --abbrev=0 "${tag}^" 2>/dev/null || true)"
+          range="${prev:+${prev}..}${tag}"
+          {
+            echo "## ${tag}"; echo
+            for t in sec feat fix ci chore docs; do
+              lines="$(git log --format='- %s (%h)' "$range" | grep -E "^- ${t}(\(|:|!)" || true)"
+              [ -n "$lines" ] && { echo "### ${t}"; echo "$lines"; echo; }
+            done
+            echo "Verify downloads with \`sha256sum -c SHA256SUMS.txt\`."
+          } > dist/CHANGELOG.md
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" dist/* --title "AutoByte ${GITHUB_REF_NAME}" --notes-file dist/CHANGELOG.md --verify-tag
