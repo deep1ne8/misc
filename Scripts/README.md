@@ -65,7 +65,6 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
 ## Calendar / Exchange (Exchange Online)
 - `Get-CalendarSharingStatus.ps1` / `GetCalendarPermissions.ps1` — read calendar perms.
 - `SetCalendarPermissions.ps1` / `SetCalendarToReviewer.ps1` / `SetExchangeCalendarToReViewer.ps1` / `GrantFullAccessToCalendar.ps1` — set calendar perms.
-- `MSOutlookCalendarPermissions_Test.ps1` — test/diagnostic for calendar perms.
 - `Set-OutlookAsDefaultEmailClient.ps1` — set Outlook as default mail client.
 - `Set-SmtpRelay.ps1` — SMTP relay config helper.
 - `3CXProv.ps1` — 3CX provisioning.
@@ -77,15 +76,14 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
 - `Install-Winget.ps1` / `InstallWinGet.ps1` — Winget bootstrap (two versions).
 - `Fido.ps1` — Windows ISO downloader (Fido).
 - `InstallRevit2024.2.0.63.ps1` — Revit 2024 install.
-- `FinancialApp.ps1` / `TestSage.ps1` / `QBDiag.ps1` / `WorkPaperMonitorTroubleShooter.ps1` / `CCHUninstall.ps1` — LOB app diagnostics (Sage, QuickBooks, CCH, Workpaper Monitor).
+- `TestSage.ps1` (Sage 300 Pervasive error 3110) / `QBDiag.ps1` / `WorkPaperMonitorTroubleShooter.ps1` / `CCHUninstall.ps1` — LOB app diagnostics (Sage, QuickBooks, CCH, Workpaper Monitor).
 
 ## Diagnostics / Utilities
 - `MemoryAccessViolation.ps1` — memory-access-violation troubleshooting.
 - `IntuneRemediate.ps1` — Intune remediation helper.
 - `DiskCleaner.ps1` / `CheckDriveSpace.ps1` — disk cleanup / space check.
 - `DebugScript.ps1` — REMOVED (was hello-world scratch).
-- `TestAI.ps1` — PSLLM local-model experiment (keep).
-- `Testing.ps1` / `ScriptStar.ps1` — alternate launchers / scratch (kept).
+- `Testing.ps1` — interactive: add a trusted network location for Office apps (misnamed; rename pending).
 
 ## macOS (shell)
 - `[MAC]DIskCleanup.sh`, `install_anydesk_macos.sh`, `install_screenconnect_macos.sh` — macOS helpers.
@@ -98,11 +96,11 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
   release tag (`-Ref vX.Y.Z` or a commit SHA), verifies each against
   `scripts.manifest.json` (SHA-256), then runs it. Non-interactive:
   `AutoByte.ps1 -Script <Name>` returns the script's exit code for RMM.
-- `ScriptStar.ps1` — legacy alternate hub (unverified `iex` from `main`, several
-  URLs are broken). Deprecated: use `AutoByte.ps1`.
 - `AutoByteGUI.py` + `AutoByteGUI-Build.ps1` — Python/Tk GUI front-end.
 
 > NOTE: scripts are run-at-your-own-risk MSP utilities. Many require Admin and
 > touch system settings. Review before production use.
 
 > The script list and counts are generated in `scripts.manifest.json`; do not hand-maintain counts.
+
+> Retired scratch scripts (ScriptStar, TestAI, FinancialApp, MSOutlookCalendarPermissions_Test) live in `archive/` and are not runnable via the launchers or agent.
