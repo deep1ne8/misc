@@ -638,45 +638,45 @@ function Export-DiagnosticReport {
     
     <div class="section">
         <h2>User Existence Check</h2>
-        <p><strong>Exchange Exists:</strong> <span class="$($DiagnosticResults.UserTest.ExchangeExists ? 'success' : 'error')">$($DiagnosticResults.UserTest.ExchangeExists)</span></p>
-        <p><strong>Azure AD Exists:</strong> <span class="$($DiagnosticResults.UserTest.AzureADExists ? 'success' : 'error')">$($DiagnosticResults.UserTest.AzureADExists)</span></p>
+        <p><strong>Exchange Exists:</strong> <span class="$(if ($DiagnosticResults.UserTest.ExchangeExists) { 'success' } else { 'error' })">$($DiagnosticResults.UserTest.ExchangeExists)</span></p>
+        <p><strong>Azure AD Exists:</strong> <span class="$(if ($DiagnosticResults.UserTest.AzureADExists) { 'success' } else { 'error' })">$($DiagnosticResults.UserTest.AzureADExists)</span></p>
     </div>
     
     <div class="section">
         <h2>Licensing Information</h2>
-        <p><strong>Has Licenses:</strong> <span class="$($DiagnosticResults.LicenseTest.HasLicenses ? 'success' : 'error')">$($DiagnosticResults.LicenseTest.HasLicenses)</span></p>
-        <p><strong>Has Teams License:</strong> <span class="$($DiagnosticResults.LicenseTest.HasTeamsLicense ? 'success' : 'error')">$($DiagnosticResults.LicenseTest.HasTeamsLicense)</span></p>
-        <p><strong>Has Exchange License:</strong> <span class="$($DiagnosticResults.LicenseTest.HasExchangeLicense ? 'success' : 'error')">$($DiagnosticResults.LicenseTest.HasExchangeLicense)</span></p>
+        <p><strong>Has Licenses:</strong> <span class="$(if ($DiagnosticResults.LicenseTest.HasLicenses) { 'success' } else { 'error' })">$($DiagnosticResults.LicenseTest.HasLicenses)</span></p>
+        <p><strong>Has Teams License:</strong> <span class="$(if ($DiagnosticResults.LicenseTest.HasTeamsLicense) { 'success' } else { 'error' })">$($DiagnosticResults.LicenseTest.HasTeamsLicense)</span></p>
+        <p><strong>Has Exchange License:</strong> <span class="$(if ($DiagnosticResults.LicenseTest.HasExchangeLicense) { 'success' } else { 'error' })">$($DiagnosticResults.LicenseTest.HasExchangeLicense)</span></p>
     </div>
     
     <div class="section">
         <h2>Autodiscover Configuration</h2>
-        <p><strong>Autodiscover Test Result:</strong> <span class="$($DiagnosticResults.AutodiscoverTest.Success ? 'success' : 'error')">$($DiagnosticResults.AutodiscoverTest.Success)</span></p>
+        <p><strong>Autodiscover Test Result:</strong> <span class="$(if ($DiagnosticResults.AutodiscoverTest.Success) { 'success' } else { 'error' })">$($DiagnosticResults.AutodiscoverTest.Success)</span></p>
         <p><strong>EWS URL:</strong> $($DiagnosticResults.AutodiscoverTest.EwsUrl)</p>
     </div>
     
     <div class="section">
         <h2>Mailbox Permissions</h2>
-        <p><strong>Permissions Test Result:</strong> <span class="$($DiagnosticResults.PermissionsTest.Success ? 'success' : 'error')">$($DiagnosticResults.PermissionsTest.Success)</span></p>
-        <p><strong>Application Permissions Found:</strong> <span class="$($DiagnosticResults.PermissionsTest.ApplicationPermissions ? 'success' : 'warning')">$($null -ne $DiagnosticResults.PermissionsTest.ApplicationPermissions)</span></p>
+        <p><strong>Permissions Test Result:</strong> <span class="$(if ($DiagnosticResults.PermissionsTest.Success) { 'success' } else { 'error' })">$($DiagnosticResults.PermissionsTest.Success)</span></p>
+        <p><strong>Application Permissions Found:</strong> <span class="$(if ($DiagnosticResults.PermissionsTest.ApplicationPermissions) { 'success' } else { 'warning' })">$($null -ne $DiagnosticResults.PermissionsTest.ApplicationPermissions)</span></p>
     </div>
     
     <div class="section">
         <h2>Teams Configuration</h2>
-        <p><strong>Teams Test Result:</strong> <span class="$($DiagnosticResults.TeamsTest.Success ? 'success' : 'error')">$($DiagnosticResults.TeamsTest.Success)</span></p>
-        <p><strong>Teams Enabled:</strong> <span class="$($DiagnosticResults.TeamsTest.TeamsUser.TeamsEnabled ? 'success' : 'error')">$($DiagnosticResults.TeamsTest.TeamsUser.TeamsEnabled)</span></p>
-        <p><strong>Exchange Integration Enabled:</strong> <span class="$($DiagnosticResults.TeamsTest.TeamsUser.ExchangeEnabled ? 'success' : 'error')">$($DiagnosticResults.TeamsTest.TeamsUser.ExchangeEnabled)</span></p>
+        <p><strong>Teams Test Result:</strong> <span class="$(if ($DiagnosticResults.TeamsTest.Success) { 'success' } else { 'error' })">$($DiagnosticResults.TeamsTest.Success)</span></p>
+        <p><strong>Teams Enabled:</strong> <span class="$(if ($DiagnosticResults.TeamsTest.TeamsUser.TeamsEnabled) { 'success' } else { 'error' })">$($DiagnosticResults.TeamsTest.TeamsUser.TeamsEnabled)</span></p>
+        <p><strong>Exchange Integration Enabled:</strong> <span class="$(if ($DiagnosticResults.TeamsTest.TeamsUser.ExchangeEnabled) { 'success' } else { 'error' })">$($DiagnosticResults.TeamsTest.TeamsUser.ExchangeEnabled)</span></p>
     </div>
     
     <div class="section">
         <h2>Mailbox Attributes</h2>
-        <p><strong>Mailbox Test Result:</strong> <span class="$($DiagnosticResults.MailboxTest.Success ? 'success' : 'error')">$($DiagnosticResults.MailboxTest.Success)</span></p>
-        <p><strong>Potential Migration Issues:</strong> <span class="$($DiagnosticResults.MailboxTest.PotentialMigrationIssues ? 'warning' : 'success')">$($DiagnosticResults.MailboxTest.PotentialMigrationIssues)</span></p>
+        <p><strong>Mailbox Test Result:</strong> <span class="$(if ($DiagnosticResults.MailboxTest.Success) { 'success' } else { 'error' })">$($DiagnosticResults.MailboxTest.Success)</span></p>
+        <p><strong>Potential Migration Issues:</strong> <span class="$(if ($DiagnosticResults.MailboxTest.PotentialMigrationIssues) { 'warning' } else { 'success' })">$($DiagnosticResults.MailboxTest.PotentialMigrationIssues)</span></p>
     </div>
     
     <div class="section">
         <h2>Azure AD Attributes</h2>
-        <p><strong>Azure AD Test Result:</strong> <span class="$($DiagnosticResults.AzureADTest.Success ? 'success' : 'error')">$($DiagnosticResults.AzureADTest.Success)</span></p>
+        <p><strong>Azure AD Test Result:</strong> <span class="$(if ($DiagnosticResults.AzureADTest.Success) { 'success' } else { 'error' })">$($DiagnosticResults.AzureADTest.Success)</span></p>
         <p><strong>On-Premises Sync Enabled:</strong> <span class="info">$($DiagnosticResults.AzureADTest.OnPremisesSyncEnabled)</span></p>
     </div>
     

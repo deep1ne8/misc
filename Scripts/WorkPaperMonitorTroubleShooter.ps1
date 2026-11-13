@@ -70,9 +70,10 @@ function Resolve-ThomsonReutersWorkpapers {
             $dnsResult = "DNS resolution failed"
         }
 
-        # Collect diagnostic results
+        # Collect diagnostic results (public vendor endpoint used as reachability probe)
+        $probeHost = 'www.thomsonreuters.com'
         $diagnosticResults = @{
-            NetworkStatus  = (Test-NetConnection -ComputerName "www.thomsonreuters.com").PingSucceeded
+            NetworkStatus  = (Test-NetConnection -ComputerName $probeHost).PingSucceeded
             DNSResolution  = $dnsResult
             FirewallStatus = (Get-NetFirewallRule -Enabled True).Count
         }
