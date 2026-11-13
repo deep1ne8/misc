@@ -12,7 +12,11 @@
 
 param(
   [switch]$ClearIMECache,
-  [string]$WorkRoot = "C:\ProgramData\IntuneFixes\DellEndpointConfigure"
+  [string]$WorkRoot = "C:\ProgramData\IntuneFixes\DellEndpointConfigure",
+  # ImmyBot install values: pass from RMM secure variables or set the IMMY_* env vars.
+  [string]$ImmyBaseUrl = $env:IMMY_BASE_URL,      # e.g. https://<tenant>.immy.bot/plugins/api/v1/1
+  [string]$ImmyId      = $env:IMMY_INSTALL_ID,
+  [string]$ImmyKey     = $env:IMMY_INSTALL_KEY
 )
 
 $ErrorActionPreference = "Stop"
@@ -142,10 +146,26 @@ if ($ClearIMECache.IsPresent) {
   try { Start-Service -Name IntuneManagementExtension -ErrorAction SilentlyContinue } catch {}
 }
 
-# --- Step 5: INSTALL (Your requested block, unchanged except wrapping in transcript/logging) ---
+# --- Step 5: INSTALL via ImmyBot (values supplied at runtime; nothing secret in this file) ---
 try {
   Write-Info "Starting installer via ImmyBot endpoint…"
-  $ErrorActionPreference = "Stop";$url = 'https://openapproach.immy.bot/plugins/api/v1/1/installer/latest-download';$InstallerFile = [io.path]::ChangeExtension([io.path]::GetTempFileName(), ".msi");(New-Object System.Net.WebClient).DownloadFile($url, $InstallerFile);$InstallerLogFile = [io.path]::ChangeExtension([io.path]::GetTempFileName(), ".log");$Arguments = " /c msiexec /i `"$InstallerFile`" /qn /norestart /l*v `"$InstallerLogFile`" REBOOT=REALLYSUPPRESS ID=849350a6-d80c-4a05-b5ad-b095c559fa02 ADDR=https://openapproach.immy.bot/plugins/api/v1/1 KEY=8LTD0MKFGhc5hYdER5j4g7J2OK4l/5ZOC3kjHSe7jlU=";Write-Host "InstallerLogFile: $InstallerLogFile";$Process = Start-Process -Wait cmd -ArgumentList $Arguments -Passthru;if ($Process.ExitCode -ne 0) {    Get-Content $InstallerLogFile -ErrorAction SilentlyContinue | Select-Object -Last 200;    throw "Exit Code: $($Process.ExitCode), ComputerName: $($env:ComputerName)"}else {    Write-Host "Exit Code: $($Process.ExitCode)";    Write-Host "ComputerName: $($env:ComputerName)";}
+  if ([string]::IsNullOrWhiteSpace($ImmyBaseUrl) -or [string]::IsNullOrWhiteSpace($ImmyId) -or [string]::IsNullOrWhiteSpace($ImmyKey)) {
+    throw "ImmyBot values missing. Pass -ImmyBaseUrl/-ImmyId/-ImmyKey or set IMMY_BASE_URL/IMMY_INSTALL_ID/IMMY_INSTALL_KEY."
+  }
+  if ($ImmyBaseUrl -notmatch '^https://') { throw "ImmyBaseUrl must be https." }
+  $url = "$($ImmyBaseUrl.TrimEnd('/'))/installer/latest-download"
+  $InstallerFile = [io.path]::ChangeExtension([io.path]::GetTempFileName(), ".msi")
+  (New-Object System.Net.WebClient).DownloadFile($url, $InstallerFile)
+  $InstallerLogFile = [io.path]::ChangeExtension([io.path]::GetTempFileName(), ".log")
+  $Arguments = " /c msiexec /i `"$InstallerFile`" /qn /norestart /l*v `"$InstallerLogFile`" REBOOT=REALLYSUPPRESS ID=$ImmyId ADDR=$ImmyBaseUrl KEY=$ImmyKey"
+  Write-Host "InstallerLogFile: $InstallerLogFile"
+  $Process = Start-Process -Wait cmd -ArgumentList $Arguments -Passthru
+  if ($Process.ExitCode -ne 0) {
+    Get-Content $InstallerLogFile -ErrorAction SilentlyContinue | Select-Object -Last 200 | ForEach-Object { $_.Replace($ImmyKey, '********') }
+    throw "Exit Code: $($Process.ExitCode), ComputerName: $($env:ComputerName)"
+  }
+  Write-Host "Exit Code: $($Process.ExitCode)"
+  Write-Host "ComputerName: $($env:ComputerName)"
 }
 catch {
   Write-Err "Installer step failed: $($_.Exception.Message)"

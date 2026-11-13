@@ -577,5 +577,5 @@ function Start-ExchangeHealthCheck {
 }
 
 # Example Usage:
-# Start-ExchangeHealthCheck -Mailboxes "seth@distributedsun.com", "alexa.moore@distributedsun.com" -ExportCSV
-# Start-ExchangeHealthCheck -Mailboxes "seth@distributedsun.com", "alexa.moore@distributedsun.com" -FixIssues
+# Start-ExchangeHealthCheck -Mailboxes "user1@contoso.com", "user2@contoso.com" -ExportCSV
+# Start-ExchangeHealthCheck -Mailboxes "user1@contoso.com", "user2@contoso.com" -FixIssues

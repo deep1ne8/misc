@@ -39,9 +39,9 @@
 [CmdletBinding()] 
 param(
     [Parameter(Mandatory=$true)]
-    [string]$Owner = "jeff@distributedsun.com",
+    [string]$Owner,
     [Parameter(Mandatory=$true)]
-    [string]$Receiver = "kate@trucurrent.com"
+    [string]$Receiver
 )
 
 $BuildVersion = "24.09.17.1810"

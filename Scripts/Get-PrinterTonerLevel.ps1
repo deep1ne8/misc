@@ -35,8 +35,8 @@ param(
     [Parameter()][string]$Community = 'public',
     [Parameter()][int]$SnmpPort = 161,
     [Parameter()][int]$ThresholdPct = 20,
-    [Parameter(Mandatory)][string]$To = 'edaniels@openapproach.com',
-    [Parameter(Mandatory)][string]$From = 'cloudadmin@simonpearce.com',
+    [Parameter(Mandatory)][string]$To,
+    [Parameter(Mandatory)][string]$From,
     [Parameter()][string]$BaseUrl = "http://10.14.0.99"
 )
 

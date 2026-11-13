@@ -1,7 +1,5 @@
 {
-    "terminal.explorerKind": "both",
-    "githubPullRequests.ignoredPullRequestBranches": [
-        "main"
-    ],
-    "CodeGPT.apiKey": "CodeGPT Plus Beta"
+    "files.encoding": "utf8bom",
+    "[python]": { "files.encoding": "utf8" },
+    "powershell.codeFormatting.preset": "OTBS"
 }
