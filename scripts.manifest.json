@@ -175,7 +175,7 @@
     {
       "name": "CheckUserProfileIssue",
       "path": "Scripts/CheckUserProfileIssue.ps1",
-      "sha256": "5c3f193a3f8cbd080d1758b9ebac15eff746d45d5449d54865bde78c36479bf2",
+      "sha256": "dd80737b24f45420f107a628f73ab2e5c17c8efa02d67a8502cd91a755b30db3",
       "version": "0.0.0",
       "description": "Windows 11 23H2 Profile Fix Script",
       "platform": "windows",
@@ -695,7 +695,7 @@
     {
       "name": "InternetSpeedTest",
       "path": "Scripts/InternetSpeedTest.ps1",
-      "sha256": "1f5228222b00dbab8b99e62478c323b7fecdd339aa495724d1e3877d164074a2",
+      "sha256": "89197022118409ee34b405d0cef98ba8e51e0d7085189047c228dcf4996b7041",
       "version": "0.0.0",
       "description": "Improved Speed Test Script",
       "platform": "windows",
@@ -760,12 +760,12 @@
     {
       "name": "MemoryAccessViolation",
       "path": "Scripts/MemoryAccessViolation.ps1",
-      "sha256": "184e09169ee4f20b9afe74b4beff093bc374c43277d112bc85c5a4d06abc0bf5",
+      "sha256": "53af4aaf034cf733e1bec7ce4350a6f95136ab09033dab62cbb83900dd680e7d",
       "version": "0.0.0",
       "description": "Memory Access Violation Troubleshooting Script",
       "platform": "windows",
       "mutating": true,
-      "requiresAdmin": false,
+      "requiresAdmin": true,
       "interactive": true,
       "unsupported": false,
       "agentDiagnostic": false
@@ -1202,7 +1202,7 @@
     {
       "name": "WindowsSystemRepair",
       "path": "Scripts/WindowsSystemRepair.ps1",
-      "sha256": "e35ade6540571d27182c1f845e733496b45761ded37cb5b9ade7ebbd91873d14",
+      "sha256": "2f2b77597b7a98490eb17f4ddc4b8fb472e2a5d28ca64303c06c2cd6b4f67d03",
       "version": "4.0",
       "description": "Quick Windows System Repair Script",
       "platform": "windows",

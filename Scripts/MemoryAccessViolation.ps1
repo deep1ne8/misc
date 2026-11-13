@@ -6,10 +6,12 @@ Write-Host "Starting comprehensive system diagnostics..." -ForegroundColor Yello
 
 # Function to run commands with error handling
 function Invoke-SafeCommand {
-    param([string]$Command, [string]$Description)
+    param([scriptblock]$Command, [string]$Description)
     Write-Host "`n[$Description]" -ForegroundColor Green
     try {
-        Invoke-Expression $Command
+        $global:LASTEXITCODE = 0
+        & $Command
+        if ($LASTEXITCODE -ne 0) { throw "exit code $LASTEXITCODE" }
         Write-Host "✓ Completed successfully" -ForegroundColor Green
     }
     catch {
@@ -18,11 +20,11 @@ function Invoke-SafeCommand {
 }
 
 # 1. System File Checker
-Invoke-SafeCommand "sfc /scannow" "Running System File Checker"
+Invoke-SafeCommand { sfc.exe /scannow } "Running System File Checker"
 
 # 2. DISM Health Check and Repair
-Invoke-SafeCommand "DISM /Online /Cleanup-Image /CheckHealth" "Checking Windows Image Health"
-Invoke-SafeCommand "DISM /Online /Cleanup-Image /RestoreHealth" "Repairing Windows Image"
+Invoke-SafeCommand { DISM.exe /Online /Cleanup-Image /CheckHealth } "Checking Windows Image Health"
+Invoke-SafeCommand { DISM.exe /Online /Cleanup-Image /RestoreHealth } "Repairing Windows Image"
 
 # 3. Memory Diagnostic
 Write-Host "`n[Memory Diagnostic Test]" -ForegroundColor Green
@@ -78,7 +80,7 @@ if ($crashEvents) {
 Write-Host "`n[Hardware Diagnostics]" -ForegroundColor Green
 
 # Check disk health
-Invoke-SafeCommand "chkdsk C: /f /r" "Disk Check (requires reboot confirmation)"
+Invoke-SafeCommand { chkdsk.exe C: /f /r } "Disk Check (requires reboot confirmation)"
 
 # Temperature and hardware info (if available)
 try {

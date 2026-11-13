@@ -343,8 +343,10 @@ function Set-23H2Fixes {
         Set-ItemProperty -Path $regPath -Name "ServiceDllUnloadOnStop" -Value 1 -Type DWord
         
         # Fix 3: Fix User Profile event channel
-        $eventCmd = "wevtutil set-log Microsoft-Windows-User Profile Service/Operational /enabled:true"
-        Invoke-Expression $eventCmd
+        # Channel name contains spaces, so it must be passed as one argument (the old
+        # Invoke-Expression string split it into several and the call always failed).
+        & wevtutil.exe set-log 'Microsoft-Windows-User Profile Service/Operational' /enabled:true
+        if ($LASTEXITCODE -ne 0) { throw "wevtutil exited with code $LASTEXITCODE" }
         
         Write-ColorOutput "Windows 11 23H2 specific fixes applied." "Green"
     }
