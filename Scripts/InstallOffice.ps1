@@ -1,6 +1,7 @@
 # Define variables
 #$odtDownloadUrl = "https://download.microsoft.com/download/2/7/A/27AF1BE6-DD20-4CB4-B154-EBAB8A7D4A7E/officedeploymenttool_18324-20194.exe"
-$odtDownloadUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/ODTTool/setup.exe"
+# Official evergreen Office Deployment Tool bootstrapper (signature verified below).
+$odtDownloadUrl = "https://officecdn.microsoft.com/pr/wsus/setup.exe"
 $GitHubConfigUrl = "https://raw.githubusercontent.com/deep1ne8/misc/refs/heads/main/ODTTool/MSOffice.xml"
 $odtExtractPath = "$env:TEMP\ODT"
 $odtInstallerPath = "$odtExtractPath\setup.exe"
@@ -29,7 +30,12 @@ if (-not (Test-Path $odtExtractPath)) {
 # Step 2: Download the Office Deployment Tool (ODT)
 Write-Host "Downloading the Office Deployment Tool..." -ForegroundColor Cyan
 try {
-    Invoke-WebRequest -Uri $odtDownloadUrl -OutFile $odtInstallerPath
+    Invoke-WebRequest -Uri $odtDownloadUrl -OutFile $odtInstallerPath -UseBasicParsing
+    $odtSig = Get-AuthenticodeSignature -FilePath $odtInstallerPath
+    if ($odtSig.Status -ne 'Valid' -or $odtSig.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') {
+        Remove-Item $odtInstallerPath -Force -ErrorAction SilentlyContinue
+        throw "Office Deployment Tool signature check failed ($($odtSig.Status))"
+    }
 } catch {
     Write-Host "Failed to download Office Deployment Tool: $($_.Exception.Message)" -ForegroundColor Red
     return

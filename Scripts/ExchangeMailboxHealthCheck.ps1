@@ -155,7 +155,7 @@ function Start-ExchangeHealthCheck {
                     if ($defaultCalendar) {
                         $mailboxHealth.CalendarFolderExists = $true
                         $mailboxHealth.CalendarFolderPath = $defaultCalendar.FolderPath
-                        Write-Log "Calendar folder exists for $mailbox: $($defaultCalendar.FolderPath)" "SUCCESS"
+                        Write-Log "Calendar folder exists for ${mailbox}: $($defaultCalendar.FolderPath)" "SUCCESS"
                     }
                     else {
                         $mailboxHealth.IssuesDetected += "Default calendar folder not found"
@@ -164,7 +164,7 @@ function Start-ExchangeHealthCheck {
                 }
             }
             catch {
-                Write-Log "Error retrieving calendar folder for $mailbox: $_" "ERROR"
+                Write-Log "Error retrieving calendar folder for ${mailbox}: $_" "ERROR"
                 $mailboxHealth.IssuesDetected += "Cannot access calendar folder"
             }
             
@@ -186,13 +186,13 @@ function Start-ExchangeHealthCheck {
                                 Write-Log "Fixed: Set RemovePrivateProperty to False for $mailbox" "SUCCESS"
                             }
                             catch {
-                                Write-Log "Failed to update RemovePrivateProperty for $mailbox: $_" "ERROR"
+                                Write-Log "Failed to update RemovePrivateProperty for ${mailbox}: $_" "ERROR"
                             }
                         }
                     }
                 }
                 catch {
-                    Write-Log "Error retrieving calendar processing settings for $mailbox: $_" "ERROR"
+                    Write-Log "Error retrieving calendar processing settings for ${mailbox}: $_" "ERROR"
                     $mailboxHealth.IssuesDetected += "Calendar processing settings inaccessible"
                 }
                 
@@ -219,13 +219,13 @@ function Start-ExchangeHealthCheck {
                                     Write-Log "Fixed: Set Default calendar permission to AvailabilityOnly for $mailbox" "SUCCESS"
                                 }
                                 catch {
-                                    Write-Log "Failed to update Default calendar permission for $mailbox: $_" "ERROR"
+                                    Write-Log "Failed to update Default calendar permission for ${mailbox}: $_" "ERROR"
                                 }
                             }
                         }
                         elseif ($defaultPerm.AccessRights -contains "Owner" -or $defaultPerm.AccessRights -contains "PublishingEditor") {
                             $mailboxHealth.IssuesDetected += "Default calendar permission is too permissive ($($defaultPerm.AccessRights -join ', '))"
-                            Write-Log "Default calendar permission is too permissive for $mailbox: $($defaultPerm.AccessRights -join ', ')" "WARNING"
+                            Write-Log "Default calendar permission is too permissive for ${mailbox}: $($defaultPerm.AccessRights -join ', ')" "WARNING"
                             
                             if ($FixIssues) {
                                 try {
@@ -235,7 +235,7 @@ function Start-ExchangeHealthCheck {
                                     Write-Log "Fixed: Set Default calendar permission to LimitedDetails for $mailbox" "SUCCESS"
                                 }
                                 catch {
-                                    Write-Log "Failed to update Default calendar permission for $mailbox: $_" "ERROR"
+                                    Write-Log "Failed to update Default calendar permission for ${mailbox}: $_" "ERROR"
                                 }
                             }
                         }
@@ -288,7 +288,7 @@ function Start-ExchangeHealthCheck {
                     }
                 }
                 catch {
-                    Write-Log "Error retrieving calendar permissions for $mailbox: $_" "ERROR"
+                    Write-Log "Error retrieving calendar permissions for ${mailbox}: $_" "ERROR"
                     $mailboxHealth.IssuesDetected += "Cannot access calendar permissions"
                 }
             }
@@ -319,7 +319,7 @@ function Start-ExchangeHealthCheck {
                             Write-Log "Fixed: Enabled Teams Meeting Add-in for $mailbox" "SUCCESS"
                         }
                         catch {
-                            Write-Log "Failed to enable Teams Meeting Add-in for $mailbox: $_" "ERROR"
+                            Write-Log "Failed to enable Teams Meeting Add-in for ${mailbox}: $_" "ERROR"
                         }
                     }
                 }
@@ -337,7 +337,7 @@ function Start-ExchangeHealthCheck {
                             Write-Log "Fixed: Enabled Exchange Web Services (EWS) for $mailbox" "SUCCESS"
                         }
                         catch {
-                            Write-Log "Failed to enable Exchange Web Services (EWS) for $mailbox: $_" "ERROR"
+                            Write-Log "Failed to enable Exchange Web Services (EWS) for ${mailbox}: $_" "ERROR"
                         }
                     }
                 }
@@ -353,7 +353,7 @@ function Start-ExchangeHealthCheck {
                 }
             }
             catch {
-                Write-Log "Error retrieving CAS mailbox settings for $mailbox: $_" "ERROR"
+                Write-Log "Error retrieving CAS mailbox settings for ${mailbox}: $_" "ERROR"
                 $mailboxHealth.IssuesDetected += "CAS mailbox settings inaccessible"
             }
             
@@ -376,7 +376,7 @@ function Start-ExchangeHealthCheck {
                 }
             }
             catch {
-                Write-Log "Error retrieving throttling policy for $mailbox: $_" "WARNING"
+                Write-Log "Error retrieving throttling policy for ${mailbox}: $_" "WARNING"
                 $mailboxHealth.ThrottlingPolicy = "Unknown"
             }
             
@@ -401,7 +401,7 @@ function Start-ExchangeHealthCheck {
                 }
             }
             catch {
-                Write-Log "Error checking mailbox quotas for $mailbox: $_" "WARNING"
+                Write-Log "Error checking mailbox quotas for ${mailbox}: $_" "WARNING"
             }
             
             # Summarize findings
