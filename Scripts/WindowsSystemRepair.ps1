@@ -1,4 +1,4 @@
-#Requires -RunAsAdministrator
+﻿#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Quick Windows System Repair Script

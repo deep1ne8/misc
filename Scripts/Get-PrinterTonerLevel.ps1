@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
   Toner monitor for SNMP-capable printers with HTML email via Microsoft Graph.
 
