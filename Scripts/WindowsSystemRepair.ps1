@@ -59,7 +59,7 @@ function Write-Log {
 
 function Start-QuickCommand {
     param(
-        [string]$Command,
+        [scriptblock]$Command,
         [string]$Description,
         [int]$TimeoutMinutes = 5
     )
@@ -67,10 +67,7 @@ function Start-QuickCommand {
     Write-Log "► Starting: $Description" -Level Info
     
     try {
-        $job = Start-Job -ScriptBlock {
-            param($cmd)
-            Invoke-Expression $cmd
-        } -ArgumentList $Command
+        $job = Start-Job -ScriptBlock $Command
         
         $completed = Wait-Job $job -Timeout ($TimeoutMinutes * 60)
         
@@ -178,11 +175,11 @@ $startTime = Get-Date
 
 # Phase 1: Quick SFC scan
 Write-Log "PHASE 1: System File Check (Quick)" -Level Header
-$results['SFC'] = Start-QuickCommand "sfc /verifyonly" "System File Verification" 3
+$results['SFC'] = Start-QuickCommand { sfc.exe /verifyonly } "System File Verification" 3
 
 # Phase 2: DISM health check (fast)
 Write-Log "PHASE 2: Component Store Health" -Level Header
-$results['DISM_Check'] = Start-QuickCommand "DISM /Online /Cleanup-Image /CheckHealth" "Component Health Check" 2
+$results['DISM_Check'] = Start-QuickCommand { DISM.exe /Online /Cleanup-Image /CheckHealth } "Component Health Check" 2
 
 # Phase 3: Clean temporary files
 Write-Log "PHASE 3: Temporary File Cleanup" -Level Header
@@ -194,11 +191,11 @@ $results['WU_Reset'] = Reset-WindowsUpdate
 
 # Phase 5: Registry cleanup
 Write-Log "PHASE 5: Registry Optimization" -Level Header
-$results['Registry'] = Start-QuickCommand "sfc /verifyonly" "Registry Verification" 2
+$results['Registry'] = Start-QuickCommand { sfc.exe /verifyonly } "Registry Verification" 2
 
 # Phase 6: Component cleanup
 Write-Log "PHASE 6: Component Cleanup" -Level Header
-$results['Cleanup'] = Start-QuickCommand "DISM /Online /Cleanup-Image /StartComponentCleanup" "Component Cleanup" 3
+$results['Cleanup'] = Start-QuickCommand { DISM.exe /Online /Cleanup-Image /StartComponentCleanup } "Component Cleanup" 3
 
 # Results summary
 Write-Log "" -Level Info
