@@ -44,7 +44,7 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
 - `InternetSpeedTest.ps1` — bandwidth test.
 - `InternetLatencyTest.ps1` / `InternetLatencyTestNew.ps1` — latency probes (two versions).
 - `NetworkScan.ps1` — basic network scan.
-- `GetWindowsEvents.ps1` / `WinLog.ps1` — pull Windows event logs.
+- `GetWindowsEvents.ps1` — pull Windows event logs.
 - `SplitlogFile.ps1` — split a large log into chunks.
 - `SimpleHttpServer.ps1` — quick local HTTP server (port 8080).
 
@@ -55,7 +55,6 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
 - `EnableFilesOnDemand.ps1` — enable OneDrive Files On-Demand.
 - `CheckIfOneDriveSyncFolder.ps1` — OneDrive sync-folder check.
 - `AddFolderToHomeNameSpace.ps1` — add folder to Explorer Home.
-- `MigrateToEntraCloud.ps1` — Entra/cloud profile migration helper.
 
 ## Dell / HP Hardware
 - `DellCommandUpdate.ps1` — run Dell Command Update.
@@ -78,14 +77,11 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
 - `Install-Winget.ps1` / `InstallWinGet.ps1` — Winget bootstrap (two versions).
 - `Fido.ps1` — Windows ISO downloader (Fido).
 - `InstallRevit2024.2.0.63.ps1` — Revit 2024 install.
-- `Add-CertChain.ps1` — install a certificate chain.
 - `FinancialApp.ps1` / `TestSage.ps1` / `QBDiag.ps1` / `WorkPaperMonitorTroubleShooter.ps1` / `CCHUninstall.ps1` — LOB app diagnostics (Sage, QuickBooks, CCH, Workpaper Monitor).
-- `BuildingTestApp.ps1` — app build/test helper.
 
 ## Diagnostics / Utilities
 - `MemoryAccessViolation.ps1` — memory-access-violation troubleshooting.
 - `IntuneRemediate.ps1` — Intune remediation helper.
-- `LanguageIDs.ps1` / `LanguagePacks.ps1` — language pack helpers.
 - `DiskCleaner.ps1` / `CheckDriveSpace.ps1` — disk cleanup / space check.
 - `DebugScript.ps1` — REMOVED (was hello-world scratch).
 - `TestAI.ps1` — PSLLM local-model experiment (keep).
@@ -108,3 +104,5 @@ few read a path/printer model from `Read-Host` prompts. Grouped by purpose below
 
 > NOTE: scripts are run-at-your-own-risk MSP utilities. Many require Admin and
 > touch system settings. Review before production use.
+
+> The script list and counts are generated in `scripts.manifest.json`; do not hand-maintain counts.

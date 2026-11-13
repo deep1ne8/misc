@@ -1,7 +1,40 @@
+# Build / runtime artefacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+*.sarif
+dist/
+build/out/
+
+# Binaries: ship vendor installers as GitHub Release assets, never in git
+*.exe
+*.EXE
+*.msi
+*.MSI
+*.zip
+*.gguf
+
+# Local config / secrets
+AutoByte-Agent/config.json
+AutoByte-Agent/models/
+.env
+*.pfx
+
+# OS / editor noise
+desktop.ini
+Thumbs.db
+.DS_Store
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Legacy local paths (kept from previous .gitignore)
 AutoByte2_0.ps1
 AutoByteTest.ps1
-AuitoBytePro/TaskAutomation.ps1
+AuitoBytePro/
 AutoByte-Test.ps1
-Ignore
-Scripts/ModernEXOCalendarTool_20250702_101956.log
-Backup
+Ignore/
+Backuprequests

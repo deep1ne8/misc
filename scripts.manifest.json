@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "hashAlgorithm": "sha256-lf",
-  "scriptCount": 93,
+  "scriptCount": 94,
   "scripts": [
     {
       "name": "[MAC]DIskCleanup",
@@ -214,7 +214,7 @@
     {
       "name": "DellCommandUpdate",
       "path": "Scripts/DellCommandUpdate.ps1",
-      "sha256": "73461017f5da31593f1d380e04979d488ff885663a64c3a35f430d4f916f202b",
+      "sha256": "464b425cef5757e42660e6f548172784befc761a735f93db305bcd69909af1fa",
       "version": "2.1",
       "description": "Installs/updates Dell Command Update and applies driver/firmware/BIOS updates.",
       "platform": "windows",
@@ -295,6 +295,19 @@
       "sha256": "16512fd07166ebb03ff8602428b2854497158f1fbceb62640f589c1ca6f2b764",
       "version": "0.0.0",
       "description": "PowerShell Verbose Logging Template",
+      "platform": "windows",
+      "mutating": true,
+      "requiresAdmin": false,
+      "interactive": false,
+      "unsupported": false,
+      "agentDiagnostic": false
+    },
+    {
+      "name": "ExchangeMailboxHealthCheck",
+      "path": "Scripts/ExchangeMailboxHealthCheck.ps1",
+      "sha256": "308c8f5b8ff5d48ebc3c8a274ff6f0ccdb4b806f6c120b9ff240a6c31c69ba91",
+      "version": "0.0.0",
+      "description": "Exchange Settings Health Check Script",
       "platform": "windows",
       "mutating": true,
       "requiresAdmin": false,
@@ -565,7 +578,7 @@
     {
       "name": "InstallMSProjects",
       "path": "Scripts/InstallMSProjects.ps1",
-      "sha256": "5de26ed3cb25a26eaf7d76c4ba03ecc10d159e06cd5f808a2f058ba98c2cb0c0",
+      "sha256": "175f53f9ad10595f92d4397b29c85c3019080bbc715e2cfe5a9e7a55f1e6b8a3",
       "version": "0.0.0",
       "description": "Define variables",
       "platform": "windows",
@@ -578,7 +591,7 @@
     {
       "name": "InstallOffice",
       "path": "Scripts/InstallOffice.ps1",
-      "sha256": "88c5d750e6134d3a99b29d6fb34f60c9067f1fc479f9fb6982bdd9bd83cd40ab",
+      "sha256": "739d2383388bfb556bb3df736281de2d6a517907043ef3be791cd66286fc5375",
       "version": "0.0.0",
       "description": "Define variables",
       "platform": "windows",
