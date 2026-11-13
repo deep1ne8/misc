@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "hashAlgorithm": "sha256-lf",
-  "scriptCount": 94,
+  "scriptCount": 90,
   "scripts": [
     {
       "name": "[MAC]DIskCleanup",
@@ -325,19 +325,6 @@
       "mutating": true,
       "requiresAdmin": false,
       "interactive": true,
-      "unsupported": false,
-      "agentDiagnostic": false
-    },
-    {
-      "name": "FinancialApp",
-      "path": "Scripts/FinancialApp.ps1",
-      "sha256": "c1443923170a020db65ca584b8bee15cfd6c5a1df549956aa3ee052839c433bf",
-      "version": "0.0.0",
-      "description": "Financial AI Coach Web App Deployment Script",
-      "platform": "windows",
-      "mutating": true,
-      "requiresAdmin": true,
-      "interactive": false,
       "unsupported": false,
       "agentDiagnostic": false
     },
@@ -771,19 +758,6 @@
       "agentDiagnostic": false
     },
     {
-      "name": "MSOutlookCalendarPermissions_Test",
-      "path": "Scripts/MSOutlookCalendarPermissions_Test.ps1",
-      "sha256": "a16b817f48b4f25f06a058c715c769073d27294050a202dc12feef3c29b929f2",
-      "version": "0.0.0",
-      "description": "Requires ExchangeOnlineManagement module",
-      "platform": "windows",
-      "mutating": true,
-      "requiresAdmin": false,
-      "interactive": true,
-      "unsupported": false,
-      "agentDiagnostic": false
-    },
-    {
       "name": "NetworkScan",
       "path": "Scripts/NetworkScan.ps1",
       "sha256": "929a68bda3c666de79f0d4bfaeb1ef069ed2b78358a2c4bd2e2b47b97a3f4b0d",
@@ -927,19 +901,6 @@
       "agentDiagnostic": false
     },
     {
-      "name": "ScriptStar",
-      "path": "Scripts/ScriptStar.ps1",
-      "sha256": "1ad44d30cc407eb7ae480f06523ab8e7a060dbea91b63d3e5dedf17dae05fd41",
-      "version": "0.0.0",
-      "description": "",
-      "platform": "windows",
-      "mutating": true,
-      "requiresAdmin": false,
-      "interactive": true,
-      "unsupported": false,
-      "agentDiagnostic": false
-    },
-    {
       "name": "Set-OutlookAsDefaultEmailClient",
       "path": "Scripts/Set-OutlookAsDefaultEmailClient.ps1",
       "sha256": "2f80aad13c314d978c252be8b6618e637b26da943b643a5020ecf75ab1902c58",
@@ -1049,19 +1010,6 @@
       "sha256": "f0a90c088d0af1825f7782ecbd5fc280403d978722674c4f615ff9cb3dd14535",
       "version": "1.0",
       "description": "Comprehensive diagnostic tool for Teams-Exchange integration issues.",
-      "platform": "windows",
-      "mutating": true,
-      "requiresAdmin": false,
-      "interactive": false,
-      "unsupported": false,
-      "agentDiagnostic": false
-    },
-    {
-      "name": "TestAI",
-      "path": "Scripts/TestAI.ps1",
-      "sha256": "506b69a252900796e6bc59db8cae95678f60ed225c27f2b95eb15cc49a67f138",
-      "version": "0.0.0",
-      "description": "Import the PSLLM module if not already imported",
       "platform": "windows",
       "mutating": true,
       "requiresAdmin": false,

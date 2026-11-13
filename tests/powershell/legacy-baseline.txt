@@ -19,7 +19,7 @@ Scripts/DownloadFile.ps1
 Scripts/EnableFilesOnDemand.ps1
 Scripts/ExchangeMailboxHealthCheck.ps1
 Scripts/Fido.ps1
-Scripts/FinancialApp.ps1
+archive/FinancialApp.ps1
 Scripts/Get-CurrentLoggedInUser.ps1
 Scripts/Get-ExcelAddIns.ps1
 Scripts/Get-HPPrinterSupplies.ps1
@@ -43,7 +43,7 @@ Scripts/InternetSpeedTest.ps1
 Scripts/IntuneRemediate.ps1
 Scripts/M365-AddTrustedLocation.ps1
 Scripts/MemoryAccessViolation.ps1
-Scripts/MSOutlookCalendarPermissions_Test.ps1
+archive/MSOutlookCalendarPermissions_Test.ps1
 Scripts/NewTeamsReadinessCheckScript.ps1
 Scripts/OfficeSetTrustedLocation.ps1
 Scripts/PrinterCleanup.ps1
@@ -53,7 +53,7 @@ Scripts/RemoveAllTeams.ps1
 Scripts/RemoveWindowsUpdatePolicy.ps1
 Scripts/RenameOnedrive.ps1
 Scripts/ResetandClearWindowsSearchDB.ps1
-Scripts/ScriptStar.ps1
+archive/ScriptStar.ps1
 Scripts/Set-OutlookAsDefaultEmailClient.ps1
 Scripts/Set-SmtpRelay.ps1
 Scripts/SetCalendarToReviewer.ps1
@@ -61,7 +61,7 @@ Scripts/SetExchangeCalendarToReViewer.ps1
 Scripts/SimpleHttpServer.ps1
 Scripts/SplitlogFile.ps1
 Scripts/TeamsOutlookTroubleshoot.ps1
-Scripts/TestAI.ps1
+archive/TestAI.ps1
 Scripts/Testing.ps1
 Scripts/TestSage.ps1
 Scripts/Uninstall-DellApps.ps1
