@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   verify:
+    # Never bill: skip if this repository is ever made private.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -32,6 +34,8 @@ jobs:
   # SIGNING_CERT_PASSWORD. Signed copies are attached to the release as a zip;
   # the repository files (and therefore the manifest hashes) are not modified.
   sign:
+    # Never bill: skip if this repository is ever made private.
+    if: ${{ !github.event.repository.private }}
     needs: verify
     runs-on: windows-latest
     environment: release-signing
@@ -70,7 +74,7 @@ jobs:
 
   publish:
     needs: [verify, sign]
-    if: always() && needs.verify.result == 'success' && needs.sign.result != 'failure'
+    if: always() && !github.event.repository.private && needs.verify.result == 'success' && needs.sign.result != 'failure'
     runs-on: ubuntu-latest
     permissions:
       contents: write
