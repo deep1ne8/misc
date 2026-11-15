@@ -20,6 +20,8 @@ env:
 
 jobs:
   manifest:
+    # Never bill: skip if this repository is ever made private.
+    if: ${{ !github.event.repository.private }}
     name: manifest (fresh)
     runs-on: ubuntu-latest
     permissions:
@@ -31,8 +33,13 @@ jobs:
       - name: Check scripts.manifest.json is up to date
         shell: pwsh
         run: ./build/Build-ScriptManifest.ps1 -Check
+      - name: Leaked-credential guard (hash denylist)
+        shell: pwsh
+        run: ./build/Test-LeakedSecrets.ps1
 
   lint-powershell:
+    # Never bill: skip if this repository is ever made private.
+    if: ${{ !github.event.repository.private }}
     runs-on: windows-latest
     permissions:
       contents: read
@@ -79,6 +86,8 @@ jobs:
           category: psscriptanalyzer
 
   test-powershell:
+    # Never bill: skip if this repository is ever made private.
+    if: ${{ !github.event.repository.private }}
     runs-on: windows-latest
     permissions:
       contents: read
@@ -106,6 +115,8 @@ jobs:
           path: pester.xml
 
   lint-test-python:
+    # Never bill: skip if this repository is ever made private.
+    if: ${{ !github.event.repository.private }}
     strategy:
       fail-fast: false
       matrix:
@@ -139,6 +150,8 @@ jobs:
         run: printf 'hello\nquit\n' | python agent.py --mock | tee out.txt && grep -q "mock responder" out.txt
 
   secret-scan:
+    # Never bill: skip if this repository is ever made private.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     permissions:
       contents: read

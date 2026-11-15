@@ -1,0 +1,5 @@
+#!/bin/sh
+# Blocks commits that contain a credential that previously leaked from this repo.
+# Enable once per clone:  pwsh ./build/Invoke-LocalCI.ps1 -InstallHooks
+if command -v pwsh >/dev/null 2>&1; then PS=pwsh; else PS=powershell.exe; fi
+exec "$PS" -NoProfile -ExecutionPolicy Bypass -File build/Test-LeakedSecrets.ps1 -Staged

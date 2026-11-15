@@ -27,6 +27,8 @@ approval — runs fixes from the bundled script library.
 
 ## Quick start
 
+> Full step-by-step guide (launcher, RMM, CLI, agent, GUI, local CI): **[docs/GETTING-STARTED.md](docs/GETTING-STARTED.md)**
+
 ```powershell
 git clone https://github.com/deep1ne8/misc.git
 cd misc\AutoByte-Agent

@@ -38,3 +38,6 @@ AuitoBytePro/
 AutoByte-Test.ps1
 Ignore/
 Backuprequests
+
+# Local CI virtualenv
+.venv-ci/
