@@ -1,7 +1,11 @@
 # 📜 AutoByte Release Notes
 
 ## 🧩 Version 3.0.0 (unreleased)
-- New engine: `src/AutoByte` module with 14 read-only checks and 8 idempotent, self-verifying fixes.
+- New engine: `src/AutoByte` module with 19 read-only checks and 14 idempotent, self-verifying fixes.
+- Event Viewer analysis across System, Application, Setup, Defender and boot-performance logs, with
+  blue-screen stop codes and Windows Update error codes mapped to the right fix.
+- "Why is it slow?" performance check, driver problems, missing security updates, CVE exposure
+  (MSRC fixed builds + CISA KEV, refreshed daily) and outdated apps (winget), each with a fix.
 - `abyte` CLI: end-user menu, `scan`, `fix`, `list`, `report`, `legacy`; JSON output; exit codes 0/1/2/3010.
 - Self-contained HTML health report.
 - Hash-verified installer (`install/Install-AutoByte.ps1`) and Datto RMM component (UDF + monitor output).

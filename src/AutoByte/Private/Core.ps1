@@ -85,6 +85,16 @@ function Get-AbConfig {
         MemoryWarnPercent  = 10
         UptimeWarnDays     = 14
         EventErrorWarn     = 25
+        EventLookbackDays  = 7
+        CpuWarnPercent     = 85
+        CommitWarnPercent  = 90
+        DiskBusyWarnPercent = 90
+        BootWarnSeconds    = 120
+        StartupItemsWarn   = 15
+        CveCheck           = 1
+        CveMonths          = 3
+        CveFeedUrl         = 'https://api.msrc.microsoft.com/cvrf/v3.0'
+        KevFeedUrl         = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
         DefenderSigMaxDays = 3
         TimeSkewWarnSeconds = 60
         TempFileMinAgeDays = 7

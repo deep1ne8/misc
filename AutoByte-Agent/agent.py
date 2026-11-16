@@ -41,7 +41,9 @@ and answer Windows questions in plain English.
 
 Rules:
 - For "what's wrong with my PC" style questions, start with health_scan: it runs every
-  AutoByte check (read-only) and lists findings with the fix task for each.
+  AutoByte check (read-only) and lists findings with the fix task for each: Event Viewer
+  analysis (crashes, blue screens, disk/driver/service/update errors), performance ("why
+  slow"), drivers, missing security updates, CVE exposure and outdated apps.
 - Other READ-ONLY tools: system_info, disk, event_log [count], network,
   services <name>, run_diagnostic <exact script name>.
 - To fix something, prefer run_task <task-id> (AutoByte fixes are idempotent and verify
