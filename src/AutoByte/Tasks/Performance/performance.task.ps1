@@ -59,7 +59,7 @@
         if ($boot -and $boot[0].Data['BootTime']) {
             $sec = [Math]::Round([double]$boot[0].Data['BootTime'] / 1000)
             if ($sec -ge [int]$c.BootWarnSeconds) {
-                New-AbFinding -Code 'performance.slow-boot' -Severity Warning -Title "Last start-up took $sec seconds" -Detail "Run 'abyte run event-logs' to see which apps, drivers or services slowed it." -Data @{ Seconds = $sec }
+                New-AbFinding -Code 'performance.slow-boot' -Severity Warning -Title "Last start-up took $sec seconds" -Detail "Run 'abyte check event-logs' to see which apps, drivers or services slowed it." -Data @{ Seconds = $sec }
             }
         }
     }

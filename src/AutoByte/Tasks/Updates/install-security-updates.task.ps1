@@ -21,7 +21,7 @@
         $r = Install-AbUpdate -UpdateId $ids
         foreach ($row in $r.Results) { Add-AbMessage -Result $Ctx.Result -Message "$($row.Title): result $($row.ResultCode) ($($row.HResult))" }
         if ($r.Failed) {
-            Add-AbMessage -Result $Ctx.Result -Message "$($r.Failed) update(s) failed. Run 'abyte run event-logs' for the error code and the matching fix."
+            Add-AbMessage -Result $Ctx.Result -Message "$($r.Failed) update(s) failed. Run 'abyte check event-logs' for the error code and the matching fix."
             if (-not $r.Installed) { throw "All $($r.Failed) update(s) failed to install." }
         }
         @{ RebootRequired = [bool]$r.RebootRequired }

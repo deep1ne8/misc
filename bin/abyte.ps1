@@ -7,7 +7,9 @@
 
     Commands (technicians and RMM):
       abyte scan   [--json] [--report] [--open] [--fail-on warning|critical] [--category <name>]
+      abyte check  <task-id>... [--param name=value] [--json] [--fail-on ...]   run single checks
       abyte fix    <task-id>... | --suggested   [--whatif] [--yes] [--param name=value] [--json]
+      abyte run    <task-id>...                   runs checks (like check) or fixes (like fix)
       abyte list   [--kind check|fix] [--json]
       abyte report [--open]                       scan and write the HTML report
       abyte legacy <ScriptName> [--whatif]        run a v2 library script (hash-verified)
@@ -18,6 +20,8 @@
 
 .EXAMPLE
     abyte scan --report --open
+.EXAMPLE
+    abyte check cve-exposure event-logs
 .EXAMPLE
     abyte fix clean-temp-files --whatif
 .EXAMPLE
@@ -182,6 +186,31 @@ try {
             if ($opt.json) { $s | ConvertTo-AbJson }
             else { Show-Scan $s; if ($file) { Write-Host "`n  Report: $($file.FullName)" -ForegroundColor DarkGray } }
             exit (Get-AbExitCode -Results $s.Results -FailOn $opt.failon)
+        }
+        { $_ -eq 'check' -or ($_ -eq 'run' -and $rest -and -not @($rest | Where-Object { (Get-AbTask -Id $_).Kind -ne 'Check' })) } {
+            if (-not $rest) { Write-Error "Usage: abyte check <task-id>... Run 'abyte list --kind check'." -ErrorAction Continue; exit 2 }
+            $ids = @($rest | Select-Object -Unique)
+            foreach ($id in $ids) { if ((Get-AbTask -Id $id).Kind -ne 'Check') { Write-Error "'$id' is a fix, not a check. Use 'abyte fix $id'." -ErrorAction Continue; exit 2 } }
+            $results = @()
+            $n = 0
+            foreach ($id in $ids) {
+                $n++
+                Write-Progress -Activity 'AutoByte checks' -Status "$n/$($ids.Count): $((Get-AbTask -Id $id).Name)" -PercentComplete ([int](100 * ($n - 1) / $ids.Count))
+                $results += if ($opt.params.Count -and $ids.Count -eq 1) { Invoke-AbTask -Id $id -Parameters $opt.params } else { Invoke-AbTask -Id $id }
+            }
+            Write-Progress -Activity 'AutoByte checks' -Completed
+            if ($opt.json) { $results | ConvertTo-AbJson }
+            else {
+                foreach ($r in $results) {
+                    Write-Host ''
+                    Write-Host ("{0} [{1}]" -f (Get-AbTask -Id $r.TaskId).Name, $r.Status) -ForegroundColor $colors[$r.Status]
+                    foreach ($m in @($r.Messages)) { Write-Host "  $m" -ForegroundColor DarkGray }
+                    if ($r.Error) { Write-Host "  could not run: $($r.Error)" -ForegroundColor Red }
+                    foreach ($f in @($r.Findings)) { Write-Finding $f }
+                    if ($r.Status -eq 'Healthy' -and -not @($r.Findings)) { Write-Host '  No problems found.' -ForegroundColor Green }
+                }
+            }
+            exit (Get-AbExitCode -Results $results -FailOn $opt.failon)
         }
         { $_ -in 'fix', 'run' } {
             $ids = @($rest)
