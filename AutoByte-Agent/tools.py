@@ -31,8 +31,14 @@ REPO_ROOT: Final = HERE.parent
 SCRIPTS_DIR: Final = REPO_ROOT / "Scripts"
 MANIFEST_PATH: Final = REPO_ROOT / "scripts.manifest.json"
 
-READONLY: Final = frozenset({"system_info", "event_log", "disk", "services", "network", "run_diagnostic"})
-MUTATING: Final = frozenset({"run_fix", "run_command", "install_updates"})
+READONLY: Final = frozenset(
+    {"system_info", "event_log", "disk", "services", "network", "run_diagnostic", "health_scan"}
+)
+MUTATING: Final = frozenset({"run_fix", "run_command", "install_updates", "run_task"})
+
+# AutoByte v3 engine (deterministic checks and idempotent, verified fixes).
+V3_MODULE: Final = REPO_ROOT / "src" / "AutoByte" / "AutoByte.psd1"
+TASK_ID_RE: Final = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
 MAX_OUTPUT_CHARS: Final = 20_000
 MAX_COMMAND_CHARS: Final = 4_000
@@ -377,6 +383,101 @@ else { 'usoclient.exe not found on this build.' }
     )
 
 
+# ---- AutoByte v3 engine ------------------------------------------------------------------
+def v3_tasks() -> dict[str, dict[str, str]]:
+    """Task catalog parsed from the v3 task files: {id: {"kind": ..., "name": ...}}.
+
+    Parsed as text so an LLM-supplied id can be validated without running PowerShell.
+    """
+    out: dict[str, dict[str, str]] = {}
+    tasks_dir = V3_MODULE.parent / "Tasks"
+    if not tasks_dir.is_dir():
+        return out
+    for f in sorted(tasks_dir.rglob("*.task.ps1")):
+        text = f.read_text(encoding="utf-8-sig", errors="replace")
+        m_id = re.search(r"\bId\s*=\s*'([a-z0-9-]+)'", text)
+        m_kind = re.search(r"\bKind\s*=\s*'(Check|Fix)'", text)
+        m_name = re.search(r"\bName\s*=\s*'([^']*)'", text)
+        if m_id and m_kind:
+            out[m_id.group(1)] = {
+                "kind": m_kind.group(1),
+                "name": m_name.group(1) if m_name else m_id.group(1),
+            }
+    return out
+
+
+def _v3_import() -> str:
+    if V3_MODULE.is_file():
+        return "Import-Module '" + str(V3_MODULE).replace("'", "''") + "' -Force"
+    return "Import-Module AutoByte"
+
+
+def _json_payload(out: str) -> Any:
+    start = min((i for i in (out.find("{"), out.find("[")) if i >= 0), default=-1)
+    if start < 0:
+        return None
+    try:
+        return json.loads(out[start : out.rfind("}" if out[start] == "{" else "]") + 1])
+    except ValueError:
+        return None
+
+
+def health_scan() -> str:
+    """Read-only: run every v3 check and summarise the findings for the model."""
+    out = _ps(_v3_import() + "; Invoke-AbScan | ConvertTo-AbJson -Compress", timeout=600)
+    data = _json_payload(out)
+    if not isinstance(data, dict):
+        return "Health scan unavailable (AutoByte v3 module not found or failed):\n" + out[:1500]
+    lines = [
+        f"Health scan of {data.get('Computer', '?')}: {data.get('Critical', 0)} critical, "
+        f"{data.get('Warning', 0)} warning, {data.get('Info', 0)} info."
+    ]
+    order = {"Critical": 0, "Warning": 1, "Info": 2}
+    for f in sorted(data.get("Findings") or [], key=lambda x: order.get(str(x.get("Severity")), 3)):
+        fix = f" -> fix: run_task {f['FixTask']}" if f.get("FixTask") else ""
+        lines.append(f"- [{f.get('Severity')}] {f.get('Title')}. {f.get('Detail', '')}{fix}".strip())
+    failed = [r.get("TaskId") for r in data.get("Results") or [] if r.get("Status") == "Failed"]
+    if failed:
+        lines.append("Checks that could not run: " + ", ".join(str(x) for x in failed))
+    return _cap("\n".join(lines))
+
+
+def resolve_task(task_id: str) -> tuple[str | None, str]:
+    task_id = (task_id or "").strip()
+    if not TASK_ID_RE.fullmatch(task_id):
+        return None, f"Invalid task id {task_id!r}."
+    catalog = v3_tasks()
+    if not catalog:
+        return None, "AutoByte v3 task catalog not found."
+    entry = catalog.get(task_id)
+    if entry is None:
+        return (
+            None,
+            f"Unknown task {task_id!r}. Fix tasks: {', '.join(sorted(k for k, v in catalog.items() if v['kind'] == 'Fix'))}",
+        )
+    if entry["kind"] != "Fix":
+        return None, f"{task_id!r} is a read-only check; it runs as part of health_scan."
+    return task_id, ""
+
+
+def run_task(task_id: str) -> str:
+    """Mutating (after approval): run one idempotent, self-verifying v3 fix task."""
+    tid, why = resolve_task(task_id)
+    if tid is None:
+        return f"REFUSED: {why}"
+    out = _ps(
+        f"{_v3_import()}; Invoke-AbTask -Id '{tid}' -Confirm:$false | ConvertTo-AbJson -Compress",
+        timeout=3600,
+    )
+    data = _json_payload(out)
+    if not isinstance(data, dict):
+        return out
+    msgs = " ".join(str(m) for m in data.get("Messages") or [])
+    err = f" Error: {data['Error']}" if data.get("Error") else ""
+    reboot = " A restart is required to finish." if data.get("RebootRequired") else ""
+    return f"{tid}: {data.get('Status')}. {msgs}{err}{reboot}".strip()
+
+
 def _event_count(arg: str) -> int:
     return int(arg) if arg.isdigit() else 20
 
@@ -391,6 +492,8 @@ DISPATCH: Final[dict[str, Callable[[str], str]]] = {
     "run_fix": run_fix,
     "run_command": run_command,
     "install_updates": lambda a: install_updates(),
+    "health_scan": lambda a: health_scan(),
+    "run_task": run_task,
 }
 
 
@@ -401,6 +504,9 @@ def preview(tool: str, arg: str) -> str:
         return f"Run script {path.name if path else arg} (hash-verified)"
     if tool == "run_command":
         return f"Run PowerShell:\n    {arg}"
+    if tool == "run_task":
+        entry = v3_tasks().get(arg.strip(), {})
+        return f"Run AutoByte fix '{arg}': {entry.get('name', '?')} (checks first, verifies after)"
     if tool == "install_updates":
         return "Trigger Windows Update install (usoclient StartInstall)"
     return f"{tool} {arg}".strip()
@@ -416,6 +522,11 @@ def call(tool: str, arg: str = "") -> ToolResult:
         if tool == "run_command":
             why = check_command(arg)
             if why:
+                audit("refused", tool=tool, arg=arg, reason=why)
+                return {"status": "refused", "tool": tool, "arg": arg, "result": why}
+        if tool == "run_task":
+            tid, why = resolve_task(arg)
+            if tid is None:
                 audit("refused", tool=tool, arg=arg, reason=why)
                 return {"status": "refused", "tool": tool, "arg": arg, "result": why}
         if tool == "run_fix":

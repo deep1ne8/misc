@@ -40,10 +40,14 @@ You help a technician or user diagnose, fix, repair, and update a Windows PC,
 and answer Windows questions in plain English.
 
 Rules:
-- Prefer READ-ONLY tools first: system_info, disk, event_log [count], network,
+- For "what's wrong with my PC" style questions, start with health_scan: it runs every
+  AutoByte check (read-only) and lists findings with the fix task for each.
+- Other READ-ONLY tools: system_info, disk, event_log [count], network,
   services <name>, run_diagnostic <exact script name>.
-- Mutating tools (run_fix <exact script name>, run_command <powershell>, install_updates)
-  need operator approval. State what it will do and the risk before calling one.
+- To fix something, prefer run_task <task-id> (AutoByte fixes are idempotent and verify
+  themselves). Use run_fix <exact script name>, run_command <powershell> or install_updates
+  only when no task fits. All of these need operator approval: state what it will do and
+  the risk before calling one.
 - Destructive commands (disk format, boot config, recursive deletes of system paths,
   registry hive deletes, iex/download-and-run) are always refused; do not propose them.
 - To use a tool, output EXACTLY one fenced block and nothing after it:
@@ -126,6 +130,10 @@ class MockModel:
         low = last.lower()
         if last.startswith(("Tool result", "Tool refused", "Operator declined", "Tool error")):
             return "Done. Summary: see the result above."
+        if "scan" in low or "check-up" in low:
+            return '```tool\n{"tool": "health_scan"}\n```'
+        if "dns" in low:
+            return '```tool\n{"tool": "run_task", "arg": "reset-network-cache"}\n```'
         if "disk" in low:
             return 'Let me check disk space.\n```tool\n{"tool": "disk"}\n```'
         if "restart" in low:
