@@ -28,7 +28,7 @@
     pwsh ./build/Invoke-LocalCI.ps1 -InstallHooks
 
 .NOTES
-    Version: 1.0.0
+    Version: 1.1.0
     Exit codes: 0 all steps passed, 1 one or more steps failed.
 #>
 #Requires -Version 5.1
@@ -53,20 +53,41 @@ if ($InstallHooks) {
 
 $results = [System.Collections.Generic.List[object]]::new()
 $psExe = (Get-Process -Id $PID).Path
+$allSteps = @('Secrets', 'Manifest', 'Parse', 'Analyzer', 'Pester', 'Python')
+$script:stepNo = 0
+$activity = 'AutoByte local CI'
+$totalTimer = [System.Diagnostics.Stopwatch]::StartNew()
+
+function Write-SubProgress {
+    # Second progress bar under the main one, for per-file work inside a step.
+    param([string]$Status, [int]$Done, [int]$Total)
+    $pct = if ($Total -gt 0) { [int](100 * $Done / $Total) } else { 0 }
+    Write-Progress -Id 2 -ParentId 1 -Activity $script:currentStep -Status $Status -PercentComplete $pct
+}
 
 function Invoke-Step {
     param([Parameter(Mandatory)][string]$Name, [Parameter(Mandatory)][scriptblock]$Body)
-    if ($Skip -contains $Name) { $results.Add([pscustomobject]@{ Step = $Name; Result = 'SKIPPED'; Seconds = 0; Detail = '' }); return }
-    Write-Host "`n=== $Name ===" -ForegroundColor Cyan
+    $script:stepNo++
+    $script:currentStep = $Name
+    $n = $allSteps.Count
+    Write-Progress -Id 1 -Activity $activity -Status "Step $($script:stepNo)/${n}: $Name" -PercentComplete ([int](100 * ($script:stepNo - 1) / $n))
+    if ($Skip -contains $Name) {
+        Write-Host "[$($script:stepNo)/$n] $Name - skipped" -ForegroundColor DarkGray
+        $results.Add([pscustomobject]@{ Step = $Name; Result = 'SKIPPED'; Seconds = 0; Detail = '' }); return
+    }
+    Write-Host "`n[$($script:stepNo)/$n] $Name..." -ForegroundColor Cyan
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     try {
         $detail = & $Body
         $results.Add([pscustomobject]@{ Step = $Name; Result = 'PASS'; Seconds = [math]::Round($sw.Elapsed.TotalSeconds, 1); Detail = "$detail" })
+        Write-Host "[$($script:stepNo)/$n] $Name - PASS ($([math]::Round($sw.Elapsed.TotalSeconds, 1))s)" -ForegroundColor Green
     }
     catch {
         Write-Host $_.Exception.Message -ForegroundColor Red
         $results.Add([pscustomobject]@{ Step = $Name; Result = 'FAIL'; Seconds = [math]::Round($sw.Elapsed.TotalSeconds, 1); Detail = $_.Exception.Message })
+        Write-Host "[$($script:stepNo)/$n] $Name - FAIL" -ForegroundColor Red
     }
+    finally { Write-Progress -Id 2 -ParentId 1 -Activity $Name -Completed }
 }
 
 function Invoke-Child {
@@ -93,8 +114,9 @@ Invoke-Step 'Secrets' { Invoke-Child -Arguments '-File', (Join-Path $PSScriptRoo
 Invoke-Step 'Manifest' { Invoke-Child -Arguments '-File', (Join-Path $PSScriptRoot 'Build-ScriptManifest.ps1'), '-Check' }
 
 Invoke-Step 'Parse' {
-    $bad = 0
+    $bad = 0; $i = 0
     foreach ($f in $psFiles) {
+        $i++; if ($i % 5 -eq 0 -or $i -eq $psFiles.Count) { Write-SubProgress "PowerShell $($PSVersionTable.PSVersion.Major): $i/$($psFiles.Count) $($f.Name)" $i $psFiles.Count }
         $e = $null
         [void][System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$e)
         foreach ($x in @($e)) { $bad++; Write-Host "$($f.FullName):$($x.Extent.StartLineNumber) $($x.Message)" -ForegroundColor Red }
@@ -102,12 +124,28 @@ Invoke-Step 'Parse' {
     $note = "PowerShell $($PSVersionTable.PSVersion)"
     $winPs = if ($env:SystemRoot) { Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' } else { '' }
     if ($winPs -and (Test-Path -LiteralPath $winPs) -and $PSVersionTable.PSVersion.Major -ge 6) {
-        $list = Join-Path ([IO.Path]::GetTempPath()) "autobyte-ci-files-$PID.txt"
-        $psFiles.FullName | Set-Content -LiteralPath $list -Encoding UTF8
-        $code = '$n=0; foreach($p in Get-Content -LiteralPath $args[0]){ $e=$null; [void][System.Management.Automation.Language.Parser]::ParseFile($p,[ref]$null,[ref]$e); foreach($x in @($e)){ $n++; Write-Output ("{0}:{1} {2}" -f $p,$x.Extent.StartLineNumber,$x.Message) } }; exit $n'
-        & $winPs -NoProfile -ExecutionPolicy Bypass -Command $code $list | Out-Host
-        $bad += $LASTEXITCODE
-        Remove-Item -LiteralPath $list -Force -ErrorAction SilentlyContinue
+        Write-SubProgress 'Windows PowerShell 5.1: parsing all files' 50 100
+        # Pass the file list to a temp script via -File: with -Command, extra arguments are appended
+        # to the command text instead of becoming $args. UTF-16 so 5.1 reads non-ASCII paths correctly.
+        $tmp = [IO.Path]::GetTempPath()
+        $list = Join-Path $tmp "autobyte-ci-files-$PID.txt"
+        $checker = Join-Path $tmp "autobyte-ci-parse51-$PID.ps1"
+        $psFiles.FullName | Set-Content -LiteralPath $list -Encoding Unicode
+        @'
+param([string]$ListPath)
+$n = 0
+foreach ($p in Get-Content -LiteralPath $ListPath -Encoding Unicode) {
+    $e = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($p, [ref]$null, [ref]$e)
+    foreach ($x in @($e)) { $n++; Write-Output ("{0}:{1} {2}" -f $p, $x.Extent.StartLineNumber, $x.Message) }
+}
+exit $n
+'@ | Set-Content -LiteralPath $checker -Encoding Unicode
+        try {
+            & $winPs -NoProfile -ExecutionPolicy Bypass -File $checker $list | Out-Host
+            $bad += $LASTEXITCODE
+        }
+        finally { Remove-Item -LiteralPath $list, $checker -Force -ErrorAction SilentlyContinue }
         $note += ' + Windows PowerShell 5.1'
     }
     if ($bad) { throw "$bad parse error(s)" }
@@ -117,8 +155,12 @@ Invoke-Step 'Parse' {
 Invoke-Step 'Analyzer' {
     Initialize-Module -Name PSScriptAnalyzer -Minimum '1.21.0'
     $settings = Join-Path $Root 'PSScriptAnalyzerSettings.psd1'
-    $r = @($psFiles + @(Get-ChildItem -Recurse -Force -Filter *.psd1 -File | Where-Object FullName -NotMatch '[\\/]\.git[\\/]') |
-            ForEach-Object { Invoke-ScriptAnalyzer -Path $_.FullName -Settings $settings })
+    $targets = @($psFiles + @(Get-ChildItem -Recurse -Force -Filter *.psd1 -File | Where-Object FullName -NotMatch '[\\/]\.git[\\/]'))
+    $i = 0
+    $r = @(foreach ($t in $targets) {
+            $i++; Write-SubProgress "$i/$($targets.Count) $($t.Name)" $i $targets.Count
+            Invoke-ScriptAnalyzer -Path $t.FullName -Settings $settings
+        })
     $errors = @($r | Where-Object Severity -EQ 'Error')
     foreach ($x in $errors) { Write-Host "$($x.ScriptPath):$($x.Line) $($x.RuleName): $($x.Message)" -ForegroundColor Red }
     if ($errors.Count) { throw "$($errors.Count) PSScriptAnalyzer error(s)" }
@@ -149,6 +191,7 @@ Invoke-Step 'Python' {
         if ($LASTEXITCODE -ne 0) { throw 'Could not create .venv-ci' }
     }
     $vpy = @((Join-Path $venv 'Scripts/python.exe'), (Join-Path $venv 'bin/python')) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    Write-SubProgress 'Installing pinned Python tools (first run takes a minute)' 0 1
     & $vpy -m pip install --quiet --disable-pip-version-check -r AutoByte-Agent/requirements-dev.txt -r AutoByte-Agent/requirements-api.txt -r requirements.txt
     if ($LASTEXITCODE -ne 0) { throw 'pip install failed' }
     $checks = @(
@@ -158,7 +201,10 @@ Invoke-Step 'Python' {
         @{ Name = 'mypy'; Dir = (Join-Path $Root 'AutoByte-Agent'); Args = @('-m', 'mypy') },
         @{ Name = 'pytest'; Dir = $Root; Args = @('-m', 'pytest', '-q', '-p', 'no:cacheprovider', 'AutoByte-Agent/tests', 'tests/python') }
     )
+    $i = 0
     foreach ($c in $checks) {
+        $i++; Write-SubProgress "$i/$($checks.Count) $($c.Name)" $i $checks.Count
+        Write-Host "  - $($c.Name)" -ForegroundColor DarkCyan
         Push-Location -LiteralPath $c.Dir
         try { & $vpy @($c.Args) | Out-Host; $code = $LASTEXITCODE } finally { Pop-Location }
         if ($code -ne 0) { throw "$($c.Name) failed ($code)" }
@@ -166,7 +212,8 @@ Invoke-Step 'Python' {
     'ruff, mypy, pytest'
 }
 
-Write-Host "`n=== Summary ===" -ForegroundColor Cyan
+Write-Progress -Id 1 -Activity $activity -Completed
+Write-Host "`n=== Summary ($([math]::Round($totalTimer.Elapsed.TotalSeconds))s) ===" -ForegroundColor Cyan
 $results | Format-Table Step, Result, Seconds, Detail -AutoSize | Out-String -Width 200 | Write-Host
 if ($results.Result -contains 'FAIL') { Write-Host 'LOCAL CI FAILED' -ForegroundColor Red; exit 1 }
 Write-Host 'LOCAL CI PASSED' -ForegroundColor Green

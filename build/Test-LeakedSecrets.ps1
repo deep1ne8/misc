@@ -25,7 +25,7 @@
     pwsh ./build/Test-LeakedSecrets.ps1 -Staged
 
 .NOTES
-    Version: 1.0.0
+    Version: 1.1.0
     Exit codes: 0 clean, 1 leaked credential found or error.
 #>
 #Requires -Version 5.1
@@ -63,7 +63,12 @@ try {
     $findings = [System.Collections.Generic.List[object]]::new()
     $self = 'build/leaked-secrets.sha256'
 
+    $count = @($Path).Count; $idx = 0
     foreach ($file in $Path) {
+        $idx++
+        if ($idx % 10 -eq 0 -or $idx -eq $count) {
+            Write-Progress -Activity 'Scanning for leaked credentials' -Status "$idx/$count $file" -PercentComplete ([int](100 * $idx / $count))
+        }
         if ($file -eq $self) { continue }
         $text = if ($Staged) { (& git show ":$file") -join "`n" } else {
             if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { continue }
@@ -88,6 +93,7 @@ try {
         }
     }
     $sha.Dispose()
+    Write-Progress -Activity 'Scanning for leaked credentials' -Completed
 }
 finally { Pop-Location }
 
