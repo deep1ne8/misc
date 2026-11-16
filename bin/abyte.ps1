@@ -206,7 +206,8 @@ try {
                     Write-Host ("{0} [{1}]" -f (Get-AbTask -Id $r.TaskId).Name, $r.Status) -ForegroundColor $colors[$r.Status]
                     foreach ($m in @($r.Messages)) { Write-Host "  $m" -ForegroundColor DarkGray }
                     if ($r.Error) { Write-Host "  could not run: $($r.Error)" -ForegroundColor Red }
-                    foreach ($f in @($r.Findings)) { Write-Finding $f }
+                    $order = @{ Critical = 0; Warning = 1; Info = 2 }
+                    foreach ($f in @($r.Findings | Sort-Object { $order[$_.Severity] })) { Write-Finding $f }
                     if ($r.Status -eq 'Healthy' -and -not @($r.Findings)) { Write-Host '  No problems found.' -ForegroundColor Green }
                 }
             }

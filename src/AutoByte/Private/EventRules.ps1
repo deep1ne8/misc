@@ -2,7 +2,8 @@
 # Each rule: Code, Log, Provider (regex on ProviderName), Id, Severity, Title, Detail, FixTask,
 # optional MinCount (default 1), Level (default 1,2,3 = Critical/Error/Warning; Information events
 # are never problems, e.g. Ntfs 98 "volume is healthy"), Group (scriptblock -> group key, one finding
-# per group), Fix (scriptblock -> fix task id, overrides FixTask per group) and Summarize
+# per group), Fix (scriptblock -> fix task id, overrides FixTask per group), Rate (scriptblock ->
+# severity per group, overrides Severity) and Summarize
 # (scriptblock over the group's events -> text appended to the detail).
 # Keep rules locale-independent: match provider + id, read named EventData fields, never message text.
 
@@ -103,6 +104,7 @@ $script:AbEventRules = @(
         Title = 'Windows Update install failed'; Detail = 'An update failed to install.'
         Group = { param($e) $c = "$($e.Data['errorCode'])"; if (-not $c -and $e.Props.Count) { $c = "$($e.Props[0])" }; if ($c -match '^\d+$') { $c = '0x{0:X8}' -f [uint32][int64]$c }; if ($c) { $c.ToUpperInvariant() -replace '^0X', '0x' } else { 'unknown' } }
         Fix = { param($g) if ($script:AbUpdateErrors.ContainsKey($g)) { $script:AbUpdateErrors[$g][1] } else { 'reset-windows-update' } }
+        Rate = { param($g) if ($g -match '^0x80073D0[26]$') { 'Info' } else { 'Warning' } }
         Explain = { param($g) if ($script:AbUpdateErrors.ContainsKey($g)) { "Error ${g}: $($script:AbUpdateErrors[$g][0])" } else { "Error $g." } }
         Summarize = { param($events) $t = @($events | ForEach-Object { $_.Data['updateTitle'] } | Where-Object { $_ } | Select-Object -Unique); if ($t) { 'Updates: ' + ((@($t | Select-Object -First 3)) -join '; ') } } }
     @{ Code = 'updates.servicing-error'; Log = 'Setup'; Provider = 'Servicing|CBS'; Id = 3, 4; Level = 1, 2; Severity = 'Warning'
@@ -183,8 +185,9 @@ function Invoke-AbEventAnalysis {
             $subject = if ($g.Name -and -not $r.ContainsKey('Explain')) { ": $($g.Name)" } else { '' }
             $when = if ($last) { ' Last seen ' + ([datetime]$last).ToString('yyyy-MM-dd HH:mm') + '.' } else { '' }
             $summary = if ($r.ContainsKey('Summarize')) { [string](& $r.Summarize $g.Group) } else { '' }
-            $detail = (@($explain, $r.Detail, $summary) | Where-Object { $_ }) -join ' '
-            New-AbFinding -Code $r.Code -Severity $r.Severity -Title "$($r.Title)$subject ($($g.Count)x in $Days days)" -Detail "$detail$when" -FixTask $fix `
+            $detail = (@($explain, $r.Detail, $summary) | Where-Object { $_ } | ForEach-Object { if ($_ -match '[.!?]$') { $_ } else { "$_." } }) -join ' '
+            $severity = if ($r.ContainsKey('Rate')) { [string](& $r.Rate $g.Name) } else { $r.Severity }
+            New-AbFinding -Code $r.Code -Severity $severity -Title "$($r.Title)$subject ($($g.Count)x in $Days days)" -Detail "$detail$when" -FixTask $fix `
                 -Data @{ Count = $g.Count; Group = $g.Name; Log = $r.Log; EventIds = (@($g.Group | ForEach-Object Id | Sort-Object -Unique) -join ',') }
         }
     }

@@ -117,6 +117,7 @@ Describe 'AutoByte diagnostics' {
             ($f | Where-Object { $_.Data.Group -eq 'DNS Client' }).FixTask | Should -Be 'start-core-services'
             $u = $f | Where-Object Code -EQ 'updates.install-failed'
             $u.FixTask | Should -Be ''
+            $u.Severity | Should -Be 'Info'
             $u.Detail | Should -Match 'Store app.*Updates: 9WZDNCRFJ3PT'
         }
         It 'queries each log with at most 20 event ids and the configured look-back' {
@@ -278,7 +279,8 @@ Describe 'AutoByte diagnostics' {
         }
         It 'names the full product in the up-to-date note' {
             Mock -ModuleName AutoByte Get-AbOsBuild { $o = $script:Os.PSObject.Copy(); $o.Ubr = 3000; $o }
-            (Invoke-AbTask -Id cve-exposure).Findings.Detail | Should -Match '\(Windows 11 Version 24H2 for x64-based Systems\)'
+            $f = (Invoke-AbTask -Id cve-exposure).Findings
+            $f.Detail | Should -Match '\(Windows 11 Version 24H2 for x64-based Systems\)\. Newest fix Microsoft lists for this release: 10\.0\.26100\.3000\.'
         }
         It 'works on the Windows PowerShell 5.1 parser output (dictionaries)' {
             InModuleScope AutoByte -Parameters @{ Doc = (ConvertTo-Dict ($script:CvrfJson | ConvertFrom-Json)) } {

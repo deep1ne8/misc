@@ -86,10 +86,11 @@ function Get-AbCveExposure {
     }
 }
 
-function Test-AbCvrfBuildCovered {
-    # True when the feed has at least one fix for this product on this exact build branch
-    # (e.g. 10.0.26100.*). Insider builds share a product name with GA releases but never match.
+function Get-AbCvrfLatestFix {
+    # Newest fixed build the feed lists for this product on this exact build branch (e.g. 10.0.26100.*),
+    # or $null when the branch is not covered (Insider builds share a product name with GA but never match).
     param([object[]]$Documents, [Parameter(Mandatory)][string[]]$ProductNames, [Parameter(Mandatory)][version]$CurrentBuild)
+    $latest = $null
     foreach ($doc in $Documents) {
         $pids = @(Get-AbCvrfProductId -Node (Get-AbField $doc 'ProductTree') -Names $ProductNames | Sort-Object -Unique)
         if (-not $pids) { continue }
@@ -98,11 +99,11 @@ function Test-AbCvrfBuildCovered {
                 $fixed = $null
                 if (-not [version]::TryParse(([string](Get-AbField $rem 'FixedBuild') -replace '[^\d.]', ''), [ref]$fixed)) { continue }
                 if ($fixed.Major -ne $CurrentBuild.Major -or $fixed.Build -ne $CurrentBuild.Build) { continue }
-                if (@(Get-AbField $rem 'ProductID' | Where-Object { $pids -contains [string]$_ }).Count) { return $true }
+                if (@(Get-AbField $rem 'ProductID' | Where-Object { $pids -contains [string]$_ }).Count -and ($null -eq $latest -or $fixed -gt $latest)) { $latest = $fixed }
             }
         }
     }
-    $false
+    $latest
 }
 
 function Get-AbCvrfDocument {
