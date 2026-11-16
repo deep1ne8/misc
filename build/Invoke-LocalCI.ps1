@@ -111,7 +111,11 @@ $psFiles = @(Get-ChildItem -Recurse -Force -Include *.ps1, *.psm1 -File |
 
 Invoke-Step 'Secrets' { Invoke-Child -Arguments '-File', (Join-Path $PSScriptRoot 'Test-LeakedSecrets.ps1') }
 
-Invoke-Step 'Manifest' { Invoke-Child -Arguments '-File', (Join-Path $PSScriptRoot 'Build-ScriptManifest.ps1'), '-Check' }
+Invoke-Step 'Manifest' {
+    Invoke-Child -Arguments '-File', (Join-Path $PSScriptRoot 'Build-ScriptManifest.ps1'), '-Check'
+    Invoke-Child -Arguments '-File', (Join-Path $PSScriptRoot 'Build-AutoByteModule.ps1'), '-Check'
+    'scripts.manifest.json + v3 files.sha256'
+}
 
 Invoke-Step 'Parse' {
     $bad = 0; $i = 0
@@ -171,7 +175,7 @@ Invoke-Step 'Pester' {
     $pesterScript = @'
 Import-Module Pester -MinimumVersion 5.5.0
 $c = New-PesterConfiguration
-$c.Run.Path = 'tests/powershell'
+$c.Run.Path = @('tests/powershell', 'tests/v3')
 $c.Run.Exit = $true
 $c.Output.Verbosity = 'Normal'
 Invoke-Pester -Configuration $c
