@@ -86,6 +86,25 @@ function Get-AbCveExposure {
     }
 }
 
+function Test-AbCvrfBuildCovered {
+    # True when the feed has at least one fix for this product on this exact build branch
+    # (e.g. 10.0.26100.*). Insider builds share a product name with GA releases but never match.
+    param([object[]]$Documents, [Parameter(Mandatory)][string[]]$ProductNames, [Parameter(Mandatory)][version]$CurrentBuild)
+    foreach ($doc in $Documents) {
+        $pids = @(Get-AbCvrfProductId -Node (Get-AbField $doc 'ProductTree') -Names $ProductNames | Sort-Object -Unique)
+        if (-not $pids) { continue }
+        foreach ($v in @(Get-AbField $doc 'Vulnerability')) {
+            foreach ($rem in @(Get-AbField $v 'Remediations')) {
+                $fixed = $null
+                if (-not [version]::TryParse(([string](Get-AbField $rem 'FixedBuild') -replace '[^\d.]', ''), [ref]$fixed)) { continue }
+                if ($fixed.Major -ne $CurrentBuild.Major -or $fixed.Build -ne $CurrentBuild.Build) { continue }
+                if (@(Get-AbField $rem 'ProductID' | Where-Object { $pids -contains [string]$_ }).Count) { return $true }
+            }
+        }
+    }
+    $false
+}
+
 function Get-AbCvrfDocument {
     # Latest $Months monthly MSRC security update documents (cached on disk). Empty when offline.
     param([string]$BaseUrl, [int]$Months = 3)

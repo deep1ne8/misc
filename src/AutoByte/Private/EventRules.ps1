@@ -1,7 +1,9 @@
 # Event log knowledge base: which events matter, what they mean, and which fix task addresses them.
 # Each rule: Code, Log, Provider (regex on ProviderName), Id, Severity, Title, Detail, FixTask,
-# optional MinCount (default 1), Level (only these levels), Group (scriptblock -> group key, one
-# finding per group) and Fix (scriptblock -> fix task id, overrides FixTask per group).
+# optional MinCount (default 1), Level (default 1,2,3 = Critical/Error/Warning; Information events
+# are never problems, e.g. Ntfs 98 "volume is healthy"), Group (scriptblock -> group key, one finding
+# per group), Fix (scriptblock -> fix task id, overrides FixTask per group) and Summarize
+# (scriptblock over the group's events -> text appended to the detail).
 # Keep rules locale-independent: match provider + id, read named EventData fields, never message text.
 
 $script:AbStopCodes = @{
@@ -35,7 +37,14 @@ $script:AbUpdateErrors = @{
     '0x80240034' = @('The download failed.', 'reset-windows-update')
     '0x8024A105' = @('Windows Update agent error.', 'reset-windows-update')
     '0x80070643' = @('Installation failed (for KB5034441 this means the recovery partition is too small).', '')
+    '0x80073D02' = @('A Microsoft Store app could not update because it was open. It retries automatically; close the app or restart.', '')
+    '0x80073CF9' = @('A Microsoft Store app failed to install. It usually retries; reset the Store (wsreset) if it persists.', '')
+    '0x80073CF3' = @('A Microsoft Store app update failed a dependency check. It usually resolves on a later attempt.', '')
+    '0x80073D06' = @('A newer version of the Store app is already installed. Harmless.', '')
 }
+
+# Services the start-core-services fix manages (display names as logged by Service Control Manager).
+$script:AbCoreServiceNames = '(?i)^(DNS Client|DHCP Client|Windows Event Log|Workstation|Windows Defender Firewall|Windows Management Instrumentation|Task Scheduler|Cryptographic Services|Windows Audio|Dnscache|Dhcp|EventLog|LanmanWorkstation|mpssvc|Winmgmt|Schedule|CryptSvc|AudioSrv)$'
 
 # Windows components: when these crash, system files are the likely cause, not the app.
 $script:AbWindowsApps = @('explorer.exe', 'svchost.exe', 'dwm.exe', 'ShellExperienceHost.exe', 'StartMenuExperienceHost.exe',
@@ -54,7 +63,7 @@ $script:AbEventRules = @(
     # ---- storage --------------------------------------------------------------------------------
     @{ Code = 'storage.bad-blocks'; Log = 'System'; Provider = '^disk$|Microsoft-Windows-Disk'; Id = 7, 51, 153; Severity = 'Critical'
         Title = 'Disk read/write errors'; Detail = 'The disk reported bad blocks or retried I/O. Back up now; the disk may be failing.'; FixTask = 'repair-disk-errors' }
-    @{ Code = 'storage.filesystem-corrupt'; Log = 'System'; Provider = 'Ntfs'; Id = 55, 98, 130; Severity = 'Critical'
+    @{ Code = 'storage.filesystem-corrupt'; Log = 'System'; Provider = 'Ntfs'; Id = 55, 98, 130; Level = 1, 2; Severity = 'Critical'
         Title = 'File system corruption'; Detail = 'NTFS found damaged structures on a volume.'; FixTask = 'repair-disk-errors' }
     @{ Code = 'storage.controller-reset'; Log = 'System'; Provider = 'stor(ahci|nvme|port)|iaStor|nvme'; Id = 129, 153; Severity = 'Warning'; MinCount = 3
         Title = 'Storage controller resets'; Detail = 'The disk stopped responding and was reset. Causes freezes. Update storage drivers and SSD firmware.'; FixTask = 'install-driver-updates' }
@@ -64,15 +73,15 @@ $script:AbEventRules = @(
         Title = 'Hardware error (WHEA)'; Detail = 'The CPU, memory or PCIe bus reported an error. Update BIOS and chipset drivers; check cooling and RAM.'; FixTask = 'install-driver-updates' }
     @{ Code = 'drivers.display-reset'; Log = 'System'; Provider = '^Display$'; Id = 4101; Severity = 'Warning'
         Title = 'Graphics driver stopped responding'; Detail = 'The display driver was reset (screen flicker or freeze).'; FixTask = 'install-driver-updates' }
-    @{ Code = 'drivers.load-failed'; Log = 'System'; Provider = 'Kernel-PnP'; Id = 219; Severity = 'Warning'; MinCount = 2
-        Title = 'Driver failed to load'; Detail = 'A device driver did not load at start-up.'; FixTask = 'install-driver-updates'
-        Group = { param($e) if ($e.Data['DriverName']) { $e.Data['DriverName'] } else { 'device' } } }
+    @{ Code = 'drivers.load-failed'; Log = 'System'; Provider = 'Kernel-PnP'; Id = 219; Severity = 'Info'; MinCount = 2
+        Title = 'Drivers loaded late at start-up'; Detail = 'Usually harmless when the devices work; the drivers check lists devices that are actually failing.'
+        Summarize = { param($events) $d = @($events | ForEach-Object { if ($_.Data['DriverName']) { $_.Data['DriverName'] } elseif ($_.Props.Count) { $_.Props[0] } } | Where-Object { $_ } | Select-Object -Unique); if ($d) { "Devices ($($d.Count)): " + ((@($d | Select-Object -First 6)) -join '; ') } } }
 
     # ---- services -----------------------------------------------------------------------------
     @{ Code = 'services.failed'; Log = 'System'; Provider = 'Service Control Manager'; Id = 7000, 7001, 7009, 7011, 7023, 7024, 7031, 7034; Severity = 'Warning'; MinCount = 2
         Title = 'Service keeps failing'; Detail = 'A service failed to start or stopped unexpectedly.'
         Group = { param($e) if ($e.Data['param1']) { $e.Data['param1'] } elseif ($e.Props.Count) { $e.Props[0] } else { 'service' } }
-        Fix = { param($g) if ($g -match 'Windows Update|Background Intelligent|^wuauserv$|^BITS$') { 'reset-windows-update' } elseif ($g -match 'Print Spooler|^Spooler$') { 'clear-print-queue' } else { 'start-core-services' } } }
+        Fix = { param($g) if ($g -match 'Windows Update|Background Intelligent|^wuauserv$|^BITS$') { 'reset-windows-update' } elseif ($g -match 'Print Spooler|^Spooler$') { 'clear-print-queue' } elseif ($g -match $script:AbCoreServiceNames) { 'start-core-services' } else { '' } } }
 
     # ---- applications ---------------------------------------------------------------------------
     @{ Code = 'apps.crash'; Log = 'Application'; Provider = '^Application Error$'; Id = 1000; Severity = 'Warning'; MinCount = 3
@@ -94,7 +103,8 @@ $script:AbEventRules = @(
         Title = 'Windows Update install failed'; Detail = 'An update failed to install.'
         Group = { param($e) $c = "$($e.Data['errorCode'])"; if (-not $c -and $e.Props.Count) { $c = "$($e.Props[0])" }; if ($c -match '^\d+$') { $c = '0x{0:X8}' -f [uint32][int64]$c }; if ($c) { $c.ToUpperInvariant() -replace '^0X', '0x' } else { 'unknown' } }
         Fix = { param($g) if ($script:AbUpdateErrors.ContainsKey($g)) { $script:AbUpdateErrors[$g][1] } else { 'reset-windows-update' } }
-        Explain = { param($g) if ($script:AbUpdateErrors.ContainsKey($g)) { "Error ${g}: $($script:AbUpdateErrors[$g][0])" } else { "Error $g." } } }
+        Explain = { param($g) if ($script:AbUpdateErrors.ContainsKey($g)) { "Error ${g}: $($script:AbUpdateErrors[$g][0])" } else { "Error $g." } }
+        Summarize = { param($events) $t = @($events | ForEach-Object { $_.Data['updateTitle'] } | Where-Object { $_ } | Select-Object -Unique); if ($t) { 'Updates: ' + ((@($t | Select-Object -First 3)) -join '; ') } } }
     @{ Code = 'updates.servicing-error'; Log = 'Setup'; Provider = 'Servicing|CBS'; Id = 3, 4; Level = 1, 2; Severity = 'Warning'
         Title = 'Windows servicing error'; Detail = 'Installing a Windows package failed (component store).'; FixTask = 'repair-system-files' }
 
@@ -154,8 +164,9 @@ function Invoke-AbEventAnalysis {
         $events[$log] = $list
     }
     foreach ($r in $Rules) {
+        $levels = if ($r.ContainsKey('Level')) { @($r.Level) } else { @(1, 2, 3) }
         $hits = @($events[$r.Log] | Where-Object {
-                $_.Provider -match $r.Provider -and $r.Id -contains $_.Id -and (-not $r.ContainsKey('Level') -or $r.Level -contains $_.Level)
+                $_.Provider -match $r.Provider -and $r.Id -contains $_.Id -and $levels -contains $_.Level
             })
         if (-not $hits) { continue }
         $min = if ($r.ContainsKey('MinCount')) { [int]$r.MinCount } else { 1 }
@@ -171,7 +182,8 @@ function Invoke-AbEventAnalysis {
             $explain = if ($r.ContainsKey('Explain')) { [string](& $r.Explain $g.Name) } else { '' }
             $subject = if ($g.Name -and -not $r.ContainsKey('Explain')) { ": $($g.Name)" } else { '' }
             $when = if ($last) { ' Last seen ' + ([datetime]$last).ToString('yyyy-MM-dd HH:mm') + '.' } else { '' }
-            $detail = (@($explain, $r.Detail) | Where-Object { $_ }) -join ' '
+            $summary = if ($r.ContainsKey('Summarize')) { [string](& $r.Summarize $g.Group) } else { '' }
+            $detail = (@($explain, $r.Detail, $summary) | Where-Object { $_ }) -join ' '
             New-AbFinding -Code $r.Code -Severity $r.Severity -Title "$($r.Title)$subject ($($g.Count)x in $Days days)" -Detail "$detail$when" -FixTask $fix `
                 -Data @{ Count = $g.Count; Group = $g.Name; Log = $r.Log; EventIds = (@($g.Group | ForEach-Object Id | Sort-Object -Unique) -join ',') }
         }

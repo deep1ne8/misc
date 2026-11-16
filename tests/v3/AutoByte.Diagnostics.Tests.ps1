@@ -93,6 +93,32 @@ Describe 'AutoByte diagnostics' {
             $codes = (Invoke-AbTask -Id event-logs).Findings.Code
             foreach ($c in 'storage.bad-blocks', 'hardware.whea', 'drivers.display-reset', 'security.malware-detected') { $codes | Should -Contain $c }
         }
+        It 'ignores informational events such as Ntfs 98 "volume is healthy"' {
+            Mock -ModuleName AutoByte Get-AbEventRecord { 1..12 | ForEach-Object { Ev 'Ntfs' 98 -Level 4 } } -ParameterFilter { $LogName -eq 'System' }
+            (Invoke-AbTask -Id event-logs).Findings | Should -BeNullOrEmpty
+            Mock -ModuleName AutoByte Get-AbEventRecord { Ev 'Ntfs' 55 -Level 2 } -ParameterFilter { $LogName -eq 'System' }
+            (Invoke-AbTask -Id event-logs).Findings.Code | Should -Be 'storage.filesystem-corrupt'
+        }
+        It 'summarises late-loading drivers as one note instead of a warning per device' {
+            Mock -ModuleName AutoByte Get-AbEventRecord { foreach ($d in 'ACPI\INTC1073', 'USB\VID_04F3') { 1..3 | ForEach-Object { Ev 'Microsoft-Windows-Kernel-PnP' 219 -Level 3 -Data @{ DriverName = $d } } } } -ParameterFilter { $LogName -eq 'System' }
+            $f = @((Invoke-AbTask -Id event-logs).Findings)
+            $f.Count | Should -Be 1
+            $f.Severity | Should -Be 'Info'
+            $f.Detail | Should -Match 'Devices \(2\)'
+        }
+        It 'offers no fix for third-party services and Store app update errors' {
+            Mock -ModuleName AutoByte Get-AbEventRecord {
+                1..3 | ForEach-Object { Ev 'Service Control Manager' 7031 -Data @{ param1 = 'Cloudflared agent' } }
+                1..2 | ForEach-Object { Ev 'Service Control Manager' 7000 -Data @{ param1 = 'DNS Client' } }
+                Ev 'Microsoft-Windows-WindowsUpdateClient' 20 -Data @{ errorCode = '0x80073D02'; updateTitle = '9WZDNCRFJ3PT-Microsoft.ZuneMusic' }
+            } -ParameterFilter { $LogName -eq 'System' }
+            $f = (Invoke-AbTask -Id event-logs).Findings
+            ($f | Where-Object { $_.Data.Group -eq 'Cloudflared agent' }).FixTask | Should -Be ''
+            ($f | Where-Object { $_.Data.Group -eq 'DNS Client' }).FixTask | Should -Be 'start-core-services'
+            $u = $f | Where-Object Code -EQ 'updates.install-failed'
+            $u.FixTask | Should -Be ''
+            $u.Detail | Should -Match 'Store app.*Updates: 9WZDNCRFJ3PT'
+        }
         It 'queries each log with at most 20 event ids and the configured look-back' {
             Invoke-AbTask -Id event-logs -Parameters @{ Days = 3 } | Out-Null
             Should -Invoke -ModuleName AutoByte Get-AbEventRecord -ParameterFilter { $Id.Count -gt 20 } -Times 0 -Exactly
@@ -243,6 +269,16 @@ Describe 'AutoByte diagnostics' {
         It 'reports up to date when the build is current' {
             Mock -ModuleName AutoByte Get-AbOsBuild { $o = $script:Os.PSObject.Copy(); $o.Ubr = 3000; $o }
             (Invoke-AbTask -Id cve-exposure).Findings.Code | Should -Be 'cve.up-to-date'
+        }
+        It 'does not claim "patched" for a build the feed does not cover (Insider)' {
+            Mock -ModuleName AutoByte Get-AbOsBuild { $o = $script:Os.PSObject.Copy(); $o.Build = '26300'; $o.Ubr = 9974; $o }
+            $f = (Invoke-AbTask -Id cve-exposure).Findings
+            $f.Code | Should -Be 'cve.product-not-in-feed'
+            $f.Detail | Should -Match 'Windows 11 Version 24H2 for x64-based Systems'
+        }
+        It 'names the full product in the up-to-date note' {
+            Mock -ModuleName AutoByte Get-AbOsBuild { $o = $script:Os.PSObject.Copy(); $o.Ubr = 3000; $o }
+            (Invoke-AbTask -Id cve-exposure).Findings.Detail | Should -Match '\(Windows 11 Version 24H2 for x64-based Systems\)'
         }
         It 'works on the Windows PowerShell 5.1 parser output (dictionaries)' {
             InModuleScope AutoByte -Parameters @{ Doc = (ConvertTo-Dict ($script:CvrfJson | ConvertFrom-Json)) } {
