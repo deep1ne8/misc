@@ -200,3 +200,69 @@ def test_real_manifest_never_exposes_tpm_bypass() -> None:
         if "bypass" in e["name"].lower() or "tpm" in e["name"].lower():
             assert e["unsupported"] and not e["agentDiagnostic"]
             assert tools.resolve_script(e["name"], purpose="fix", manifest=m)[0] is None
+
+
+# ---- AutoByte v3 tasks via the agent ---------------------------------------------------------
+def test_v3_catalog_parses_real_task_files() -> None:
+    cat = tools.v3_tasks()
+    assert cat.get("disk-space", {}).get("kind") == "Check"
+    assert cat.get("clean-temp-files", {}).get("kind") == "Fix"
+
+
+@pytest.mark.parametrize(
+    "arg", ["disk-space", "nope", "../x", "clean-temp-files; Format-Volume C", "", "Clean-Temp-Files"]
+)
+def test_run_task_refuses_checks_unknown_and_injection(arg: str, runner: object) -> None:
+    assert tools.call("run_task", arg)["status"] == "refused"
+    assert tools.execute("run_task", arg, approved=True)["status"] == "refused"
+    assert runner.calls == []  # type: ignore[attr-defined]
+
+
+def test_run_task_is_held_for_approval_then_runs_exact_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[list[str]] = []
+
+    def fake(args: list[str], timeout: int) -> tuple[int, str]:
+        seen.append(args)
+        return (
+            0,
+            '{"TaskId":"clean-temp-files","Status":"Fixed","Messages":["Removed 3 files"],"RebootRequired":false,"Error":""}',
+        )
+
+    monkeypatch.setattr(tools, "_run", fake)
+    held = tools.call("run_task", "clean-temp-files")
+    assert held["status"] == "need_confirm" and seen == []
+    assert "Clean temporary files" in held["preview"]
+    res = tools.execute("run_task", "clean-temp-files", approved=True)
+    assert res["status"] == "ok" and "Fixed" in res["result"] and "Removed 3 files" in res["result"]
+    assert "Invoke-AbTask -Id 'clean-temp-files'" in seen[0][-1]
+
+
+def test_health_scan_summarises_findings(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = {
+        "Computer": "PC1",
+        "Critical": 1,
+        "Warning": 1,
+        "Info": 0,
+        "Findings": [
+            {
+                "Severity": "Warning",
+                "Title": "Low disk",
+                "Detail": "5 GB free",
+                "FixTask": "clean-temp-files",
+            },
+            {"Severity": "Critical", "Title": "Real-time protection is off", "Detail": "", "FixTask": ""},
+        ],
+        "Results": [{"TaskId": "office", "Status": "Failed"}],
+    }
+    monkeypatch.setattr(tools, "_run", lambda args, timeout: (0, "noise\n" + json.dumps(payload)))
+    out = tools.call("health_scan")["result"]
+    lines = out.splitlines()
+    assert lines[0].startswith("Health scan of PC1: 1 critical")
+    assert "Real-time protection" in lines[1]  # critical sorted first
+    assert "run_task clean-temp-files" in out
+    assert "could not run: office" in out
+
+
+def test_health_scan_reports_missing_engine(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tools, "_run", lambda args, timeout: (1, "module not found"))
+    assert "unavailable" in tools.call("health_scan")["result"]
