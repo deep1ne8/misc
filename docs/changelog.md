@@ -1,5 +1,13 @@
 # 📜 AutoByte Release Notes
 
+## 🧩 Version 3.0.0 (unreleased)
+- New engine: `src/AutoByte` module with 14 read-only checks and 8 idempotent, self-verifying fixes.
+- `abyte` CLI: end-user menu, `scan`, `fix`, `list`, `report`, `legacy`; JSON output; exit codes 0/1/2/3010.
+- Self-contained HTML health report.
+- Hash-verified installer (`install/Install-AutoByte.ps1`) and Datto RMM component (UDF + monitor output).
+- AI agent: `health_scan` and `run_task` tools on top of the engine.
+- v2 launcher and scripts unchanged; `abyte legacy <name>` bridges to them.
+
 ## 🔐 Version 2.0.0 (unreleased)
 **Security**
 - Removed embedded Liongard and ImmyBot credentials; values are now parameters/env vars.

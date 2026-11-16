@@ -6,6 +6,18 @@ or through your RMM, and a local AI assistant that diagnoses a PC in plain Engli
 
 ![AutoByte](AutoByte_Main.png)
 
+## New: AutoByte v3 (one engine, one command)
+
+```powershell
+abyte              # plain-language PC check-up for anyone
+abyte scan --report --open
+abyte fix --suggested --whatif
+```
+
+Read-only health checks, safe self-verifying fixes, an HTML report, JSON for Datto RMM, and the
+optional AI agent on top. Everything below (v2) keeps working. Install, Datto setup and how it
+works: **[docs/V3.md](docs/V3.md)**.
+
 ## What's in it
 
 | Tool | What it does | Who it's for |
@@ -104,6 +116,10 @@ AutoByteGUI.py          GUI  (AutoByteGUI-Build.ps1 installs it)
 AutoByte-Agent/         AI troubleshooting agent
 Scripts/                script library (see scripts.manifest.json)
 archive/                retired scripts, not runnable by the tools
+src/AutoByte/           v3 engine: module, tasks, adapters
+bin/abyte.ps1           v3 command line (end-user menu, scan, fix, report)
+install/                v3 hash-verified installer
+datto/                  v3 Datto RMM component
 build/                  manifest generator, local CI, leaked-key guard
 docs/                   getting-started guide, changelog
 tests/                  Pester and pytest suites
