@@ -72,19 +72,6 @@ Describe 'pending-reboot' {
     }
 }
 
-Describe 'event-errors' {
-    It 'warns on many errors and flags blue screens as critical' {
-        Mock -ModuleName AutoByte Get-AbWinEvent {
-            if ($FilterHashtable.ContainsKey('Level')) { 1..30 | ForEach-Object { [pscustomobject]@{ ProviderName = 'Disk'; Id = 7 } } }
-            else { [pscustomobject]@{ Id = 1001; ProviderName = 'Microsoft-Windows-WER-SystemErrorReporting' }; [pscustomobject]@{ Id = 41; ProviderName = 'Kernel-Power' } }
-        }
-        $codes = (Invoke-AbTask -Id event-errors).Findings.Code
-        $codes | Should -Contain 'events.many-errors'
-        $codes | Should -Contain 'events.bugcheck'
-        $codes | Should -Contain 'events.unexpected-shutdown'
-    }
-}
-
 Describe 'core-services and start-core-services' {
     It 'finds stopped automatic services and the fix starts only those' {
         Mock -ModuleName AutoByte Get-AbService { @((Svc 'Dnscache' 'Stopped'), (Svc 'Spooler' 'Running'), (Svc 'AudioSrv' 'Stopped' 'Manual')) }

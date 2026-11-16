@@ -14,7 +14,8 @@ abyte scan --report --open
 abyte fix --suggested --whatif
 ```
 
-Read-only health checks, safe self-verifying fixes, an HTML report, JSON for Datto RMM, and the
+Read-only health checks (Event Viewer analysis, "why is it slow?", drivers, missing patches and
+CVE exposure, outdated apps), safe self-verifying fixes, an HTML report, JSON for Datto RMM, and the
 optional AI agent on top. Everything below (v2) keeps working. Install, Datto setup and how it
 works: **[docs/V3.md](docs/V3.md)**.
 
