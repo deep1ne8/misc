@@ -13,7 +13,7 @@
       abWhatIf   true | false                          (default: false) preview fixes only
       abFailOn   None | Warning | Critical             (default: None) make the job/monitor alert
       abUdf      1-30                                   (optional) write a one-line summary to that UDF
-      abVersion  AutoByte version to install            (default: 3.0.0)
+      abVersion  AutoByte version to install            (default: 3.1.0)
     Thresholds can be tuned with AB_* variables, e.g. AB_DiskWarnPercent=20 (see docs).
 
     Output: a human summary, the JSON result, and Datto monitor markers
@@ -40,7 +40,7 @@ function Get-Var([string]$Name, [string]$Default = '') {
 }
 
 $action = (Get-Var 'abAction' 'scan').ToLowerInvariant()
-$version = Get-Var 'abVersion' '3.0.0'
+$version = Get-Var 'abVersion' '3.1.0'
 $whatIf = (Get-Var 'abWhatIf' 'false') -match '^(true|1|yes)$'
 $failOn = Get-Var 'abFailOn' 'None'
 $udf = Get-Var 'abUdf' ''
@@ -89,9 +89,10 @@ $findings = @($results | ForEach-Object { $_.Findings } | Where-Object { $_ })
 $crit = @($findings | Where-Object Severity -EQ 'Critical').Count
 $warn = @($findings | Where-Object Severity -EQ 'Warning').Count
 $fixed = @($results | Where-Object Status -EQ 'Fixed').Count
+$partial = @($results | Where-Object { $_.Status -eq 'Partial' -and $_.Kind -eq 'Fix' }).Count
 $failed = @($results | Where-Object { $_.Status -eq 'Failed' -and $_.Kind -eq 'Fix' }).Count
 $code = Get-AbExitCode -Results $results -FailOn $failOn
-$status = if ($action -eq 'fix') { "AB $version fix: $fixed fixed, $failed failed" } else { "AB $version scan: $crit critical, $warn warning" }
+$status = if ($action -eq 'fix') { "AB $version fix: $fixed fixed, $partial partly, $failed failed" } else { "AB $version scan: $crit critical, $warn warning" }
 $summary = "$status | $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
 
 Write-Output $summary

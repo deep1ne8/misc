@@ -15,7 +15,7 @@
     %LOCALAPPDATA%\AutoByte).
 
 .PARAMETER Version
-    Release to install (tag v<Version>). Default: 3.0.0.
+    Release to install (tag v<Version>). Default: 3.1.0.
 
 .PARAMETER SourcePath
     Install from a local copy of the repository instead of GitHub (offline / USB / testing).
@@ -29,7 +29,7 @@
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File .\Install-AutoByte.ps1 -AddToPath -CreateShortcut
 .EXAMPLE
-    .\Install-AutoByte.ps1 -Version 3.0.0 -WhatIf
+    .\Install-AutoByte.ps1 -Version 3.1.0 -WhatIf
 
 .NOTES
     Version: 1.0.0
@@ -38,7 +38,7 @@
 #Requires -Version 5.1
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '3.0.0',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '3.1.0',
     [string]$SourcePath,
     [ValidatePattern('^[A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+$')][string]$Repository = 'deep1ne8/misc',
     [string]$InstallRoot,

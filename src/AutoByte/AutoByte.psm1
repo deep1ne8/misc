@@ -16,4 +16,6 @@ foreach ($file in Get-ChildItem -Path (Join-Path $PSScriptRoot 'Tasks') -Filter 
     Register-AbTask -Definition $definition -Source $file.Name
 }
 
-Export-ModuleMember -Function Get-AbTask, Invoke-AbTask, Invoke-AbScan, Invoke-AbFix, Get-AbSystemSummary, Export-AbReport, ConvertTo-AbJson, Invoke-AbLegacyScript, Get-AbExitCode
+Export-ModuleMember -Function Get-AbTask, Invoke-AbTask, Invoke-AbScan, Invoke-AbFix, Get-AbSystemSummary, Export-AbReport, ConvertTo-AbJson, Invoke-AbLegacyScript, Get-AbExitCode,
+    Initialize-AbConsole, Write-AbLine, Write-AbBox, Write-AbRule, Write-AbScanView, Write-AbFixView, Get-AbStatusView,
+    Get-AbSandboxStatus, Enable-AbSandbox, New-AbSandboxConfig, Start-AbSandbox, Start-AbRemoteHelp
