@@ -12,6 +12,8 @@ or through your RMM, and a local AI assistant that diagnoses a PC in plain Engli
 abyte              # plain-language PC check-up for anyone
 abyte scan --report --open
 abyte fix --suggested --whatif
+abyte sandbox      # try fixes in a throw-away copy of Windows first
+abyte remote       # let IT support connect (your support page or Quick Assist)
 ```
 
 Read-only health checks (Event Viewer analysis, "why is it slow?", drivers, missing patches and

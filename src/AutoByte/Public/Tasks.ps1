@@ -83,10 +83,21 @@ function Invoke-AbTask {
             Write-AbLog -Message "[$($def.Id)] Repair starting."
             $out = @(& $def.Repair $ctx $p) | Where-Object { $_ -is [hashtable] } | Select-Object -Last 1
             if ($out -and $out['RebootRequired']) { $result.RebootRequired = $true }
-            $result.Changed = $true
+            if ($out -and $out['Data'] -is [hashtable]) { $result.Data = $out['Data'] }
+            $partial = [bool]($out -and $out['Partial'])
+            $hardFail = if ($out -and $out['Failed']) { [string]$out['Failed'] } else { '' }
+            $result.Changed = -not $hardFail
             $ctx.AfterRepair = $true   # lets Test ignore a -Force style parameter when verifying
             $after = Get-AbVerdict (& $def.Test $ctx $p)
-            if ($after.Needed -and -not $result.RebootRequired) {
+            if ($hardFail) {
+                $result.Status = 'Failed'
+                Add-AbMessage -Result $result -Message $hardFail
+            }
+            elseif ($partial) {
+                $result.Status = 'Partial'
+                Add-AbMessage -Result $result -Message ('Partly fixed. ' + $(if ($after.Needed) { "Still needed: $($after.Reason)" } else { 'Some items could not be fixed; see above.' }))
+            }
+            elseif ($after.Needed -and -not $result.RebootRequired) {
                 $result.Status = 'Failed'
                 Add-AbMessage -Result $result -Message "Verification failed: $($after.Reason)"
             }

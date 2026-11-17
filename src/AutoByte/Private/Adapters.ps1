@@ -323,11 +323,12 @@ function Get-AbWingetPath {
 }
 
 function Get-AbAppUpgrade {
-    # Apps with an available upgrade: Name, Id, Version, Available. $null if winget is unavailable.
+    # Apps with an available upgrade: Name, Id, Version, Available (an array, possibly empty).
+    # $null only when winget itself is unavailable.
     $winget = Get-AbWingetPath
     if (-not $winget) { return $null }
     $r = Invoke-AbNative -FilePath $winget -ArgumentList 'upgrade', '--include-unknown', '--accept-source-agreements', '--disable-interactivity' -TimeoutSeconds 300
-    ConvertFrom-AbWingetTable -Text $r.Output
+    , @(ConvertFrom-AbWingetTable -Text $r.Output)
 }
 
 function ConvertFrom-AbWingetTable {

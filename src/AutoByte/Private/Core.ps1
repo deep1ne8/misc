@@ -36,12 +36,13 @@ function New-AbResult {
         PSTypeName     = 'AutoByte.Result'
         TaskId         = $TaskId
         Kind           = $Kind
-        Status         = 'Pending'   # Healthy | Issues | NotNeeded | Fixed | Failed | Skipped | WhatIf
+        Status         = 'Pending'   # Healthy | Issues | NotNeeded | Fixed | Partial | Failed | Skipped | WhatIf
         Changed        = $false
         RebootRequired = $false
         Findings       = @()
         Messages       = @()
         Error          = ''
+        Data           = @{}         # optional structured details from a fix (e.g. per-app results)
         DurationMs     = 0
         StartedUtc     = (Get-Date).ToUniversalTime().ToString('o')
     }
@@ -95,6 +96,8 @@ function Get-AbConfig {
         CveMonths          = 3
         CveFeedUrl         = 'https://api.msrc.microsoft.com/cvrf/v3.0'
         KevFeedUrl         = 'https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json'
+        RemoteSupportUrl   = ''   # https:// page for "Get remote help" (e.g. ScreenConnect/Splashtop SOS); empty = Quick Assist
+        RemoteSupportName  = ''   # shown to end users, e.g. "Contoso IT"
         DefenderSigMaxDays = 3
         TimeSkewWarnSeconds = 60
         TempFileMinAgeDays = 7
@@ -158,12 +161,13 @@ function Merge-AbParameter {
 function Get-AbExitCode {
     <#
     .SYNOPSIS
-        Maps results to RMM exit codes: 1 if any fix failed, 3010 if a reboot is required, else 0.
+        Maps results to RMM exit codes: 1 if any fix failed or only partly succeeded, 3010 if a
+        reboot is required, else 0.
         A check that could not run is reported but does not fail the job.
         With -FailOn Warning|Critical, findings at or above that severity also return 1 (for monitors).
     #>
     param([Parameter(Mandatory)][object[]]$Results, [ValidateSet('None', 'Warning', 'Critical')][string]$FailOn = 'None')
-    if (@($Results | Where-Object { $_.Status -eq 'Failed' -and $_.Kind -eq 'Fix' }).Count) { return 1 }
+    if (@($Results | Where-Object { $_.Status -in 'Failed', 'Partial' -and $_.Kind -eq 'Fix' }).Count) { return 1 }
     if ($FailOn -ne 'None') {
         $min = [array]::IndexOf($script:Severities, $FailOn)
         $hit = @($Results | ForEach-Object { $_.Findings } | Where-Object { [array]::IndexOf($script:Severities, $_.Severity) -ge $min })

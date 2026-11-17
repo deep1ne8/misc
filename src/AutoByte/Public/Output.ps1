@@ -29,7 +29,8 @@ function Export-AbReport {
     .PARAMETER FixResults
         Optional output of Invoke-AbFix, shown in an "Actions taken" section.
     .PARAMETER Path
-        Output file. Default: %ProgramData%\AutoByte\Reports\<Computer>_<timestamp>.html
+        Output file. Default: %ProgramData%\AutoByte\Reports\<Computer>_<timestamp>.html, or the folder in
+        AUTOBYTE_REPORT_DIR (used by the Windows Sandbox mode).
     .EXAMPLE
         Invoke-AbScan | Export-AbReport -Open
     #>
@@ -44,7 +45,8 @@ function Export-AbReport {
     process {
         if (-not $Path) {
             $base = if ($env:ProgramData) { $env:ProgramData } else { [IO.Path]::GetTempPath() }
-            $Path = Join-Path $base ('AutoByte\Reports\{0}_{1}.html' -f $Scan.Computer, (Get-Date -Format 'yyyyMMdd-HHmmss'))
+            $dir = if ($env:AUTOBYTE_REPORT_DIR) { $env:AUTOBYTE_REPORT_DIR } else { [IO.Path]::Combine($base, 'AutoByte', 'Reports') }
+            $Path = [IO.Path]::Combine($dir, ('{0}_{1}.html' -f $Scan.Computer, (Get-Date -Format 'yyyyMMdd-HHmmss')))
         }
         $e = { param($v) ConvertTo-AbHtmlText $v }
         $sev = @{ Critical = 3; Warning = 2; Info = 1 }

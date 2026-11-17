@@ -1,6 +1,18 @@
 # 📜 AutoByte Release Notes
 
-## 🧩 Version 3.0.0 (unreleased)
+## 🎨 Version 3.1.0 (unreleased)
+- Redesigned console output: pastel colour palette (24-bit where supported, 16-colour and plain
+  fallbacks), plain-language statuses, grouped findings, wrapped details and clear next steps.
+- New end-user menu with options to try fixes in **Windows Sandbox** and to **get remote help**
+  (MSP support page via `RemoteSupportUrl`, else Quick Assist; mentions Datto Web Remote).
+- `abyte sandbox [command]` / `--enable` / `--no-network`; `abyte remote`; `--plain`, `--ascii`.
+- `update-apps`: progress per app, plain reasons for winget errors (app open, per-user install,
+  broken uninstaller, ...), per-app results in `Data`, and a new **Partial** status (exit code 1)
+  when some apps update and others do not. Fixed "winget not available" being reported after
+  every app had been updated.
+- Reports honour `AUTOBYTE_REPORT_DIR`.
+
+## 🧩 Version 3.0.0
 - New engine: `src/AutoByte` module with 19 read-only checks and 14 idempotent, self-verifying fixes.
 - Event Viewer analysis across System, Application, Setup, Defender and boot-performance logs, with
   blue-screen stop codes and Windows Update error codes mapped to the right fix.

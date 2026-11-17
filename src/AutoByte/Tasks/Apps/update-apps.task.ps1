@@ -14,6 +14,16 @@
         $want = @("$($P.Ids)" -split ',' | ForEach-Object Trim | Where-Object { $_ })
         $skip = @("$($P.Exclude)" -split ',' | ForEach-Object Trim | Where-Object { $_ })
         $todo = @(@($apps) | Where-Object { (-not $want -or $want -contains $_.Id) -and $skip -notcontains $_.Id })
+        if ($Ctx.AfterRepair -and $Ctx.ContainsKey('Attempted')) {
+            # Apps already tried: failures are reported by Repair; successes that winget still lists are
+            # a known detection quirk (Store apps, old VC++ runtimes) and usually clear after a restart.
+            $still = @($todo | Where-Object { $Ctx.Succeeded -contains $_.Id })
+            if ($still -and $Ctx.Result.Data -is [hashtable]) {
+                $Ctx.Result.Data['StillListed'] = @($still | ForEach-Object { [pscustomobject]@{ Id = $_.Id; Name = $_.Name } })
+                Add-AbMessage -Result $Ctx.Result -Message ("winget still lists $($still.Count) updated app(s) (usually clears after a restart): " + ((@($still | ForEach-Object Name)) -join ', '))
+            }
+            $todo = @($todo | Where-Object { $Ctx.Attempted -notcontains $_.Id })
+        }
         if ($todo) { return @{ Needed = $true; Reason = "$($todo.Count) app(s): " + ((@($todo | Select-Object -First 5 | ForEach-Object Id)) -join ', '); Ids = @($todo.Id) } }
         @{ Needed = $false; Reason = 'All selected applications are up to date.' }
     }
@@ -22,19 +32,35 @@
         $winget = Get-AbWingetPath
         $want = @("$($P.Ids)" -split ',' | ForEach-Object Trim | Where-Object { $_ })
         $skip = @("$($P.Exclude)" -split ',' | ForEach-Object Trim | Where-Object { $_ })
-        $todo = @(@(Get-AbAppUpgrade) | Where-Object { (-not $want -or $want -contains $_.Id) -and $skip -notcontains $_.Id })
-        $failed = 0; $reboot = $false
+        $todo = @(@(Get-AbAppUpgrade) | Where-Object { (-not $want -or $want -contains $_.Id) -and $skip -notcontains $_.Id -and $_.Id -match '^[A-Za-z0-9][A-Za-z0-9._+\-]*$' })
+        $updated = New-Object System.Collections.Generic.List[object]
+        $failed = New-Object System.Collections.Generic.List[object]
+        $Ctx.Attempted = @(); $Ctx.Succeeded = @()
+        $reboot = $false
+        $n = 0
         foreach ($a in $todo) {
-            if ($a.Id -notmatch '^[A-Za-z0-9][A-Za-z0-9._+\-]*$') { continue }   # never pass odd text to winget
+            $n++
+            Write-Progress -Id 7 -Activity 'Updating applications' -Status "$n of $($todo.Count): $($a.Name) $($a.Version) -> $($a.Available)" -PercentComplete ([int](100 * ($n - 1) / [Math]::Max(1, $todo.Count)))
+            $Ctx.Attempted += $a.Id
             $r = Invoke-AbNative -FilePath $winget -ArgumentList 'upgrade', '--id', $a.Id, '--exact', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity' -TimeoutSeconds 1800
-            # 0 ok; 0x8A15002B (-1978335189) no applicable upgrade; 3010/1641 reboot.
-            switch ($r.ExitCode) {
-                { $_ -in 0, -1978335189 } { Add-AbMessage -Result $Ctx.Result -Message "Updated $($a.Id) to $($a.Available)." }
-                { $_ -in 3010, 1641 } { $reboot = $true; Add-AbMessage -Result $Ctx.Result -Message "Updated $($a.Id) (restart needed)." }
-                default { $failed++; Add-AbMessage -Result $Ctx.Result -Message ("{0} failed: exit 0x{1:X8}" -f $a.Id, $r.ExitCode) }
+            $o = Get-AbWingetOutcome -ExitCode $r.ExitCode
+            if ($o.Outcome -in 'Ok', 'Reboot', 'Current') {
+                $Ctx.Succeeded += $a.Id
+                if ($o.Outcome -eq 'Reboot') { $reboot = $true }
+                $updated.Add([pscustomobject]@{ Id = $a.Id; Name = $a.Name; From = $a.Version; To = $a.Available; Note = $o.Reason })
+                Add-AbMessage -Result $Ctx.Result -Message ("Updated {0} ({1} -> {2}){3}" -f $a.Name, $a.Version, $a.Available, $(if ($o.Reason) { ". $($o.Reason)" } else { '' }))
+            }
+            else {
+                $failed.Add([pscustomobject]@{ Id = $a.Id; Name = $a.Name; From = $a.Version; To = $a.Available; Code = $o.Code; Reason = $o.Reason; Hint = $o.Hint })
+                Add-AbMessage -Result $Ctx.Result -Message ("Not updated: {0} - {1} {2} [{3}]" -f $a.Name, $o.Reason, $o.Hint, $o.Code)
             }
         }
-        if ($failed -and $failed -eq $todo.Count) { throw "All $failed app update(s) failed." }
-        @{ RebootRequired = $reboot }
+        Write-Progress -Id 7 -Activity 'Updating applications' -Completed
+        @{
+            RebootRequired = $reboot
+            Partial        = ($failed.Count -gt 0 -and $updated.Count -gt 0)
+            Failed         = $(if ($todo.Count -and $failed.Count -eq $todo.Count) { "None of the $($failed.Count) app update(s) succeeded." } else { '' })
+            Data           = @{ Updated = $updated.ToArray(); Failed = $failed.ToArray(); StillListed = @() }
+        }
     }
 }
